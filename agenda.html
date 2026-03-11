@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda - L'ange Beauty</title>
+  
+  <!-- FullCalendar -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+  
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2> L'ange Beauty</h2>
+      <nav>
+        <a href="index.html" class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Início</span>
+        </a>
+        <a href="agenda.html" class="nav-item active">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Agenda</span>
+        </a>
+        <a href="clientes.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Clientes</span>
+        </a>
+        <a href="servicos.html" class="nav-item">
+          <span class="nav-icon">💇</span>
+          <span class="nav-text">Serviços</span>
+        </a>
+        <a href="profissionais.html" class="nav-item">
+          <span class="nav-icon">👩</span>
+          <span class="nav-text">Profissionais</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <div class="page-header">
+        <h1>📅 Agenda - L'ange Beauty</h1>
+        <div class="header-actions">
+          <button id="btnHoje" class="btn btn-secondary">
+            📅 Hoje
+          </button>
+          <button id="btnAtualizar" class="btn btn-primary">
+            🔄 Atualizar
+          </button>
+        </div>
+      </div>
+
+      <div class="toolbar-extra">
+        <button type="button" id="btnBloqueioRapido" class="btn btn-secondary">
+          <span class="btn-icon">🔒</span>
+          <span class="btn-text">Bloquear Horário</span>
+        </button>
+        <div class="toolbar-info">
+          <span class="info-badge"> Dica</span>
+          <span class="info-text">Arraste agendamentos para mover | Redimensione para alterar duração | Ctrl+N Novo | Ctrl+H Hoje | Esc Fechar</span>
+        </div>
+      </div>
+
+      <!-- NOVA IMPLEMENTAÇÃO V1.2 - FILTROS DINÂMICOS -->
+      <div class="filter-section">
+        <h3> Filtros da Agenda</h3>
+        
+        <!-- Filtro por Profissional -->
+        <div class="filter-group">
+          <label for="filtroProfissional">Profissional:</label>
+          <select id="filtroProfissional" class="filter-select">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <!-- Filtro por Serviço -->
+        <div class="filter-group">
+          <label for="filtroServico">Serviço:</label>
+          <select id="filtroServico" class="filter-select">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <!-- Filtro por Cliente -->
+        <div class="filter-group">
+          <label for="filtroCliente">Cliente:</label>
+          <input type="text" id="filtroCliente" class="filter-input" placeholder="Buscar cliente...">
+        </div>
+
+        <!-- Botão Limpar Filtros -->
+        <div class="filter-actions">
+          <button id="btnLimparFiltros" class="btn btn-secondary btn-sm">
+            🗑️ Limpar Filtros
+          </button>
+        </div>
+      </div>
+
+      <div class="calendar-container">
+        <div id="calendar"></div>
+      </div>
+
+      <!-- Estatísticas Rápidas -->
+      <div class="stats-container">
+        <div class="stat-card">
+          <div class="stat-icon">📊</div>
+          <div class="stat-content">
+            <div class="stat-value" id="totalAgendamentos">0</div>
+            <div class="stat-label">Agendamentos Hoje</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-content">
+            <div class="stat-value" id="confirmadosHoje">0</div>
+            <div class="stat-label">Confirmados</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⏰</div>
+          <div class="stat-content">
+            <div class="stat-value" id="proximosAgendamentos">0</div>
+            <div class="stat-label">Próximos</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Botão de Logout -->
+  <button id="logoutButton" class="btn btn-danger logout-btn">
+    🚪 Sair
+  </button>
+
+  <!-- Modal de Agendamento/Bloqueio -->
+  <div id="formAgendamento" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitulo">Novo Agendamento</h3>
+        <button type="button" id="btnFecharModal" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Tipo de Registro -->
+        <div class="form-group">
+          <label for="tipoRegistro">Tipo:</label>
+          <select id="tipoRegistro" class="form-control">
+            <option value="agendamento">📅 Agendamento</option>
+            <option value="bloqueio">🔒 Bloqueio</option>
+          </select>
+        </div>
+
+        <!-- Campos de Agendamento -->
+        <div id="camposAgendamento" class="form-section">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cliente">Cliente *</label>
+              <select id="cliente" class="form-control" required>
+                <option value="">Selecione...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="servico">Serviço *</label>
+              <select id="servico" class="form-control" required>
+                <option value="">Selecione...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="profissional">Profissional *</label>
+              <select id="profissional" class="form-control" required>
+                <option value="">Selecione...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="status">Status</label>
+              <select id="status" class="form-control">
+                <option value="agendado">📅 Agendado</option>
+                <option value="confirmado">✅ Confirmado</option>
+                <option value="em_andamento">⏳ Em Andamento</option>
+                <option value="concluido">✔️ Concluído</option>
+                <option value="cancelado">❌ Cancelado</option>
+                <option value="nao_compareceu">⚠️ Não Compareceu</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="inicio">Início *</label>
+              <input type="datetime-local" id="inicio" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="fim">Fim *</label>
+              <input type="datetime-local" id="fim" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="observacoes">Observações</label>
+            <textarea id="observacoes" class="form-control" rows="3" placeholder="Observações sobre o agendamento..."></textarea>
+          </div>
+        </div>
+
+        <!-- Campos de Bloqueio -->
+        <div id="camposBloqueio" class="form-section" style="display: none;">
+          <div class="form-group">
+            <label for="tituloBloqueio">Título *</label>
+            <input type="text" id="tituloBloqueio" class="form-control" required placeholder="Ex: Manutenção, Folga, etc.">
+          </div>
+
+          <div class="form-group">
+            <label for="motivoBloqueio">Motivo</label>
+            <textarea id="motivoBloqueio" class="form-control" rows="2" placeholder="Motivo do bloqueio..."></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="tipoBloqueio">Tipo *</label>
+              <select id="tipoBloqueio" class="form-control" required>
+                <option value="bloqueio"> Bloqueio</option>
+                <option value="folga"> Folga</option>
+                <option value="manutencao"> Manutenção</option>
+                <option value="feriado"> Feriado</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="profissionalBloqueio">Profissional</label>
+              <select id="profissionalBloqueio" class="form-control">
+                <option value="">Todos os profissionais</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="inicioBloqueio">Início *</label>
+              <input type="datetime-local" id="inicioBloqueio" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="fimBloqueio">Fim *</label>
+              <input type="datetime-local" id="fimBloqueio" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="observacoesBloqueio">Observações</label>
+            <textarea id="observacoesBloqueio" class="form-control" rows="3" placeholder="Observações sobre o bloqueio..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btnExcluir" class="btn btn-danger">
+          <span class="btn-icon"> </span>
+          <span class="btn-icon">🗑️</span>
+          Excluir
+        </button>
+        <button type="button" id="btnSalvar" class="btn btn-primary">
+          <span class="btn-icon">💾</span>
+          Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Container -->
+  <div id="alertContainer" class="alert-container"></div>
+  
+  <!-- Notification Container -->
+  <div id="notificationContainer"></div>
+  
+  <!-- Tooltip Container -->
+  <div id="tooltipContainer" class="event-tooltip"></div>
+
+  <!-- Scripts -->
+  <script src="js/utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js"></script>
+
+  <!-- AuthManager completo inline -->
+  <script>
+    console.log('🔍 AGENDA_AUTH: Início do script inline');
+    
+    // AuthManager completo com Supabase
+    class AuthManager {
+      constructor() {
+        console.log('🔍 AGENDA_AUTH: Construtor iniciado');
+        
+        // Verificar se Supabase está disponível
+        console.log("🔍 AGENDA_AUTH: SUPABASE CLIENT:", window.supabase);
+        
+        if (!window.supabase) {
+          console.error("❌ AGENDA_AUTH: Supabase client não encontrado!");
+          this.supabaseAvailable = false;
+        } else {
+          console.log("✅ AGENDA_AUTH: Supabase client disponível");
+          this.supabaseAvailable = true;
+        }
+        
+        this.currentUser = null;
+        this.currentUserProfile = null;
+        console.log('🔍 AGENDA_AUTH: Construtor finalizado');
+      }
+
+      async initialize() {
+        console.log('🔍 AGENDA_AUTH: Inicializando...');
+        
+        if (!this.supabaseAvailable) {
+          console.log('⚠️ AGENDA_AUTH: Supabase não disponível');
+          return { authenticated: false };
+        }
+        
+        try {
+          const { data, error } = await window.supabase.auth.getSession();
+          if (error) {
+            console.error('❌ AGENDA_AUTH: Erro ao verificar sessão:', error);
+            return { authenticated: false };
+          }
+          
+          if (data.session) {
+            this.currentUser = data.session.user;
+            await this.loadUserProfile();
+            console.log('✅ AGENDA_AUTH: Sessão ativa encontrada');
+            return { authenticated: true, user: data.session.user };
+          } else {
+            console.log('⚠️ AGENDA_AUTH: Nenhuma sessão ativa');
+            return { authenticated: false };
+          }
+        } catch (error) {
+          console.error('❌ AGENDA_AUTH: Falha na inicialização:', error);
+          return { authenticated: false };
+        }
+      }
+
+      async login(email, password) {
+        if (!this.supabaseAvailable) {
+          return { success: false, error: 'Supabase não disponível' };
+        }
+        
+        try {
+          console.log('🔐 AGENDA_AUTH: Tentando login...', { email });
+          
+          const { data, error } = await window.supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (error) {
+            console.error('❌ AGENDA_AUTH: Erro no login:', error);
+            return { success: false, error: error.message };
+          }
+
+          console.log('✅ AGENDA_AUTH: Login sucesso!', data.user);
+          this.currentUser = data.user;
+          
+          // Carregar profile do usuário
+          await this.loadUserProfile();
+          
+          return { success: true, user: data.user };
+        } catch (error) {
+          console.error('❌ AGENDA_AUTH: Falha no login:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      async logout() {
+        if (!this.supabaseAvailable) {
+          return { success: false, error: 'Supabase não disponível' };
+        }
+        
+        try {
+          console.log('🔐 AGENDA_AUTH: Realizando logout...');
+          
+          const { error } = await window.supabase.auth.signOut();
+          
+          if (error) {
+            console.error('❌ AGENDA_AUTH: Erro no logout:', error);
+            return { success: false, error: error.message };
+          }
+
+          console.log('✅ AGENDA_AUTH: Logout sucesso!');
+          this.currentUser = null;
+          this.currentUserProfile = null;
+          window.currentUserProfile = null;
+          
+          return { success: true };
+        } catch (error) {
+          console.error('❌ AGENDA_AUTH: Falha no logout:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      async loadUserProfile() {
+        if (!this.currentUser || !this.supabaseAvailable) {
+          return null;
+        }
+
+        try {
+          console.log('🔍 AGENDA_AUTH: Carregando profile...', this.currentUser.id);
+          
+          const { data, error } = await window.supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', this.currentUser.id)
+            .single();
+
+          if (error) {
+            console.warn('⚠️ AGENDA_AUTH: Profile não encontrado, usando defaults');
+            // Criar profile default se não existir
+            this.currentUserProfile = {
+              id: this.currentUser.id,
+              nome: this.currentUser.email?.split('@')[0] || 'Usuário',
+              role: 'admin' // Default para primeiro usuário
+            };
+            window.currentUserProfile = this.currentUserProfile;
+            return this.currentUserProfile;
+          }
+
+          console.log('✅ AGENDA_AUTH: Profile carregado:', data);
+          this.currentUserProfile = data;
+          window.currentUserProfile = data;
+          
+          // Log do role para diagnóstico
+          if (data.role === 'admin') {
+            console.log('👑 AGENDA_AUTH: ROLE_ADMIN detectado');
+          } else if (data.role === 'profissional') {
+            console.log('👩 AGENDA_AUTH: ROLE_PROFISSIONAL detectado');
+          }
+          
+          return data;
+        } catch (error) {
+          console.error('❌ AGENDA_AUTH: Falha ao carregar profile:', error);
+          return null;
+        }
+      }
+
+      isAdmin() {
+        const isAdmin = this.currentUserProfile?.role === 'admin';
+        console.log('🔐 AGENDA_AUTH: Verificando se é admin:', isAdmin);
+        return isAdmin;
+      }
+
+      isProfissional() {
+        const isProfissional = this.currentUserProfile?.role === 'profissional';
+        console.log('👩 AGENDA_AUTH: Verificando se é profissional:', isProfissional);
+        return isProfissional;
+      }
+    }
+
+    // Criar instância global
+    console.log('🔍 AGENDA_AUTH: Criando instância global');
+    window.authManager = new AuthManager();
+    console.log('✅ AGENDA_AUTH: Instância criada:', !!window.authManager);
+    console.log('✅ AGENDA_AUTH: AuthManager completo carregado');
+  </script>
+
+  <script src="js/dataManager.js"></script>
+  <script src="js/modalManager.js?v=20260311142500"></script>
+  <script src="js/calendarManager.js?v=20260311142100"></script>
+  <script src="js/pageManager.js"></script>
+  <script src="js/agendaPage.js"></script>
+  <script src="js/enhancements.js"></script>
+  <script src="js/appInit.js"></script>
+  
+  <script>
+    // Inicializar página quando aplicação estiver pronta
+    window.addEventListener('appReady', async () => {
+      console.log('🚀 Inicializando página de agenda...');
+      
+      console.log('🔍 Verificando FullCalendar:', typeof FullCalendar);
+      console.log('🔍 FullCalendar disponível?', !!FullCalendar);
+      console.log('🔍 FullCalendar.Calendar?', !!FullCalendar?.Calendar);
+      
+      if (typeof FullCalendar === 'undefined') {
+        console.error('❌ FullCalendar não está carregado!');
+        document.getElementById('calendar').innerHTML = '<div style="padding: 20px; color: red;">FullCalendar não carregou. Verifique os arquivos JS.</div>';
+        return;
+      }
+      
+      try {
+        console.log('🚀 Criando AgendaPage...');
+        window.pageManager = new AgendaPage();
+        console.log('✅ AgendaPage criada:', window.pageManager);
+        
+        // Forçar inicialização manual
+        if (window.pageManager.initializePage) {
+          console.log('🔄 Inicializando página manualmente...');
+          await window.pageManager.initializePage();
+        }
+      } catch (error) {
+        console.error('❌ Erro ao criar AgendaPage:', error);
+      }
+    });
+
+    // Configurar botão de logout
+    const logoutBtn = document.getElementById('logoutButton');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        console.log('🚪 LOGOUT: Botão clicado');
+        
+        // Confirmar logout
+        const confirmed = confirm('Tem certeza que deseja sair do sistema?');
+        if (!confirmed) {
+          console.log('⏹️ LOGOUT: Cancelado pelo usuário');
+          return;
+        }
+        
+        try {
+          // Executar logout
+          const result = await window.authManager.logout();
+          
+          if (result.success) {
+            console.log('✅ LOGOUT: Sucesso!');
+            window.location.href = 'login.html';
+          } else {
+            console.error('❌ LOGOUT: Erro:', result.error);
+            alert('Erro ao fazer logout: ' + result.error);
+          }
+        } catch (error) {
+          console.error('❌ LOGOUT: Erro inesperado:', error);
+          alert('Ocorreu um erro inesperado ao fazer logout');
+        }
+      });
+      
+      console.log('✅ LOGOUT: Botão configurado');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda Beauty - Sistema de Gestão</title>
+  
+  <!-- FullCalendar -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2> Agenda Beauty</h2>
+      <h2> Agenda Beauty</h2>
+      <h2>💇 Agenda Beauty</h2>
+      <nav>
+        <a href="index.html" class="nav-item active">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Início</span>
+        </a>
+        <a href="agenda.html" class="nav-item">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Agenda</span>
+        </a>
+        <a href="clientes.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Clientes</span>
+        </a>
+        <a href="servicos.html" class="nav-item">
+          <span class="nav-icon">💇</span>
+          <span class="nav-text">Serviços</span>
+        </a>
+        <a href="profissionais.html" class="nav-item">
+          <span class="nav-icon">👩</span>
+          <span class="nav-text">Profissionais</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <div class="page-header">
+        <h1>🏠 Bem-vindo ao Agenda Beauty</h1>
+        <div class="header-subtitle">
+          Sistema completo de gestão para salões de beleza
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <!-- Card de Agendamentos -->
+        <div class="dashboard-card" onclick="window.location.href='agenda.html'">
+          <div class="card-icon">📅</div>
+          <div class="card-content">
+            <h3>Agenda</h3>
+            <p>Gerencie agendamentos, bloqueios e visualize a agenda completa</p>
+          </div>
+          <div class="card-arrow">→</div>
+        </div>
+
+        <!-- Card de Clientes -->
+        <div class="dashboard-card" onclick="window.location.href='clientes.html'">
+          <div class="card-icon">👥</div>
+          <div class="card-content">
+            <h3>Clientes</h3>
+            <p>Cadastre e visualize o histórico completo dos clientes</p>
+          </div>
+          <div class="card-arrow">→</div>
+        </div>
+
+        <!-- Card de Serviços -->
+        <div class="dashboard-card" onclick="window.location.href='servicos.html'">
+          <div class="card-icon">💇</div>
+          <div class="card-content">
+            <h3>Serviços</h3>
+            <p>Defina serviços, preços e durações padrão</p>
+          </div>
+          <div class="card-arrow">→</div>
+        </div>
+
+        <!-- Card de Profissionais -->
+        <div class="dashboard-card" onclick="window.location.href='profissionais.html'">
+          <div class="card-icon">👩</div>
+          <div class="card-content">
+            <h3>Profissionais</h3>
+            <p>Gerencie a equipe de profissionais do salão</p>
+          </div>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+
+      <!-- Estatísticas Rápidas -->
+      <div class="stats-section">
+        <h2>📊 Estatísticas Rápidas</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-content">
+              <div class="stat-value" id="totalAgendamentosHoje">0</div>
+              <div class="stat-label">Agendamentos Hoje</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-content">
+              <div class="stat-value" id="totalClientes">0</div>
+              <div class="stat-label">Total de Clientes</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">👩</div>
+            <div class="stat-content">
+              <div class="stat-value" id="totalProfissionais">0</div>
+              <div class="stat-label">Profissionais</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">💇</div>
+            <div class="stat-content">
+              <div class="stat-value" id="totalServicos">0</div>
+              <div class="stat-label">Serviços</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ações Rápidas -->
+      <div class="quick-actions">
+        <h2>⚡ Ações Rápidas</h2>
+        <div class="actions-grid">
+          <button onclick="window.location.href='agenda.html'" class="action-btn">
+            <span class="action-icon">📅</span>
+            <span class="action-text">Novo Agendamento</span>
+          </button>
+          <button onclick="window.location.href='clientes.html'" class="action-btn">
+            <span class="action-icon">👤</span>
+            <span class="action-text">Novo Cliente</span>
+          </button>
+          <button onclick="window.location.href='servicos.html'" class="action-btn">
+            <span class="action-icon">💇</span>
+            <span class="action-text">Novo Serviço</span>
+          </button>
+          <button onclick="window.location.href='profissionais.html'" class="action-btn">
+            <span class="action-icon">👩</span>
+            <span class="action-text">Novo Profissional</span>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Botão de Logout Fixo -->
+  <div id="logoutButton" style="
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    z-index: 1000;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  " onmouseover="this.style.background='#b91c1c'; this.style.transform='translateY(-2px)'" onmouseout="this.style.background='#dc2626'; this.style.transform='translateY(0)'">
+    <span></span>
+    <span>Sair</span>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js"></script>
+  
+  <!-- TESTE: AuthManager inline completo -->
+  <script>
+    console.log(' INLINE_AUTH: Início do script inline');
+    
+    // AuthManager completo com Supabase
+    class AuthManager {
+      constructor() {
+        console.log('🔍 INLINE_AUTH: Construtor iniciado');
+        
+        // Verificar se Supabase está disponível
+        console.log("🔍 INLINE_AUTH: SUPABASE CLIENT:", window.supabase);
+        
+        if (!window.supabase) {
+          console.error("❌ INLINE_AUTH: Supabase client não encontrado!");
+          this.supabaseAvailable = false;
+        } else {
+          console.log("✅ INLINE_AUTH: Supabase client disponível");
+          this.supabaseAvailable = true;
+        }
+        
+        this.currentUser = null;
+        this.currentUserProfile = null;
+        console.log('🔍 INLINE_AUTH: Construtor finalizado');
+      }
+
+      async initialize() {
+        console.log('🔍 INLINE_AUTH: Inicializando...');
+        
+        if (!this.supabaseAvailable) {
+          console.log('⚠️ INLINE_AUTH: Supabase não disponível');
+          return { authenticated: false };
+        }
+        
+        try {
+          const { data, error } = await window.supabase.auth.getSession();
+          if (error) {
+            console.error('❌ INLINE_AUTH: Erro ao verificar sessão:', error);
+            return { authenticated: false };
+          }
+          
+          if (data.session) {
+            this.currentUser = data.session.user;
+            await this.loadUserProfile();
+            console.log('✅ INLINE_AUTH: Sessão ativa encontrada');
+            return { authenticated: true, user: data.session.user };
+          } else {
+            console.log('⚠️ INLINE_AUTH: Nenhuma sessão ativa');
+            return { authenticated: false };
+          }
+        } catch (error) {
+          console.error('❌ INLINE_AUTH: Falha na inicialização:', error);
+          return { authenticated: false };
+        }
+      }
+
+      async login(email, password) {
+        if (!this.supabaseAvailable) {
+          return { success: false, error: 'Supabase não disponível' };
+        }
+        
+        try {
+          console.log('🔐 INLINE_AUTH: Tentando login...', { email });
+          
+          const { data, error } = await window.supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (error) {
+            console.error('❌ INLINE_AUTH: Erro no login:', error);
+            return { success: false, error: error.message };
+          }
+
+          console.log('✅ INLINE_AUTH: Login sucesso!', data.user);
+          this.currentUser = data.user;
+          
+          // Carregar profile do usuário
+          await this.loadUserProfile();
+          
+          return { success: true, user: data.user };
+        } catch (error) {
+          console.error('❌ INLINE_AUTH: Falha no login:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      async logout() {
+        if (!this.supabaseAvailable) {
+          return { success: false, error: 'Supabase não disponível' };
+        }
+        
+        try {
+          console.log('🔐 INLINE_AUTH: Realizando logout...');
+          
+          const { error } = await window.supabase.auth.signOut();
+          
+          if (error) {
+            console.error('❌ INLINE_AUTH: Erro no logout:', error);
+            return { success: false, error: error.message };
+          }
+
+          console.log('✅ INLINE_AUTH: Logout sucesso!');
+          this.currentUser = null;
+          this.currentUserProfile = null;
+          window.currentUserProfile = null;
+          
+          return { success: true };
+        } catch (error) {
+          console.error('❌ INLINE_AUTH: Falha no logout:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      async loadUserProfile() {
+        if (!this.currentUser || !this.supabaseAvailable) {
+          return null;
+        }
+
+        try {
+          console.log('🔍 INLINE_AUTH: Carregando profile...', this.currentUser.id);
+          
+          const { data, error } = await window.supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', this.currentUser.id)
+            .single();
+
+          if (error) {
+            console.warn('⚠️ INLINE_AUTH: Profile não encontrado, usando defaults');
+            // Criar profile default se não existir
+            this.currentUserProfile = {
+              id: this.currentUser.id,
+              nome: this.currentUser.email?.split('@')[0] || 'Usuário',
+              role: 'admin' // Default para primeiro usuário
+            };
+            window.currentUserProfile = this.currentUserProfile;
+            return this.currentUserProfile;
+          }
+
+          console.log('✅ INLINE_AUTH: Profile carregado:', data);
+          this.currentUserProfile = data;
+          window.currentUserProfile = data;
+          
+          // Log do role para diagnóstico
+          if (data.role === 'admin') {
+            console.log('👑 INLINE_AUTH: ROLE_ADMIN detectado');
+          } else if (data.role === 'profissional') {
+            console.log('👩 INLINE_AUTH: ROLE_PROFISSIONAL detectado');
+          }
+          
+          return data;
+        } catch (error) {
+          console.error('❌ INLINE_AUTH: Falha ao carregar profile:', error);
+          return null;
+        }
+      }
+
+      isAdmin() {
+        const isAdmin = this.currentUserProfile?.role === 'admin';
+        console.log('🔐 INLINE_AUTH: Verificando se é admin:', isAdmin);
+        return isAdmin;
+      }
+
+      isProfissional() {
+        const isProfissional = this.currentUserProfile?.role === 'profissional';
+        console.log('👩 INLINE_AUTH: Verificando se é profissional:', isProfissional);
+        return isProfissional;
+      }
+    }
+
+    // Criar instância global
+    console.log('🔍 INLINE_AUTH: Criando instância global');
+    window.authManager = new AuthManager();
+    console.log('✅ INLINE_AUTH: Instância criada:', !!window.authManager);
+    console.log('✅ INLINE_AUTH: AuthManager completo carregado');
+  </script>
+  
+  <script src="js/dataManager.js"></script>
+  <script src="js/pageManager.js"></script>
+  <script src="js/menuManager.js"></script>
+  <script src="js/appInit.js"></script>
+  
+  <script>
+    // Inicializar dashboard quando aplicação estiver pronta
+    window.addEventListener('appReady', () => {
+      console.log(' Inicializando dashboard...');
+      carregarEstatisticas();
+      
+      // Configurar botão de logout
+      const logoutBtn = document.getElementById('logoutButton');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+          console.log('🚪 LOGOUT: Botão clicado');
+          
+          // Confirmar logout
+          const confirmed = confirm('Tem certeza que deseja sair do sistema?');
+          if (!confirmed) {
+            console.log('⏹️ LOGOUT: Cancelado pelo usuário');
+            return;
+          }
+          
+          try {
+            // Executar logout
+            const result = await window.authManager.logout();
+            
+            if (result.success) {
+              console.log('✅ LOGOUT: Sucesso!');
+              window.location.href = 'login.html';
+            } else {
+              console.error('❌ LOGOUT: Erro:', result.error);
+              alert('Erro ao fazer logout: ' + result.error);
+            }
+          } catch (error) {
+            console.error('❌ LOGOUT: Erro inesperado:', error);
+            alert('Ocorreu um erro inesperado ao fazer logout');
+          }
+        });
+        
+        console.log('✅ LOGOUT: Botão configurado');
+      }
+    });
+
+    function carregarEstatisticas() {
+      try {
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        const amanha = new Date(hoje);
+        amanha.setDate(amanha.getDate() + 1);
+
+        const agendamentosHoje = window.dataManager.agendamentos.filter(a => {
+          const dataAg = new Date(a.inicio);
+          return dataAg >= hoje && dataAg < amanha;
+        });
+
+        document.getElementById('totalAgendamentosHoje').textContent = agendamentosHoje.length;
+        document.getElementById('totalClientes').textContent = window.dataManager.clientes.length;
+        document.getElementById('totalProfissionais').textContent = window.dataManager.profissionais.length;
+        document.getElementById('totalServicos').textContent = window.dataManager.servicos.length;
+        
+        console.log('✅ Dashboard carregado com sucesso');
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error);
+      }
+    }
+  </script>
+</body>
+</html>

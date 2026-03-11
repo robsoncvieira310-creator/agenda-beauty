@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Serviços - Agenda Beauty</title>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2> Agenda Beauty</h2>
+      <nav>
+        <a href="index.html" class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Início</span>
+        </a>
+        <a href="agenda.html" class="nav-item">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Agenda</span>
+        </a>
+        <a href="clientes.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Clientes</span>
+        </a>
+        <a href="servicos.html" class="nav-item active">
+          <span class="nav-icon">💇</span>
+          <span class="nav-text">Serviços</span>
+        </a>
+        <a href="profissionais.html" class="nav-item">
+          <span class="nav-icon">👩</span>
+          <span class="nav-text">Profissionais</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <div class="page-header">
+        <h1>💇 Serviços</h1>
+        <div class="header-actions">
+          <button id="btnAtualizar" class="btn btn-secondary">
+            🔄 Atualizar
+          </button>
+          <button id="btnNovoServico" class="btn btn-primary">
+            <span class="btn-icon">➕</span>
+            Novo Serviço
+          </button>
+        </div>
+      </div>
+
+      <!-- Estatísticas -->
+      <div class="stats-section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon"> </div>
+            <div class="stat-content">
+              <div class="stat-value" id="totalServicos">0</div>
+              <div class="stat-label">Total de Serviços</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"> </div>
+            <div class="stat-content">
+              <div class="stat-value" id="duracaoMedia">0</div>
+              <div class="stat-label">Duração Média (min)</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"> </div>
+            <div class="stat-content">
+              <div class="stat-value" id="valorMedio">R$ 0</div>
+              <div class="stat-label">Valor Médio</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela de Serviços -->
+      <div class="table-container">
+        <div class="table-header">
+          <h2>Lista de Serviços</h2>
+          <div class="table-actions">
+            <input type="text" id="buscaServico" class="form-control" placeholder="Buscar serviço...">
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Duração</th>
+                <th>Valor</th>
+                <th>Agendamentos</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaServicos">
+              <!-- Serviços serão carregados aqui -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Botão de Logout -->
+  <button id="logoutButton" class="btn btn-danger logout-btn">
+    🚪 Sair
+  </button>
+
+  <!-- Modal de Serviço -->
+  <div id="modalServico" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitulo">Novo Serviço</h3>
+        <button type="button" id="btnFecharModal" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-section">
+          <div class="form-group">
+            <label for="nomeServico">Nome do Serviço *</label>
+            <input type="text" id="nomeServico" class="form-control" required placeholder="Ex: Corte Masculino">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="duracaoServico">Duração (minutos) *</label>
+              <input type="number" id="duracaoServico" class="form-control" required min="5" placeholder="30">
+            </div>
+            <div class="form-group">
+              <label for="valorServico">Valor (R$)</label>
+              <input type="number" id="valorServico" class="form-control" min="0" step="0.01" placeholder="50.00">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="descricaoServico">Descrição</label>
+            <textarea id="descricaoServico" class="form-control" rows="3" placeholder="Descrição detalhada do serviço..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btnExcluir" class="btn btn-danger" style="display: none;">
+          <span class="btn-icon"> </span>
+          Excluir
+  </div>
+
+  <!-- Alert Container -->
+  <div id="alertContainer" class="alert-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js"></script>
+  
+  <!-- AuthManager completo inline -->
+  <script>
+    console.log('🔍 SERVICOS_AUTH: Início do script inline');
+    
+    // AuthManager completo com Supabase
+    class AuthManager {
+      constructor() {
+        console.log('🔍 SERVICOS_AUTH: Construtor iniciado');
+        
+        // Verificar se Supabase está disponível
+        console.log("🔍 SERVICOS_AUTH: SUPABASE CLIENT:", window.supabase);
+        
+        if (!window.supabase) {
+          console.error("❌ SERVICOS_AUTH: Supabase client não encontrado!");
+          this.supabaseAvailable = false;
+        } else {
+          console.log("✅ SERVICOS_AUTH: Supabase client disponível");
+          this.supabaseAvailable = true;
+        }
+        
+        this.currentUser = null;
+        this.currentUserProfile = null;
+        console.log('🔍 SERVICOS_AUTH: Construtor finalizado');
+      }
+
+      async initialize() {
+        console.log('🔍 SERVICOS_AUTH: Inicializando...');
+        
+        if (!this.supabaseAvailable) {
+          console.log('⚠️ SERVICOS_AUTH: Supabase não disponível');
+          return { authenticated: false };
+        }
+        
+        try {
+          const { data, error } = await window.supabase.auth.getSession();
+          if (error) {
+            console.error('❌ SERVICOS_AUTH: Erro ao verificar sessão:', error);
+            return { authenticated: false };
+          }
+          
+          if (data.session) {
+            this.currentUser = data.session.user;
+            await this.loadUserProfile();
+            console.log('✅ SERVICOS_AUTH: Sessão ativa encontrada');
+            return { authenticated: true, user: data.session.user };
+          } else {
+            console.log('⚠️ SERVICOS_AUTH: Nenhuma sessão ativa');
+            return { authenticated: false };
+          }
+        } catch (error) {
+          console.error('❌ SERVICOS_AUTH: Falha na inicialização:', error);
+          return { authenticated: false };
+        }
+      }
+
+      async login(email, password) {
+        if (!this.supabaseAvailable) {
+          return { success: false, error: 'Supabase não disponível' };
+        }
+        
+        try {
+          console.log('🔐 SERVICOS_AUTH: Tentando login...', { email });
+          
+          const { data, error } = await window.supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (error) {
+            console.error('❌ SERVICOS_AUTH: Erro no login:', error);
+            return { success: false, error: error.message };
+          }
+
+          console.log('✅ SERVICOS_AUTH: Login sucesso!', data.user);
+          this.currentUser = data.user;
+          
+          // Carregar profile do usuário
+          await this.loadUserProfile();
+          
+          return { success: true, user: data.user };
+        } catch (error) {
+          console.error('❌ SERVICOS_AUTH: Falha no login:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      async logout() {
+        if (!this.supabaseAvailable) {
+          return { success: false, error: 'Supabase não disponível' };
+        }
+        
+        try {
+          console.log('🔐 SERVICOS_AUTH: Realizando logout...');
+          
+          const { error } = await window.supabase.auth.signOut();
+          
+          if (error) {
+            console.error('❌ SERVICOS_AUTH: Erro no logout:', error);
+            return { success: false, error: error.message };
+          }
+
+          console.log('✅ SERVICOS_AUTH: Logout sucesso!');
+          this.currentUser = null;
+          this.currentUserProfile = null;
+          window.currentUserProfile = null;
+          
+          return { success: true };
+        } catch (error) {
+          console.error('❌ SERVICOS_AUTH: Falha no logout:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      async loadUserProfile() {
+        if (!this.currentUser || !this.supabaseAvailable) {
+          return null;
+        }
+
+        try {
+          console.log('🔍 SERVICOS_AUTH: Carregando profile...', this.currentUser.id);
+          
+          const { data, error } = await window.supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', this.currentUser.id)
+            .single();
+
+          if (error) {
+            console.warn('⚠️ SERVICOS_AUTH: Profile não encontrado, usando defaults');
+            // Criar profile default se não existir
+            this.currentUserProfile = {
+              id: this.currentUser.id,
+              nome: this.currentUser.email?.split('@')[0] || 'Usuário',
+              role: 'admin' // Default para primeiro usuário
+            };
+            window.currentUserProfile = this.currentUserProfile;
+            return this.currentUserProfile;
+          }
+
+          console.log('✅ SERVICOS_AUTH: Profile carregado:', data);
+          this.currentUserProfile = data;
+          window.currentUserProfile = data;
+          
+          // Log do role para diagnóstico
+          if (data.role === 'admin') {
+            console.log('👑 SERVICOS_AUTH: ROLE_ADMIN detectado');
+          } else if (data.role === 'profissional') {
+            console.log('👩 SERVICOS_AUTH: ROLE_PROFISSIONAL detectado');
+          }
+          
+          return data;
+        } catch (error) {
+          console.error('❌ SERVICOS_AUTH: Falha ao carregar profile:', error);
+          return null;
+        }
+      }
+
+      isAdmin() {
+        const isAdmin = this.currentUserProfile?.role === 'admin';
+        console.log('🔐 SERVICOS_AUTH: Verificando se é admin:', isAdmin);
+        return isAdmin;
+      }
+
+      isProfissional() {
+        const isProfissional = this.currentUserProfile?.role === 'profissional';
+        console.log('👩 SERVICOS_AUTH: Verificando se é profissional:', isProfissional);
+        return isProfissional;
+      }
+    }
+
+    // Criar instância global
+    console.log('🔍 SERVICOS_AUTH: Criando instância global');
+    window.authManager = new AuthManager();
+    console.log('✅ SERVICOS_AUTH: Instância criada:', !!window.authManager);
+    console.log('✅ SERVICOS_AUTH: AuthManager completo carregado');
+  </script>
+  
+  <script src="js/dataManager.js"></script>
+  <script src="js/pageManager.js"></script>
+  <script src="js/menuManager.js"></script>
+  <script src="js/servicosPage.js"></script>
+  <script src="js/appInit.js"></script>
+  
+  <script>
+    // NOVA IMPLEMENTAÇÃO V1.2 - GARANTIR ORDEM CORRETA
+    // Esperar um pouco para garantir que appInit.js tenha tempo de disparar o evento
+    setTimeout(() => {
+      console.log(' Verificando se appReady já foi disparado...');
+      
+      // Se DataManager já existe e tem dados, o evento já foi disparado
+      if (window.dataManager && window.dataManager.servicos) {
+        console.log(' appReady já foi disparado, inicializando diretamente...');
+        window.pageManager = new ServicosPage();
+        
+        // NOVA IMPLEMENTAÇÃO V1.2 - INICIALIZAR DIRETAMENTE
+        console.log(' Chamando initializeSpecificPage() diretamente...');
+        window.pageManager.initializeSpecificPage();
+      } else {
+        console.log(' appReady ainda não foi disparado, registrando listener...');
+        // Registrar listener para o evento
+        window.addEventListener('appReady', () => {
+          console.log(' appReady recebido, inicializando página de serviços...');
+          window.pageManager = new ServicosPage();
+          
+          // CHAMAR initializeSpecificPage MANUALMENTE
+          console.log(' Chamando initializeSpecificPage() manualmente...');
+          window.pageManager.initializeSpecificPage();
+        });
+      }
+      
+      // Configurar botão de logout
+      const logoutBtn = document.getElementById('logoutButton');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+          console.log('🚪 LOGOUT: Botão clicado');
+          
+          // Confirmar logout
+          const confirmed = confirm('Tem certeza que deseja sair do sistema?');
+          if (!confirmed) {
+            console.log('⏹️ LOGOUT: Cancelado pelo usuário');
+            return;
+          }
+          
+          try {
+            // Executar logout
+            const result = await window.authManager.logout();
+            
+            if (result.success) {
+              console.log('✅ LOGOUT: Sucesso!');
+              window.location.href = 'login.html';
+            } else {
+              console.error('❌ LOGOUT: Erro:', result.error);
+              alert('Erro ao fazer logout: ' + result.error);
+            }
+          } catch (error) {
+            console.error('❌ LOGOUT: Erro inesperado:', error);
+            alert('Ocorreu um erro inesperado ao fazer logout');
+          }
+        });
+        
+        console.log('✅ LOGOUT: Botão configurado');
+      }
+    }, 100);
+  </script>
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profissionais - Agenda Beauty</title>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2> Agenda Beauty</h2>
+      <nav>
+        <a href="index.html" class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Início</span>
+        </a>
+        <a href="agenda.html" class="nav-item">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Agenda</span>
+        </a>
+        <a href="clientes.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Clientes</span>
+        </a>
+        <a href="servicos.html" class="nav-item">
+          <span class="nav-icon">💇</span>
+          <span class="nav-text">Serviços</span>
+        </a>
+        <a href="profissionais.html" class="nav-item active">
+          <span class="nav-icon">👩</span>
+          <span class="nav-text">Profissionais</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <div class="page-header">
+        <h1>👩 Profissionais</h1>
+        <div class="header-actions">
+          <button id="btnAtualizar" class="btn btn-secondary">
+            🔄 Atualizar
+          </button>
+          <button id="btnNovoProfissional" class="btn btn-primary">
+            <span class="btn-icon">➕</span>
+            Novo Profissional
+          </button>
+        </div>
+      </div>
+
+      <!-- Estatísticas -->
+      <div class="stats-section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon"> </div>
+            <div class="stat-content">
+              <div class="stat-value" id="totalProfissionais">0</div>
+              <div class="stat-label">Total de Profissionais</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"> </div>
+            <div class="stat-content">
+              <div class="stat-value" id="agendamentosHoje">0</div>
+              <div class="stat-label">Agendamentos Hoje</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"> </div>
+            <div class="stat-content">
+              <div class="stat-value" id="profissionalAtivo">-</div>
+              <div class="stat-label">Mais Ativo</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela de Profissionais -->
+      <div class="table-container">
+        <div class="table-header">
+          <h2>Lista de Profissionais</h2>
+          <div class="table-actions">
+            <input type="text" id="buscaProfissional" class="form-control" placeholder="Buscar profissional...">
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Especialidade</th>
+                <th>Cor Calendário</th>
+                <th>Agendamentos</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaProfissionais">
+              <!-- Profissionais serão carregados aqui -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Botão de Logout -->
+  <button id="logoutButton" class="btn btn-danger logout-btn">
+    🚪 Sair
+  </button>
+
+  <!-- Modal de Profissional -->
+  <div id="modalProfissional" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitulo">Novo Profissional</h3>
+        <button type="button" id="btnFecharModal" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-section">
+          <div class="form-group">
+            <label for="nomeProfissional">Nome do Profissional *</label>
+            <input type="text" id="nomeProfissional" class="form-control" required placeholder="Nome completo">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="telefoneProfissional">Telefone</label>
+              <input type="tel" id="telefoneProfissional" class="form-control" placeholder="(00) 00000-0000">
+            </div>
+            <div class="form-group">
+              <label for="especialidadeProfissional">Especialidade</label>
+              <input type="text" id="especialidadeProfissional" class="form-control" placeholder="Ex: Cabelereiro, Manicure">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="corCalendario">Cor no Calendário</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="corCalendario" class="form-control color-picker" value="#3b82f6">
+              <input type="text" id="corHex" class="form-control color-hex" value="#3b82f6" placeholder="#000000">
+              <button type="button" id="btnCorAleatoria" class="btn btn-secondary">
+                Cor Aleatória
+              </button>
+            </div>
+            <small class="form-help">Esta cor será usada para identificar o profissional no calendário</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btnExcluir" class="btn btn-danger" style="display: none;">
+          <span class="btn-icon"> </span>
+          Excluir
+  </div>
+
+  <!-- Alert Container -->
+  <div id="alertContainer" class="alert-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js"></script>
+  
+  <!-- AuthManager completo inline -->
+  <script>
+    console.log('🔍 PROFISSIONAIS_AUTH: Início do script inline');
+    
+    // AuthManager completo com Supabase
+    class AuthManager {
+      constructor() {
+        console.log('🔍 PROFISSIONAIS_AUTH: Construtor iniciado');
+        
+        // Verificar se Supabase está disponível
+        console.log("🔍 PROFISSIONAIS_AUTH: SUPABASE CLIENT:", window.supabase);
+        
+        if (!window.supabase) {
+          console.error("❌ PROFISSIONAIS_AUTH: Supabase client não encontrado!");
+          this.supabaseAvailable = false;
+        } else {
+          console.log("✅ PROFISSIONAIS_AUTH: Supabase client disponível");
+          this.supabaseAvailable = true;
+        }
+        
+        this.currentUser = null;
+        this.currentUserProfile = null;
+        console.log('🔍 PROFISSIONAIS_AUTH: Construtor finalizado');
+      }
+
+      async initialize() {
+        console.log('🔍 PROFISSIONAIS_AUTH: Inicializando...');
+        
+        if (!this.supabaseAvailable) {
+          console.log('⚠️ PROFISSIONAIS_AUTH: Supabase não disponível');
+          return { authenticated: false };
+        }
+        
+        try {
+          const { data, error } = await window.supabase.auth.getSession();
+          if (error) {
+            console.error('❌ PROFISSIONAIS_AUTH: Erro ao verificar sessão:', error);
+            return { authenticated: false };
+          }
+          
+          if (data.session) {
+            this.currentUser = data.session.user;
+            await this.loadUserProfile();
+            console.log('✅ PROFISSIONAIS_AUTH: Sessão ativa encontrada');
+            return { authenticated: true, user: data.session.user };
+          } else {
+            console.log('⚠️ PROFISSIONAIS_AUTH: Nenhuma sessão ativa');
+            return { authenticated: false };
+          }
+        } catch (error) {
+          console.error('❌ PROFISSIONAIS_AUTH: Falha na inicialização:', error);
+          return { authenticated: false };
+        }
+      }
+
+      async login(email, password) {
+        if (!this.supabaseAvailable) {
+          return { success: false, error: 'Supabase não disponível' };
+        }
+        
+        try {
+          console.log('🔐 PROFISSIONAIS_AUTH: Tentando login...', { email });
+          
+          const { data, error } = await window.supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (error) {
+            console.error('❌ PROFISSIONAIS_AUTH: Erro no login:', error);
+            return { success: false, error: error.message };
+          }
+
+          console.log('✅ PROFISSIONAIS_AUTH: Login sucesso!', data.user);
+          this.currentUser = data.user;
+          
+          // Carregar profile do usuário
+          await this.loadUserProfile();
+          
+          return { success: true, user: data.user };
+        } catch (error) {
+          console.error('❌ PROFISSIONAIS_AUTH: Falha no login:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      async logout() {
+        if (!this.supabaseAvailable) {
+          return { success: false, error: 'Supabase não disponível' };
+        }
+        
+        try {
+          console.log('🔐 PROFISSIONAIS_AUTH: Realizando logout...');
+          
+          const { error } = await window.supabase.auth.signOut();
+          
+          if (error) {
+            console.error('❌ PROFISSIONAIS_AUTH: Erro no logout:', error);
+            return { success: false, error: error.message };
+          }
+
+          console.log('✅ PROFISSIONAIS_AUTH: Logout sucesso!');
+          this.currentUser = null;
+          this.currentUserProfile = null;
+          window.currentUserProfile = null;
+          
+          return { success: true };
+        } catch (error) {
+          console.error('❌ PROFISSIONAIS_AUTH: Falha no logout:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      async loadUserProfile() {
+        if (!this.currentUser || !this.supabaseAvailable) {
+          return null;
+        }
+
+        try {
+          console.log('🔍 PROFISSIONAIS_AUTH: Carregando profile...', this.currentUser.id);
+          
+          const { data, error } = await window.supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', this.currentUser.id)
+            .single();
+
+          if (error) {
+            console.warn('⚠️ PROFISSIONAIS_AUTH: Profile não encontrado, usando defaults');
+            // Criar profile default se não existir
+            this.currentUserProfile = {
+              id: this.currentUser.id,
+              nome: this.currentUser.email?.split('@')[0] || 'Usuário',
+              role: 'admin' // Default para primeiro usuário
+            };
+            window.currentUserProfile = this.currentUserProfile;
+            return this.currentUserProfile;
+          }
+
+          console.log('✅ PROFISSIONAIS_AUTH: Profile carregado:', data);
+          this.currentUserProfile = data;
+          window.currentUserProfile = data;
+          
+          // Log do role para diagnóstico
+          if (data.role === 'admin') {
+            console.log('👑 PROFISSIONAIS_AUTH: ROLE_ADMIN detectado');
+          } else if (data.role === 'profissional') {
+            console.log('👩 PROFISSIONAIS_AUTH: ROLE_PROFISSIONAL detectado');
+          }
+          
+          return data;
+        } catch (error) {
+          console.error('❌ PROFISSIONAIS_AUTH: Falha ao carregar profile:', error);
+          return null;
+        }
+      }
+
+      isAdmin() {
+        const isAdmin = this.currentUserProfile?.role === 'admin';
+        console.log('🔐 PROFISSIONAIS_AUTH: Verificando se é admin:', isAdmin);
+        return isAdmin;
+      }
+
+      isProfissional() {
+        const isProfissional = this.currentUserProfile?.role === 'profissional';
+        console.log('👩 PROFISSIONAIS_AUTH: Verificando se é profissional:', isProfissional);
+        return isProfissional;
+      }
+    }
+
+    // Criar instância global
+    console.log('🔍 PROFISSIONAIS_AUTH: Criando instância global');
+    window.authManager = new AuthManager();
+    console.log('✅ PROFISSIONAIS_AUTH: Instância criada:', !!window.authManager);
+    console.log('✅ PROFISSIONAIS_AUTH: AuthManager completo carregado');
+  </script>
+  
+  <script src="js/dataManager.js"></script>
+  <script src="js/pageManager.js"></script>
+  <script src="js/menuManager.js"></script>
+  <script src="js/profissionaisPage.js"></script>
+  <script src="js/appInit.js"></script>
+  
+  <script>
+    // NOVA IMPLEMENTAÇÃO V1.2 - GARANTIR ORDEM CORRETA
+    // Esperar um pouco para garantir que appInit.js tenha tempo de disparar o evento
+    setTimeout(() => {
+      console.log(' Verificando se appReady já foi disparado...');
+      
+      // Se DataManager já existe e tem dados, o evento já foi disparado
+      if (window.dataManager && window.dataManager.profissionais) {
+        console.log(' appReady já foi disparado, inicializando diretamente...');
+        window.pageManager = new ProfissionaisPage();
+        
+        // NOVA IMPLEMENTAÇÃO V1.2 - INICIALIZAR DIRETAMENTE
+        console.log(' Chamando initializeSpecificPage() diretamente...');
+        window.pageManager.initializeSpecificPage();
+      } else {
+        console.log(' appReady ainda não foi disparado, registrando listener...');
+        // Registrar listener para o evento
+        window.addEventListener('appReady', () => {
+          console.log(' appReady recebido, inicializando página de profissionais...');
+          window.pageManager = new ProfissionaisPage();
+          
+          // CHAMAR initializeSpecificPage MANUALMENTE
+          console.log(' Chamando initializeSpecificPage() manualmente...');
+          window.pageManager.initializeSpecificPage();
+        });
+      }
+      
+      // Configurar botão de logout
+      const logoutBtn = document.getElementById('logoutButton');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+          console.log('🚪 LOGOUT: Botão clicado');
+          
+          // Confirmar logout
+          const confirmed = confirm('Tem certeza que deseja sair do sistema?');
+          if (!confirmed) {
+            console.log('⏹️ LOGOUT: Cancelado pelo usuário');
+            return;
+          }
+          
+          try {
+            // Executar logout
+            const result = await window.authManager.logout();
+            
+            if (result.success) {
+              console.log('✅ LOGOUT: Sucesso!');
+              window.location.href = 'login.html';
+            } else {
+              console.error('❌ LOGOUT: Erro:', result.error);
+              alert('Erro ao fazer logout: ' + result.error);
+            }
+          } catch (error) {
+            console.error('❌ LOGOUT: Erro inesperado:', error);
+            alert('Ocorreu um erro inesperado ao fazer logout');
+          }
+        });
+        
+        console.log('✅ LOGOUT: Botão configurado');
+      }
+    }, 100);
+  </script>
+</body>
+</html>
