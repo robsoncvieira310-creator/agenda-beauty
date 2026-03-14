@@ -11,7 +11,7 @@
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <h2> Agenda Beauty</h2>
+      <h2>💇 Agenda Beauty</h2>
       <nav>
         <a href="index.html" class="nav-item">
           <span class="nav-icon">🏠</span>
@@ -78,7 +78,7 @@
       </div>
 
       <!-- Tabela de Clientes -->
-      <div class="table-container">
+      <div class="table-container" id="listaSection">
         <div class="table-header">
           <h2>Lista de Clientes</h2>
           <div class="table-actions">
@@ -90,9 +90,9 @@
             <thead>
               <tr>
                 <th>Nome</th>
-                <th>Telefone</th>
-                <th>Email</th>
-                <th>Agendamentos</th>
+                <th>WhatsApp</th>
+                <th>Próx. Atendimento</th>
+                <th>Último Atendimento</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -144,25 +144,9 @@
               <input type="text" id="nomeCliente" class="form-control" required placeholder="Nome completo">
             </div>
             <div class="form-group">
-              <label for="telefoneCliente">Telefone</label>
-              <input type="tel" id="telefoneCliente" class="form-control" placeholder="(00) 00000-0000">
+              <label for="telefoneCliente">WhatsApp *</label>
+              <input type="tel" id="telefoneCliente" class="form-control" maxlength="15" placeholder="(DDD) 00000-0000" required>
             </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="emailCliente">Email</label>
-              <input type="email" id="emailCliente" class="form-control" placeholder="email@exemplo.com">
-            </div>
-            <div class="form-group">
-              <label for="enderecoCliente">Endereço</label>
-              <input type="text" id="enderecoCliente" class="form-control" placeholder="Rua, número, bairro">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="observacoesCliente">Observações</label>
-            <textarea id="observacoesCliente" class="form-control" rows="3" placeholder="Observações sobre o cliente..."></textarea>
           </div>
         </div>
       </div>
@@ -175,6 +159,200 @@
         <button type="button" id="btnSalvar" class="btn btn-primary">
           <span class="btn-icon"> </span>
           Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Ficha de Anamnese -->
+  <div id="modalAnamnese" class="modal">
+    <div class="modal-content modal-anamnese">
+      <div class="modal-header">
+        <h3 id="modalAnamneseTitulo">Ficha de Anamnese</h3>
+        <button type="button" id="btnFecharModalAnamnese" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formAnamnese">
+          <!-- Dados Pessoais -->
+          <div class="anamnese-section">
+            <h4><i class="fas fa-user"></i> Dados Pessoais</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="anamneseNomeCompleto">Nome Completo</label>
+                <input type="text" id="anamneseNomeCompleto" class="form-control" data-restricted="true">
+              </div>
+              <div class="form-group">
+                <label for="anamneseIdade">Idade</label>
+                <input type="number" id="anamneseIdade" class="form-control" data-restricted="true">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="anamneseOcupacao">Ocupação</label>
+                <input type="text" id="anamneseOcupacao" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="anamneseIndicacao">Indicação</label>
+                <input type="text" id="anamneseIndicacao" class="form-control" placeholder="Quem indicou nosso serviço?">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="anamneseEndereco">Endereço</label>
+                <input type="text" id="anamneseEndereco" class="form-control" data-restricted="true">
+              </div>
+              <div class="form-group">
+                <label for="anamneseContatoWhatsApp">Contato WhatsApp</label>
+                <input type="tel" id="anamneseContatoWhatsApp" class="form-control" data-restricted="true" maxlength="15" placeholder="(DDD) 00000-0000">
+              </div>
+            </div>
+          <div class="form-row">
+              <div class="form-group">
+                <label for="anamneseCEP">CEP</label>
+                <input type="text" id="anamneseCEP" class="form-control" data-restricted="true" placeholder="00000-000" maxlength="9" oninput="this.value = this.value.replace(/\D/g, '')">
+              </div>
+              <div class="form-group">
+                <label for="anamneseCPF">CPF</label>
+                <input type="text" id="anamneseCPF" class="form-control" data-restricted="true" placeholder="000.000.000-00" maxlength="11" oninput="this.value = this.value.replace(/\D/g, '')">
+              </div>
+            </div>
+          </div>
+          <div class="anamnese-section">
+            <h4><i class="fas fa-heartbeat"></i> Informações de Saúde</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseMenorIdade">
+                  <span>Menor de idade</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-row" id="rowResponsavel" style="display: none;">
+              <div class="form-group">
+                <label for="anamneseResponsavel">Nome do Responsável</label>
+                <input type="text" id="anamneseResponsavel" class="form-control" placeholder="Nome completo do responsável">
+              </div>
+              <div class="form-group">
+                <label for="anamneseContatoResponsavel">Telefone do Responsável</label>
+                <input type="text" id="anamneseContatoResponsavel" class="form-control" placeholder="Telefone do responsável">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseGestacao">
+                  <span>Gestação</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseDiabetes">
+                  <span>Diabetes</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseRoeUnhas">
+                  <span>Hábito de roer unhas</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseUnhaEncravada">
+                  <span>Unha encravada</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseAlergia">
+                  <span>Alergia a esmaltes ou cosméticos</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseCuticula">
+                  <span>Costuma retirar cutícula</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseMicose">
+                  <span>Problema com micose ou fungo</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseUsaMedicamento">
+                  <span>Faz uso de medicamento</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="anamneseMedicamentos">Medicamentos utilizados</label>
+                <textarea id="anamneseMedicamentos" class="form-control" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hábitos -->
+          <div class="anamnese-section">
+            <h4><i class="fas fa-running"></i> Hábitos</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseAtividadeFisica">
+                  <span>Pratica atividade física</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamnesePiscinaPraia">
+                  <span>Frequenta piscina ou praia</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Procedimento -->
+          <div class="anamnese-section">
+            <h4><i class="fas fa-spa"></i> Procedimento</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="anamneseServico">Serviço escolhido</label>
+                <select id="anamneseServico" class="form-control">
+                  <option value="">Selecione um serviço...</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Autorização -->
+          <div class="anamnese-section">
+            <h4><i class="fas fa-file-signature"></i> Autorização</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="anamneseAutorizacao">
+                  <span>Autorizo o procedimento e registro fotográfico</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btnSalvarAnamnese" class="btn btn-primary">
+          <span class="btn-icon"> </span>
+          Salvar Ficha
         </button>
       </div>
     </div>
@@ -391,11 +569,11 @@
         // Registrar listener para o evento
         window.addEventListener('appReady', () => {
           console.log('🚀 appReady recebido, inicializando página de clientes...');
-          window.pageManager = new ClientesPage();
+          window.clientesPage = new ClientesPage();
           
           // CHAMAR initializeSpecificPage MANUALMENTE
           console.log('🚀 Chamando initializeSpecificPage() manualmente...');
-          window.pageManager.initializeSpecificPage();
+          window.clientesPage.init();
         });
       }
       
@@ -433,5 +611,32 @@
       }
     }, 100);
   </script>
+  
+  <style>
+    .readonly {
+      background-color: #f8f9fa !important;
+      border-color: #dee2e6 !important;
+      cursor: not-allowed !important;
+    }
+    
+    .readonly:focus {
+      box-shadow: none !important;
+      border-color: #dee2e6 !important;
+    }
+    
+    /* Estilo para linha clicável */
+    #tabelaClientes tr {
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    #tabelaClientes tr:hover {
+      background-color: #f8f9fa;
+    }
+    
+    #tabelaClientes tr:hover td {
+      background-color: transparent;
+    }
+  </style>
 </body>
 </html>

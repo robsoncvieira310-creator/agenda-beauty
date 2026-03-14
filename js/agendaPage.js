@@ -51,16 +51,6 @@ class AgendaPage extends PageManager {
   }
 
   setupAgendaButtons() {
-    // Botão de bloqueio rápido
-    const btnBloqueioRapido = document.getElementById('btnBloqueioRapido');
-    if (btnBloqueioRapido) {
-      btnBloqueioRapido.addEventListener('click', () => {
-        if (this.modalManager) {
-          this.modalManager.abrirModalBloqueio({ tipo: 'novo' });
-        }
-      });
-    }
-
     // Botão Hoje
     const btnHoje = document.getElementById('btnHoje');
     if (btnHoje) {

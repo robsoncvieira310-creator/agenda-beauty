@@ -20,6 +20,8 @@ class ServicosPage extends PageManager {
   async init() {
     console.log("🔄 Inicializando página de serviços");
     await this.loadServicos();
+    this.setupColorPicker();
+    this.setupServiceButtons();
   }
 
   // NOVA IMPLEMENTAÇÃO V1.2 - MÉTODO initializeSpecificPage() PARA COMPATIBILIDADE
@@ -72,6 +74,14 @@ class ServicosPage extends PageManager {
     if (btnExcluir) {
       btnExcluir.addEventListener('click', () => this.deleteService());
     }
+    
+    // Botão X do header para fechar modal
+    const btnFecharModal = document.getElementById('btnFecharModal');
+    if (btnFecharModal) {
+      btnFecharModal.addEventListener('click', () => this.closeModal());
+    }
+    
+    console.log('✅ Botões de serviços configurados');
   }
 
   async renderPage() {
@@ -79,9 +89,15 @@ class ServicosPage extends PageManager {
     try {
       // NOVA IMPLEMENTAÇÃO V1.2 - FORÇAR CARREGAMENTO DIRETO
       console.log("🔍 Forçando carregamento direto do Supabase...");
-      this.servicos = await window.dataManager.loadServicos();  // Força carregamento
-      console.log("✅ Serviços carregados:", this.servicos);
-      console.log("📊 Quantidade de serviços:", this.servicos.length);
+      
+      try {
+        this.servicos = await window.dataManager.loadServicos();  // Força carregamento
+        console.log("✅ Serviços carregados:", this.servicos);
+        console.log("📊 Quantidade de serviços:", this.servicos.length);
+      } catch (loadError) {
+        console.error("❌ Erro específico no loadServicos():", loadError);
+        throw loadError;
+      }
       
       // NOVA IMPLEMENTAÇÃO V1.2 - VERIFICAR ESTRUTURA DOS DADOS
       if (this.servicos.length > 0) {
@@ -89,9 +105,22 @@ class ServicosPage extends PageManager {
         console.log("🔍 Campos disponíveis:", Object.keys(this.servicos[0]));
       }
       
+      // Configurar botões (importante!)
+      console.log("🔧 Configurando botões de serviços...");
+      this.setupServiceButtons();
+      console.log("✅ setupServiceButtons() chamado");
+      
+      // Configurar seletor de cores
+      console.log("🎨 Configurando seletor de cores...");
+      this.setupColorPicker();
+      console.log("✅ setupColorPicker() chamado");
+      
+      console.log("🎨 Iniciando renderização da tabela...");
       this.renderServiceTable();
+      console.log("✅ renderServiceTable() concluído");
     } catch (error) {
       console.error("❌ Erro ao carregar serviços em renderPage():", error);
+      console.error("❌ Stack trace:", error.stack);
       this.servicos = [];
       this.renderServiceTable();
     }
@@ -124,6 +153,7 @@ class ServicosPage extends PageManager {
       console.log(`🔍 Agendamentos encontrados para ${servico.nome}: ${agendamentosCount}`);
       
       const tr = document.createElement('tr');
+      const corServico = servico.cor || '#78909c';
       tr.innerHTML = `
         <td>
           <div class="service-name">
@@ -138,6 +168,12 @@ class ServicosPage extends PageManager {
           <span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span>
         </td>
         <td>
+          <div class="color-display">
+            <div class="color-badge" style="background-color: ${corServico}; border-color: ${this.getDarkerColor(corServico)};"></div>
+            <span class="color-code">${corServico.toUpperCase()}</span>
+          </div>
+        </td>
+        <td>
           <span class="badge badge-info">${agendamentosCount} agendamentos</span>
         </td>
         <td>
@@ -145,7 +181,7 @@ class ServicosPage extends PageManager {
             <button class="btn btn-sm btn-warning" onclick="pageManager.editService('${servico.nome}')" title="Editar">
               <span class="btn-icon">✏️</span>
             </button>
-            <button class="btn btn-sm btn-danger" onclick="pageManager.confirmDelete('${servico.nome}')" title="Excluir">
+            <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')" title="Excluir">
               <span class="btn-icon">🗑️</span>
             </button>
           </div>
@@ -216,7 +252,7 @@ class ServicosPage extends PageManager {
         <td><span class="badge badge-info">${agendamentosCount}</span></td>
         <td>
           <button class="btn btn-sm btn-warning" onclick="pageManager.editService('${servico.nome}')">✏️</button>
-          <button class="btn btn-sm btn-danger" onclick="pageManager.confirmDelete('${servico.nome}')">🗑️</button>
+          <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')">🗑️</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -227,7 +263,24 @@ class ServicosPage extends PageManager {
     this.servicoEditando = null;
     document.getElementById('modalTitulo').textContent = 'Novo Serviço';
     document.getElementById('btnExcluir').style.display = 'none';
+    
+    // Reabilitar campo nome (caso tenha sido desabilitado na edição)
+    document.getElementById('nomeServico').disabled = false;
+    
     this.clearForm('modalServico');
+    
+    // Resetar cor para padrão
+    const corPadrao = '#78909c';
+    document.getElementById('corServico').value = corPadrao;
+    
+    // Atualizar pré-visualização da cor
+    const colorPreview = document.getElementById('colorPreview');
+    if (colorPreview) {
+      colorPreview.style.backgroundColor = corPadrao;
+      colorPreview.style.color = this.getContrastColor(corPadrao);
+      colorPreview.querySelector('.preview-text').textContent = corPadrao.toUpperCase();
+    }
+    
     this.showModal('modalServico');
   }
 
@@ -242,8 +295,20 @@ class ServicosPage extends PageManager {
     // Preencher formulário
     document.getElementById('nomeServico').value = servico.nome || '';
     document.getElementById('duracaoServico').value = servico.duracao_minutos || servico.duracao || '';
-    document.getElementById('valorServico').value = servico.valor || '';
+    document.getElementById('valorServico').value = servico.valor || servico.preco || '';
     document.getElementById('descricaoServico').value = servico.descricao || '';
+    
+    // Preencher cor (usar cor padrão se não existir)
+    const corServico = servico.cor || '#78909c';
+    document.getElementById('corServico').value = corServico;
+    
+    // Atualizar pré-visualização da cor
+    const colorPreview = document.getElementById('colorPreview');
+    if (colorPreview) {
+      colorPreview.style.backgroundColor = corServico;
+      colorPreview.style.color = this.getContrastColor(corServico);
+      colorPreview.querySelector('.preview-text').textContent = corServico.toUpperCase();
+    }
     
     // Desabilitar edição do nome
     document.getElementById('nomeServico').disabled = true;
@@ -252,48 +317,43 @@ class ServicosPage extends PageManager {
   }
 
   async saveService() {
+    console.log('🔘 Botão salvar clicado - Iniciando saveService()');
+    
     const nome = document.getElementById('nomeServico').value.trim();
     const duracao = parseInt(document.getElementById('duracaoServico').value) || 0;
     const valor = parseFloat(document.getElementById('valorServico').value) || 0;
     const descricao = document.getElementById('descricaoServico').value.trim();
-
-    // VERSÃO ORIGINAL
-    // Validação
-    // const errors = this.validateForm(['nomeServico', 'duracaoServico']);
-    // if (errors.length > 0) {
-    //   this.showError(errors[0]);
-    //   return;
-    // }
-
-    // if (duracao <= 0) {
-    //   this.showError('Duração deve ser maior que 0');
-    //   return;
-    // }
-
-    // if (valor < 0) {
-    //   this.showError('Valor não pode ser negativo');
-    //   return;
-    // }
     
-    // NOVA IMPLEMENTAÇÃO V1.2 - VALIDAÇÃO COMPLETA
-    const errors = [];
+    console.log('📋 Dados do formulário:', { nome, duracao, valor, descricao });
     
     // Validação de nome obrigatório
     if (!nome) {
-      errors.push('O nome do serviço é obrigatório');
-    } else if (nome.length < 3) {
-      errors.push('O nome deve ter pelo menos 3 caracteres');
+      console.log('❌ Validação: nome vazio');
+      UIUtils.showAlert('Nome do serviço é obrigatório', 'error');
+      return;
     }
     
     // Validação de duração obrigatória e positiva
     if (!duracao || duracao <= 0) {
-      errors.push('A duração deve ser maior que 0 minutos');
-    } else if (duracao > 480) { // máximo 8 horas
-      errors.push('A duração não pode exceder 8 horas (480 minutos)');
+      console.log('❌ Validação: duração inválida', duracao);
+      UIUtils.showAlert('Duração deve ser maior que 0', 'error');
+      return;
     }
     
+    console.log('✅ Validações básicas passadas');
+    
     // Validação de valor obrigatório e positivo
-    if (valor === null || valor === undefined || valor <= 0) {
+    const errors = [];
+    console.log('💰 Valor informado:', valor, 'Tipo:', typeof valor);
+    
+    // Se for edição e valor for 0, verificar se o campo foi preenchido
+    if (this.servicoEditando && valor === 0) {
+      const valorInput = document.getElementById('valorServico').value;
+      console.log('💰 Valor do input:', valorInput);
+      if (valorInput === '' || valorInput === '0') {
+        errors.push('O valor deve ser maior que 0');
+      }
+    } else if (!this.servicoEditando && (valor === null || valor === undefined || valor <= 0)) {
       errors.push('O valor deve ser maior que 0');
     } else if (valor > 10000) { // máximo R$ 10.000
       errors.push('O valor não pode exceder R$ 10.000,00');
@@ -301,52 +361,70 @@ class ServicosPage extends PageManager {
     
     // Se houver erros, mostrar primeiro erro
     if (errors.length > 0) {
-      this.showToast(errors[0], 'error');
+      console.log('❌ Validação: erro de valor', errors[0]);
+      UIUtils.showAlert(errors[0], 'error');
       return;
     }
+    
+    console.log('✅ Todas as validações passaram');
 
     const btnSalvar = document.getElementById('btnSalvar');
+    console.log('🔘 Botão salvar encontrado:', !!btnSalvar);
     UIUtils.showLoading(btnSalvar);
+    console.log('✅ Loading mostrado no botão');
 
     try {
+      // Obter cor selecionada
+      const corServico = document.getElementById('corServico').value;
+      console.log('🎨 Cor selecionada:', corServico, '(agora será salva no banco!)');
+      
       if (this.servicoEditando) {
-        // Atualizar serviço
+        console.log('📝 Modo edição - serviço:', this.servicoEditando);
+        // Atualizar serviço (com cor agora)
         await window.dataManager.updateServico(this.servicoEditando.id, {
-          nome, duracao, duracao_minutos: duracao, valor, descricao
+          nome, 
+          duracao, 
+          valor, 
+          descricao,
+          cor: corServico
         });
-        this.showSuccess('Serviço atualizado com sucesso');
+        console.log('✅ Serviço atualizado com sucesso');
+        UIUtils.showAlert('Serviço atualizado com sucesso', 'success');
       } else {
+        console.log('🆕 Modo criação - novo serviço');
         // Verificar se já existe
         if (this.servicos.some(s => s.nome === nome)) {
-          this.showError('Já existe um serviço com este nome');
+          console.log('❌ Serviço já existe:', nome);
+          UIUtils.showAlert('Já existe um serviço com este nome', 'error');
           return;
         }
         
-        // Criar novo serviço
+        // Criar novo serviço (com cor agora)
+        console.log('💾 Criando novo serviço...');
         await window.dataManager.addServico({ 
           nome, 
           duracao, 
-          duracao_minutos: duracao, 
           valor, 
-          descricao 
+          descricao,
+          cor: corServico
         });
-        this.showSuccess('Serviço criado com sucesso');
+        console.log('✅ Serviço criado com sucesso');
+        UIUtils.showAlert('Serviço criado com sucesso', 'success');
       }
 
+      console.log('🔄 Atualizando página...');
       await this.renderPage();
       await this.updateStatistics();
+      console.log('✅ Página atualizada');
       this.closeModal();
+      console.log('✅ Modal fechado');
     } catch (error) {
-      console.error('Erro ao salvar serviço:', error);
-      this.showError('Erro ao salvar serviço');
+      console.error('❌ Erro ao salvar serviço:', error);
+      UIUtils.showAlert('Erro ao salvar serviço', 'error');
     } finally {
+      console.log('🔄 Escondendo loading...');
       UIUtils.hideLoading(btnSalvar);
-    }
-  }
-
-  confirmDelete(nome) {
-    if (confirm(`Tem certeza que deseja excluir o serviço "${nome}"? Esta ação não pode ser desfeita.`)) {
-      this.deleteServiceByName(nome);
+      console.log('✅ Loading escondido');
     }
   }
 
@@ -356,12 +434,12 @@ class ServicosPage extends PageManager {
 
     try {
       await window.dataManager.deleteServico(servico.id);
-      this.showToast('Serviço excluído com sucesso!', 'success');
+      UIUtils.showAlert('Serviço excluído com sucesso!', 'success');
       await this.renderPage();
       await this.updateStatistics();
     } catch (error) {
       console.error('Erro ao excluir serviço:', error);
-      this.showToast('Erro ao excluir serviço', 'error');
+      UIUtils.showAlert('Erro ao excluir serviço', 'error');
     }
   }
 
@@ -369,7 +447,108 @@ class ServicosPage extends PageManager {
     if (!this.servicoEditando) return;
     this.deleteServiceByName(this.servicoEditando.nome);
   }
+
+  async confirmDelete(nome) {
+    const confirmed = await window.ConfirmDialog.confirmDelete({
+      title: 'Excluir Serviço',
+      message: 'Tem certeza que deseja excluir este serviço?',
+      itemName: nome,
+      confirmText: 'Excluir Serviço'
+    });
+
+    if (confirmed) {
+      await this.deleteServiceByName(nome);
+    }
+  }
+
+  // Método para configurar o seletor de cores
+  setupColorPicker() {
+    console.log('🎨 Configurando seletor de cores...');
+    
+    const colorInput = document.getElementById('corServico');
+    const colorPreview = document.getElementById('colorPreview');
+    
+    console.log('🔍 Elementos encontrados:');
+    console.log('  - colorInput:', !!colorInput);
+    console.log('  - colorPreview:', !!colorPreview);
+    
+    if (!colorInput || !colorPreview) {
+      console.log('⚠️ Campos de cor não encontrados');
+      return;
+    }
+    
+    // Verificar se o preview tem o elemento de texto
+    const previewText = colorPreview.querySelector('.preview-text');
+    console.log('  - previewText:', !!previewText);
+    
+    // Função para atualizar pré-visualização
+    const updatePreview = (color) => {
+      console.log('🎨 Atualizando preview para cor:', color);
+      colorPreview.style.backgroundColor = color;
+      colorPreview.style.color = this.getContrastColor(color);
+      if (previewText) {
+        previewText.textContent = color.toUpperCase();
+      }
+    };
+    
+    // Event listener para input de cor
+    colorInput.addEventListener('input', (e) => {
+      const color = e.target.value;
+      console.log('🎨 Cor alterada pelo usuário:', color);
+      updatePreview(color);
+    });
+    
+    // Inicializar com a cor atual
+    console.log('🎨 Inicializando com cor:', colorInput.value);
+    updatePreview(colorInput.value);
+    
+    console.log('✅ Seletor de cores configurado');
+  }
+  
+  // Método para calcular cor de contraste
+  getContrastColor(hexColor) {
+    // Converter hex para RGB
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+    
+    // Calcular luminosidade
+    const luminosity = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    
+    // Retornar branco ou preto dependendo da luminosidade
+    return luminosity > 0.5 ? '#000000' : '#ffffff';
+  }
+  
+  // Método para obter cor mais escura para bordas
+  getDarkerColor(hexColor) {
+    // Converter hex para RGB
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+    
+    // Escurecer 20%
+    const darkerR = Math.floor(r * 0.8);
+    const darkerG = Math.floor(g * 0.8);
+    const darkerB = Math.floor(b * 0.8);
+    
+    // Converter para hex
+    return '#' + [darkerR, darkerG, darkerB].map(x => {
+      const hex = x.toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    }).join('');
+  }
 }
 
 // Exportar para uso global
 window.ServicosPage = ServicosPage;
+
+// Função global para o botão excluir
+window.confirmDelete = function(nome) {
+  if (window.pageManager && window.pageManager.confirmDelete) {
+    window.pageManager.confirmDelete(nome);
+  } else if (window.servicosPage && window.servicosPage.confirmDelete) {
+    window.servicosPage.confirmDelete(nome);
+  } else {
+    console.error('❌ Instância de ServicosPage não encontrada');
+  }
+};

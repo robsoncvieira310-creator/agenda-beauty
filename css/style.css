@@ -1761,3 +1761,218 @@ RESPONSIVE TABLES
     width:100%;
   }
 }
+
+/* =====================================================
+SELETOR DE CORES PARA SERVIÇOS
+===================================================== */
+
+.color-picker-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.color-input {
+  width: 80px;
+  height: 40px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.color-input:hover {
+  border-color: #4285f4;
+  transform: scale(1.05);
+}
+
+.color-preview {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.preview-text {
+  color: #5f6368;
+}
+
+/* Animação de cor */
+.color-preview {
+  animation: colorChange 0.3s ease;
+}
+
+@keyframes colorChange {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* =====================================================
+ESTILOS DA FICHA DE ANAMNESE
+===================================================== */
+
+/* Modal de Anamnese */
+.modal-anamnese {
+  max-width: 900px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Seções da Anamnese */
+.anamnese-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  border: 1px solid #e9ecef;
+}
+
+.anamnese-section h4 {
+  margin-bottom: 20px;
+  color: var(--primary-gold);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.anamnese-section h4 i {
+  font-size: 18px;
+}
+
+/* Formulário de Anamnese */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+.form-control {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+}
+
+/* Checkboxes estilizados */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 400;
+  color: var(--text-dark);
+  font-size: 14px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary-gold);
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.checkbox-label span {
+  line-height: 18px;
+  display: inline-block;
+  vertical-align: middle;
+  transform: translateY(-3px);
+}
+
+/* Campos restritos para profissionais */
+.form-control[data-restricted="true"] {
+  background-color: #f8f9fa;
+  border-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+.form-control[data-restricted="true"]:focus {
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+}
+
+.form-control[data-restricted="true"]:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.form-control[data-restricted="true"]:not(:disabled) {
+  background-color: #ffffff;
+  border-color: #ddd;
+  cursor: text;
+}
+
+.form-control[data-restricted="true"]:not(:disabled):focus {
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .modal-anamnese {
+    width: 98%;
+    max-height: 95vh;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .anamnese-section {
+    padding: 15px;
+  }
+}
+
+/* Animações */
+.anamnese-section {
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Botão de responsável aparecendo */
+#rowResponsavel {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

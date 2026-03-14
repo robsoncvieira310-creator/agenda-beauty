@@ -11,7 +11,7 @@
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <h2> Agenda Beauty</h2>
+      <h2>💇 Agenda Beauty</h2>
       <nav>
         <a href="index.html" class="nav-item">
           <span class="nav-icon">🏠</span>
@@ -91,9 +91,6 @@
               <tr>
                 <th>Nome</th>
                 <th>Telefone</th>
-                <th>Especialidade</th>
-                <th>Cor Calendário</th>
-                <th>Agendamentos</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -128,34 +125,26 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label for="telefoneProfissional">Telefone</label>
-              <input type="tel" id="telefoneProfissional" class="form-control" placeholder="(00) 00000-0000">
+              <label for="telefoneProfissional">WhatsApp</label>
+              <input type="tel" id="telefoneProfissional" class="form-control" maxlength="15" placeholder="(DDD) 00000-0000">
             </div>
             <div class="form-group">
-              <label for="especialidadeProfissional">Especialidade</label>
-              <input type="text" id="especialidadeProfissional" class="form-control" placeholder="Ex: Cabelereiro, Manicure">
+              <label for="emailProfissional">Email *</label>
+              <input type="email" id="emailProfissional" class="form-control" required placeholder="email@exemplo.com">
             </div>
           </div>
-
-          <div class="form-group">
-            <label for="corCalendario">Cor no Calendário</label>
-            <div class="color-picker-wrapper">
-              <input type="color" id="corCalendario" class="form-control color-picker" value="#3b82f6">
-              <input type="text" id="corHex" class="form-control color-hex" value="#3b82f6" placeholder="#000000">
-              <button type="button" id="btnCorAleatoria" class="btn btn-secondary">
-                Cor Aleatória
-              </button>
-            </div>
-            <small class="form-help">Esta cor será usada para identificar o profissional no calendário</small>
-          </div>
-        </div>
       </div>
 
       <div class="modal-footer">
         <button type="button" id="btnExcluir" class="btn btn-danger" style="display: none;">
           <span class="btn-icon"> </span>
           Excluir
-  </div>
+        </button>
+        <button type="button" id="btnSalvar" class="btn btn-primary">
+          <span class="btn-icon">💾</span>
+          Salvar
+        </button>
+      </div>
 
   <!-- Alert Container -->
   <div id="alertContainer" class="alert-container"></div>
@@ -356,22 +345,22 @@
       
       // Se DataManager já existe e tem dados, o evento já foi disparado
       if (window.dataManager && window.dataManager.profissionais) {
-        console.log(' appReady já foi disparado, inicializando diretamente...');
-        window.pageManager = new ProfissionaisPage();
+        console.log('🚀 appReady já foi disparado, inicializando diretamente...');
+        window.profissionaisPage = new ProfissionaisPage();
         
         // NOVA IMPLEMENTAÇÃO V1.2 - INICIALIZAR DIRETAMENTE
-        console.log(' Chamando initializeSpecificPage() diretamente...');
-        window.pageManager.initializeSpecificPage();
+        console.log('🚀 Chamando initializeSpecificPage() diretamente...');
+        window.profissionaisPage.initializeSpecificPage();
       } else {
         console.log(' appReady ainda não foi disparado, registrando listener...');
         // Registrar listener para o evento
         window.addEventListener('appReady', () => {
-          console.log(' appReady recebido, inicializando página de profissionais...');
-          window.pageManager = new ProfissionaisPage();
+          console.log('🚀 appReady recebido, inicializando página de profissionais...');
+          window.profissionaisPage = new ProfissionaisPage();
           
           // CHAMAR initializeSpecificPage MANUALMENTE
-          console.log(' Chamando initializeSpecificPage() manualmente...');
-          window.pageManager.initializeSpecificPage();
+          console.log('🚀 Chamando initializeSpecificPage() manualmente...');
+          window.profissionaisPage.initializeSpecificPage();
         });
       }
       

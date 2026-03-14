@@ -184,9 +184,97 @@ class FormManager {
   }
 }
 
+// Função padrão de confirmação de exclusão
+class ConfirmDialog {
+  static async confirmDelete(options = {}) {
+    const {
+      title = 'Confirmar Exclusão',
+      message = 'Tem certeza que deseja excluir este item?',
+      itemName = '',
+      type = 'default',
+      confirmText = 'Excluir',
+      cancelText = 'Cancelar'
+    } = options;
+
+    // Criar modal de confirmação
+    const modalHtml = `
+      <div class="modal fade" id="confirmDeleteModal" tabindex="-1" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div class="modal-dialog modal-dialog-centered" style="position: relative; max-width: 500px; width: 90%; margin: 0;">
+          <div class="modal-content">
+            <div class="modal-header border-0">
+              <h5 class="modal-title">
+                <span class="text-danger">⚠️</span> ${title}
+              </h5>
+              <button type="button" class="btn-close" onclick="ConfirmDialog.close()"></button>
+            </div>
+            <div class="modal-body">
+              <div class="d-flex align-items-center mb-3">
+                <div class="flex-shrink-0">
+                  <div class="rounded-circle bg-danger bg-opacity-10 p-3">
+                    <i class="fas fa-trash-alt text-danger fs-4"></i>
+                  </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                  <p class="mb-0">${message}</p>
+                  ${itemName ? `<p class="mb-0 fw-bold text-danger">${itemName}</p>` : ''}
+                  <small class="text-muted">Esta ação não pode ser desfeita.</small>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer border-0">
+              <button type="button" class="btn btn-secondary" onclick="ConfirmDialog.close()">
+                ${cancelText}
+              </button>
+              <button type="button" class="btn btn-danger" id="btnConfirmDelete">
+                <i class="fas fa-trash-alt me-2"></i>${confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Adicionar modal ao body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    return new Promise((resolve) => {
+      const confirmBtn = document.getElementById('btnConfirmDelete');
+      const modal = document.getElementById('confirmDeleteModal');
+
+      confirmBtn.addEventListener('click', () => {
+        this.close();
+        resolve(true);
+      });
+
+      // Fechar modal ao clicar fora
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          this.close();
+          resolve(false);
+        }
+      });
+
+      // Fechar modal ao pressionar ESC
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          this.close();
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  static close() {
+    const modal = document.getElementById('confirmDeleteModal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+}
+
 // Exportar para uso global
 window.API_CONFIG = API_CONFIG;
 window.ApiClient = ApiClient;
-window.DateUtils = DateUtils;
 window.UIUtils = UIUtils;
 window.FormManager = FormManager;
+window.ConfirmDialog = ConfirmDialog;

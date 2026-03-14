@@ -10,6 +10,11 @@ class PageManager {
     document.addEventListener('DOMContentLoaded', () => {
       this.initializePage();
     });
+    
+    // Configurar modais após DOM estar pronto
+    document.addEventListener('DOMContentLoaded', () => {
+      this.setupModals();
+    });
   }
 
   async initializePage() {
@@ -64,9 +69,6 @@ class PageManager {
     if (buscaInput) {
       buscaInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
     }
-
-    // Configurar modais
-    this.setupModals();
   }
 
   setupModals() {

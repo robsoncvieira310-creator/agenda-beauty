@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha de Anamnese - Agenda Beauty</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .anamnese-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            margin: 0 auto;
+        }
+        
+        .anamnese-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+        }
+        
+        .anamnese-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .anamnese-header p {
+            margin: 10px 0 0 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .anamnese-body {
+            padding: 30px;
+        }
+        
+        .anamnese-section {
+            margin-bottom: 30px;
+        }
+        
+        .anamnese-section h4 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .anamnese-section h4 i {
+            color: #667eea;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        /* CSS para formulário escondido */
+        .hidden-form {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        .checkbox-label input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #667eea;
+        }
+        
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+        
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-submit:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #fcc;
+        }
+        
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #cfc;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .anamnese-container {
+                margin: 0;
+                border-radius: 0;
+                min-height: 100vh;
+            }
+            
+            .anamnese-header {
+                border-radius: 0;
+            }
+            
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .form-group {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="anamnese-container">
+        <div class="anamnese-header">
+            <h1>📋 Ficha de Anamnese</h1>
+            <p>Por favor, preencha suas informações para atendimento</p>
+        </div>
+        
+        <div class="anamnese-body">
+            <div id="loadingMessage" class="loading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Carregando suas informações...</p>
+            </div>
+            
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            <div id="successMessage" class="success-message" style="display: none;"></div>
+            
+            <form id="anamneseForm">
+                <!-- Dados Pessoais -->
+                <div class="anamnese-section">
+                    <h4><i class="fas fa-user"></i> Dados Pessoais</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nome_completo">Nome Completo *</label>
+                            <input type="text" id="nome_completo" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="idade">Idade</label>
+                            <input type="number" id="idade" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ocupacao">Ocupação</label>
+                            <input type="text" id="ocupacao" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="indicacao">Indicação</label>
+                            <input type="text" id="indicacao" class="form-control" placeholder="Quem indicou nosso serviço?">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="endereco">Endereço</label>
+                            <input type="text" id="endereco" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="cep">CEP</label>
+                            <input type="text" id="cep" class="form-control" placeholder="00000-000" maxlength="9" oninput="this.value = this.value.replace(/\D/g, '')">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cpf">CPF</label>
+                            <input type="text" id="cpf" class="form-control" placeholder="000.000.000-00" maxlength="11" oninput="this.value = this.value.replace(/\D/g, '')">
+                        </div>
+                        <div class="form-group">
+                            <label for="contato_whatsapp">Contato WhatsApp</label>
+                            <input type="text" id="contato_whatsapp" class="form-control" placeholder="(DDD) 00000-0000">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações de Saúde -->
+                <div class="anamnese-section">
+                    <h4><i class="fas fa-heartbeat"></i> Informações de Saúde</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="menor_idade">
+                                <span>Menor de idade</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-row" id="rowResponsavel" style="display: none;">
+                        <div class="form-group">
+                            <label for="responsavel">Nome do Responsável</label>
+                            <input type="text" id="responsavel" class="form-control" placeholder="Nome completo do responsável">
+                        </div>
+                        <div class="form-group">
+                            <label for="contato_responsavel">Telefone do Responsável</label>
+                            <input type="text" id="contato_responsavel" class="form-control" placeholder="Telefone do responsável">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="gestante">
+                                <span>Gestante</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="diabetes">
+                                <span>Diabetes</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="roe_unhas">
+                                <span>Hábito de roer unhas</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="unha_encravada">
+                                <span>Unha encravada</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="alergia_esmalte">
+                                <span>Alergia a esmaltes ou cosméticos</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="retira_cuticula">
+                                <span>Costuma retirar cutícula</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="micose_fungo">
+                                <span>Problema com micose ou fungo</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="usa_medicamento">
+                                <span>Faz uso de medicamento</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="medicamentos">Medicamentos utilizados</label>
+                            <textarea id="medicamentos" class="form-control" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hábitos -->
+                <div class="anamnese-section">
+                    <h4><i class="fas fa-running"></i> Hábitos</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="atividade_fisica">
+                                <span>Pratica atividade física</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="piscina_praia">
+                                <span>Frequenta piscina ou praia</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Procedimento -->
+                <div class="anamnese-section">
+                    <h4><i class="fas fa-spa"></i> Procedimento</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="servico_escolhido">Serviço desejado</label>
+                            <select id="servico_escolhido" class="form-control">
+                                <option value="">Selecione um serviço...</option>
+                                <!-- Serviços serão carregados dinamicamente -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Autorização -->
+                <div class="anamnese-section">
+                    <h4><i class="fas fa-file-signature"></i> Autorização</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="autorizacao_procedimento" required>
+                                <span>Autorizo o procedimento e registro fotográfico *</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btnSubmit">
+                    📋 Enviar Ficha
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabaseClient.js?v=20260313134000"></script>
+    <script>
+        // Classe para gerenciar a ficha pública
+        class PublicAnamnese {
+            constructor() {
+                this.token = null;
+                this.cliente = null;
+                this.supabase = null;
+            }
+
+            async init() {
+                try {
+                    // Obter token da URL
+                    const urlParams = new URLSearchParams(window.location.search);
+                    this.token = urlParams.get('token');
+
+                    if (!this.token) {
+                        this.showError('Link inválido ou incompleto. Por favor, solicite um novo link ao profissional.');
+                        return;
+                    }
+
+                    // Inicializar Supabase
+                    if (window.supabaseClient) {
+                        this.supabase = window.supabaseClient;
+                    } else {
+                        this.showError('Erro de configuração. Contate o profissional.');
+                        return;
+                    }
+
+                    // Mostrar loading
+                    this.showLoading(true);
+
+                    // Buscar cliente pelo token
+                    await this.loadClienteByToken();
+                    
+                    // Carregar serviços do banco de dados
+                    await this.loadServicos();
+
+                } catch (error) {
+                    console.error('Erro ao inicializar:', error);
+                    this.showError('Erro ao carregar ficha. Tente novamente mais tarde.');
+                }
+            }
+
+            async loadServicos() {
+                try {
+                    console.log('🔍 Carregando serviços do banco de dados...');
+                    
+                    const { data, error } = await this.supabase
+                        .from('servicos')
+                        .select('id, nome')
+                        .order('nome');
+                    
+                    if (error) {
+                        console.error('Erro ao carregar serviços:', error);
+                        // Se falhar, carregar opções padrão
+                        this.loadDefaultServicos();
+                        return;
+                    }
+                    
+                    console.log('✅ Serviços carregados:', data);
+                    
+                    // Preencher select com serviços do banco
+                    const selectServico = document.getElementById('servico_escolhido');
+                    if (selectServico) {
+                        // Limpar opções existentes (exceto a primeira)
+                        selectServico.innerHTML = '<option value="">Selecione um serviço...</option>';
+                        
+                        // Adicionar serviços do banco
+                        data.forEach(servico => {
+                            const option = document.createElement('option');
+                            option.value = servico.nome;
+                            option.textContent = servico.nome;
+                            selectServico.appendChild(option);
+                        });
+                    }
+                    
+                } catch (error) {
+                    console.error('Erro ao carregar serviços:', error);
+                    this.loadDefaultServicos();
+                }
+            }
+            
+            loadDefaultServicos() {
+                console.log('🔄 Carregando serviços padrão...');
+                
+                const selectServico = document.getElementById('servico_escolhido');
+                if (selectServico) {
+                    selectServico.innerHTML = `
+                        <option value="">Selecione um serviço...</option>
+                        <option value="Manicure">Manicure</option>
+                        <option value="Pedicure">Pedicure</option>
+                        <option value="Manicure + Pedicure">Manicure + Pedicure</option>
+                        <option value="Alongamento">Alongamento</option>
+                        <option value="Esmaltação em Gel">Esmaltação em Gel</option>
+                        <option value="Nail Art">Nail Art</option>
+                    `;
+                }
+            }
+
+            async loadClienteByToken() {
+                try {
+                    const { data, error } = await this.supabase
+                        .from("clientes")
+                        .select("*")
+                        .eq("ficha_token", this.token)
+                        .single();
+
+                    if (error) {
+                        if (error.code === 'PGRST116') {
+                            this.showError('Link inválido. Por favor, solicite um novo link ao profissional.');
+                        } else {
+                            throw error;
+                        }
+                        return;
+                    }
+
+                    this.cliente = data;
+                    console.log('Cliente encontrado:', this.cliente);
+
+                    // Verificar se ficha já existe
+                    const fichaExists = await this.checkExistingAnamnese();
+                    
+                    // Só carregar ficha existente se não estiver bloqueada
+                    if (!fichaExists) {
+                        await this.loadExistingAnamnese();
+                    }
+
+                    // Auto-preencher contato WhatsApp com telefone do cliente
+                    const contatoWhatsApp = document.getElementById('contato_whatsapp');
+                    if (contatoWhatsApp && this.cliente.telefone && !contatoWhatsApp.value) {
+                        contatoWhatsApp.value = this.cliente.telefone;
+                        contatoWhatsApp.readOnly = true; // Torna readonly para não alterar
+                        contatoWhatsApp.classList.add('readonly');
+                    }
+
+                    this.showLoading(false);
+
+                } catch (error) {
+                    console.error('Erro ao carregar cliente:', error);
+                    this.showError('Erro ao carregar informações do cliente.');
+                    this.showLoading(false);
+                }
+            }
+
+            async loadExistingAnamnese() {
+                try {
+                    const { data, error } = await this.supabase
+                        .from("anamnese_clientes")
+                        .select("*")
+                        .eq("cliente_id", this.cliente.id)
+                        .maybeSingle();
+
+                    if (data && !error) {
+                        console.log('Ficha existente encontrada:', data);
+                        this.populateForm(data);
+                    }
+                } catch (error) {
+                    console.error('Erro ao carregar ficha existente:', error);
+                    // Não mostrar erro aqui, apenas continuar com formulário vazio
+                }
+            }
+
+            populateForm(anamnese) {
+                // Preencher todos os campos com os dados existentes
+                const fields = [
+                    'idade', 'ocupacao', 'endereco', 'cep', 'cpf',
+                    'menor_idade', 'responsavel_contato', 'gestante', 'diabetes',
+                    'roe_unhas', 'unha_encravada', 'alergia_esmalte', 'retira_cuticula',
+                    'micose_fungo', 'usa_medicamento', 'medicamentos',
+                    'atividade_fisica', 'piscina_praia', 'servico_escolhido',
+                    'autorizacao_procedimento'
+                ];
+
+                fields.forEach(field => {
+                    const element = document.getElementById(field);
+                    if (element) {
+                        if (element.type === 'checkbox') {
+                            element.checked = anamnese[field] || false;
+                        } else {
+                            element.value = anamnese[field] || '';
+                        }
+                    }
+                });
+
+                // Mostrar/esconder campos de responsável
+                this.toggleResponsavelFields();
+            }
+
+            toggleResponsavelFields() {
+                const menorIdade = document.getElementById('menor_idade');
+                const rowResponsavel = document.getElementById('rowResponsavel');
+                
+                if (menorIdade && rowResponsavel) {
+                    rowResponsavel.style.display = menorIdade.checked ? 'block' : 'none';
+                }
+            }
+
+            async checkExistingAnamnese() {
+                try {
+                    const { data, error } = await this.supabase
+                        .from("anamnese_clientes")
+                        .select("*")
+                        .eq("cliente_id", this.cliente.id)
+                        .single();
+
+                    if (error && error.code !== 'PGRST116') {
+                        throw error;
+                    }
+
+                    if (data) {
+                        // Ficha já existe - bloquear formulário
+                        console.log('Ficha já existe:', data);
+                        this.showExistingFichaMessage(data);
+                        this.disableFormPermanently();
+                        return true; // Indica que ficha existe
+                    } else {
+                        // Ficha não existe - permitir preenchimento
+                        console.log('Ficha não encontrada, permitindo preenchimento');
+                        this.enableForm();
+                        return false; // Indica que ficha não existe
+                    }
+
+                } catch (error) {
+                    console.error('Erro ao verificar ficha existente:', error);
+                    // Em caso de erro, permitir preenchimento para não bloquear indevidamente
+                    this.enableForm();
+                    return false;
+                }
+            }
+
+            showExistingFichaMessage(anamneseData) {
+                // Esconder formulário completamente
+                const form = document.getElementById('anamneseForm');
+                const formContainer = form.parentElement;
+                
+                // Remover mensagens existentes para evitar duplicação
+                const existingMessages = formContainer.querySelectorAll('.existing-ficha-container');
+                existingMessages.forEach(msg => msg.remove());
+                
+                // Esconder o formulário
+                form.style.display = 'none';
+                form.classList.add('hidden-form');
+                
+                // Esconder botão de submit
+                const submitButton = document.getElementById('btnSubmit');
+                if (submitButton) {
+                    submitButton.style.display = 'none';
+                }
+                
+                // Criar mensagem de ficha já existente
+                const existingMessage = document.createElement('div');
+                existingMessage.className = 'existing-ficha-container';
+                existingMessage.style.cssText = `
+                    text-align: center;
+                    padding: 40px 20px;
+                    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                    color: white;
+                    border-radius: 12px;
+                    margin: 20px 0;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                `;
+                existingMessage.innerHTML = `
+                    <div style="font-size: 48px; margin-bottom: 20px;">📋</div>
+                    <h2 style="margin-bottom: 15px; font-size: 24px;">Ficha Já Preenchida</h2>
+                    <p style="margin-bottom: 10px; font-size: 16px; opacity: 0.9;">
+                        O profissional já recebeu suas informações.
+                    </p>
+                    <div style="margin-top: 30px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                        <small style="opacity: 0.7;">
+                            Esta página não pode ser preenchida novamente. 
+                            Se precisar atualizar alguma informação, entre em contato com o profissional.
+                        </small>
+                    </div>
+                `;
+                
+                // Inserir mensagem no lugar do formulário
+                formContainer.appendChild(existingMessage);
+            }
+
+            disableFormPermanently() {
+                const form = document.getElementById('anamneseForm');
+                const submitButton = document.getElementById('btnSubmit');
+                
+                // Esconder completamente o formulário
+                form.style.display = 'none';
+                form.classList.add('hidden-form');
+                
+                // Esconder botão de envio
+                submitButton.style.display = 'none';
+            }
+
+            enableForm() {
+                const form = document.getElementById('anamneseForm');
+                const submitButton = document.getElementById('btnSubmit');
+                
+                // Verificar se o formulário está escondido (bloqueado)
+                if (form.style.display === 'none') {
+                    return; // Não habilitar se estiver bloqueado
+                }
+                
+                // Garantir que o formulário está visível
+                form.style.display = 'block';
+                
+                // Garantir que o formulário está habilitado
+                const allInputs = form.querySelectorAll('input, select, textarea, checkbox');
+                allInputs.forEach(input => {
+                    input.disabled = false;
+                    input.classList.remove('disabled');
+                });
+                
+                // Mostrar botão de envio
+                submitButton.style.display = 'block';
+            }
+
+            async submitForm() {
+                try {
+                    this.showLoading(true);
+                    this.hideMessages();
+
+                    // Validar autorização
+                    const autorizacao = document.getElementById('autorizacao_procedimento');
+                    if (!autorizacao.checked) {
+                        this.showError('Você precisa autorizar o procedimento para continuar.');
+                        this.showLoading(false);
+                        return;
+                    }
+
+                    // Coletar dados do formulário
+                    const formData = this.collectFormData();
+                    console.log('Dados do formulário:', formData);
+
+                    // Salvar ficha
+                    const response = await this.saveAnamnese(formData);
+
+                    if (response.success) {
+                        const action = response.action === 'created' ? 'criada' : 'atualizada';
+                        
+                        // Esconder formulário completamente após sucesso
+                        setTimeout(() => {
+                            const form = document.getElementById('anamneseForm');
+                            const formContainer = form.parentElement;
+                            
+                            // Remover mensagens existentes para evitar duplicação
+                            const existingMessages = formContainer.querySelectorAll('.success-container, .existing-ficha-container');
+                            existingMessages.forEach(msg => msg.remove());
+                            
+                            // Esconder o formulário
+                            form.style.display = 'none';
+                            
+                            // Criar mensagem padrão (sempre verde) para manter consistência
+                            const successMessage = document.createElement('div');
+                            successMessage.className = 'existing-ficha-container';
+                            successMessage.style.cssText = `
+                                text-align: center;
+                                padding: 40px 20px;
+                                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                                color: white;
+                                border-radius: 12px;
+                                margin: 20px 0;
+                                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                            `;
+                            successMessage.innerHTML = `
+                                <div style="font-size: 48px; margin-bottom: 20px;">📋</div>
+                                <h2 style="margin-bottom: 15px; font-size: 24px;">Ficha Enviada com Sucesso!</h2>
+                                <p style="margin-bottom: 10px; font-size: 16px; opacity: 0.9;">
+                                    O profissional já recebeu suas informações.
+                                </p>
+                                <div style="margin-top: 30px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                                    <small style="opacity: 0.7;">
+                                        Esta página não pode ser preenchida novamente. 
+                                        Se precisar atualizar alguma informação, entre em contato com o profissional.
+                                    </small>
+                                </div>
+                            `;
+                            
+                            // Inserir mensagem no lugar do formulário
+                            formContainer.appendChild(successMessage);
+                            
+                            // Esconder botão de submit se ainda estiver visível
+                            const submitButton = document.getElementById('btnSubmit');
+                            if (submitButton) {
+                                submitButton.style.display = 'none';
+                            }
+                            
+                            // Bloquear permanentemente para garantir que não reapareça
+                            this.disableFormPermanently();
+                        }, 1000); // Reduzido para 1 segundo para aparecer mais rápido
+                    }
+
+                    this.showLoading(false);
+
+                } catch (error) {
+                    console.error('Erro ao enviar ficha:', error);
+                    this.showError('Erro ao enviar ficha. Tente novamente.');
+                    this.showLoading(false);
+                }
+            }
+
+            collectFormData() {
+                const formData = {};
+
+                // Mapeamento de campos do formulário para colunas do banco
+                // BASEADO NA ESTRUTURA REAL DO BANCO DE DADOS (APÓS SQL)
+                const fieldMapping = {
+                    // Campos de identificação
+                    'nome_completo': 'nome_completo',
+                    'idade': 'idade',
+                    'ocupacao': 'ocupacao',
+                    'endereco': 'endereco',
+                    'cep': 'cep',
+                    'cpf': 'cpf',
+                    'indicacao': 'indicacao',  // NOVO CAMPO
+                    
+                    // Campos sobre responsável (menor)
+                    'menor_idade': 'menor_idade',
+                    'responsavel': 'responsavel',  // CAMPO SEPARADO
+                    'contato_responsavel': 'contato_responsavel',  // CAMPO SEPARADO
+                    'contato_whatsapp': 'contato_whatsapp',  // NOVO CAMPO
+                    
+                    // Informações de saúde (booleanos)
+                    'gestante': 'gestante',
+                    'diabetes': 'diabetes',
+                    'roe_unhas': 'roe_unhas',
+                    'unha_encravada': 'unha_encravada',
+                    'alergia_esmalte': 'alergia_esmalte',
+                    'retira_cuticula': 'retira_cuticula',
+                    'micose_fungo': 'micose_fungo',
+                    'usa_medicamento': 'usa_medicamento',  // CORRIGIDO: banco usa usa_
+                    'atividade_fisica': 'atividade_fisica',
+                    'piscina_praia': 'piscina_praia',
+                    
+                    // Procedimentos
+                    'servico_escolhido': 'servico_escolhido',
+                    'autorizacao_procedimento': 'autorizacao_procedimento',  // CORRIGIDO: nome completo
+                    
+                    // Campos de texto
+                    'medicamentos': 'medicamentos'
+                };
+
+                // Coletar todos os campos
+                Object.keys(fieldMapping).forEach(fieldId => {
+                    const element = document.getElementById(fieldId);
+                    if (element) {
+                        const dbField = fieldMapping[fieldId];
+                        if (element.type === 'checkbox') {
+                            formData[dbField] = element.checked;
+                        } else {
+                            formData[dbField] = element.value;
+                        }
+                    }
+                });
+
+                // Adicionar cliente_id ao formData
+                formData.cliente_id = this.cliente.id;
+
+                return formData;
+            }
+
+            async saveAnamnese(formData) {
+                try {
+                    // Verificar se já existe ficha
+                    const { data: existingData } = await this.supabase
+                        .from("anamnese_clientes")
+                        .select("id")
+                        .eq("cliente_id", this.cliente.id)
+                        .maybeSingle();
+
+                    if (existingData) {
+                        // Atualizar ficha existente
+                        const { data, error } = await this.supabase
+                            .from("anamnese_clientes")
+                            .update(formData)
+                            .eq("id", existingData.id)
+                            .select();
+
+                        if (error) throw error;
+                        return { success: true, action: 'updated', data: data[0] };
+                    } else {
+                        // Criar nova ficha
+                        const anamneseWithClientId = {
+                            ...formData,
+                            cliente_id: this.cliente.id
+                        };
+
+                        const { data, error } = await this.supabase
+                            .from("anamnese_clientes")
+                            .insert([anamneseWithClientId])
+                            .select();
+
+                        if (error) throw error;
+                        return { success: true, action: 'created', data: data[0] };
+                    }
+                } catch (error) {
+                    console.error('Erro ao salvar ficha:', error);
+                    throw error;
+                }
+            }
+
+            showLoading(show) {
+                const loadingElement = document.getElementById('loadingMessage');
+                const formElement = document.getElementById('anamneseForm');
+                const submitButton = document.getElementById('btnSubmit');
+                
+                if (show) {
+                    loadingElement.style.display = 'block';
+                    formElement.style.display = 'none';
+                    submitButton.disabled = true;
+                } else {
+                    loadingElement.style.display = 'none';
+                    formElement.style.display = 'block';
+                    submitButton.disabled = false;
+                }
+            }
+
+            showError(message) {
+                this.hideMessages();
+                const errorElement = document.getElementById('errorMessage');
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+
+            showSuccess(message) {
+                this.hideMessages();
+                const successElement = document.getElementById('successMessage');
+                successElement.textContent = message;
+                successElement.style.display = 'block';
+            }
+
+            hideMessages() {
+                document.getElementById('errorMessage').style.display = 'none';
+                document.getElementById('successMessage').style.display = 'none';
+            }
+        }
+
+        // Inicializar quando a página carregar
+        document.addEventListener('DOMContentLoaded', () => {
+            const publicAnamnese = new PublicAnamnese();
+            publicAnamnese.init();
+
+            // Adicionar event listener para o formulário
+            document.getElementById('anamneseForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                publicAnamnese.submitForm();
+            });
+
+            // Event listener para checkbox de menor idade
+            document.getElementById('menor_idade').addEventListener('change', () => {
+                publicAnamnese.toggleResponsavelFields();
+            });
+
+            // Validação de campos numéricos
+            document.getElementById('cep').addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '');
+            });
+
+            document.getElementById('cpf').addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '');
+            });
+        });
+    </script>
+</body>
+</html>

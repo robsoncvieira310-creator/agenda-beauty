@@ -1,47 +1,27 @@
-// Lógica específica da página de profissionais
-class ProfissionaisPage extends PageManager {
+// Página de Profissionais
+class ProfissionaisPage {
   constructor() {
-    super();
-    this.currentPage = 'profissionais';
     this.profissionais = [];
     this.profissionalEditando = null;
-    this.coresDisponiveis = [
-      "#3b82f6", "#10b981", "#f97316", "#ec4899", "#8b5cf6", 
-      "#f59e0b", "#ef4444", "#06b6d4", "#84cc16", "#a855f7"
-    ];
-    console.log('✅ ProfissionaisPage iniciada');
-    
-    // VERSÃO ORIGINAL
-    // Forçar inicialização específica após o DOM estar pronto
-    // setTimeout(() => {
-    //   this.initializeSpecificPage();
-    // }, 100);
-    
-    // NOVA IMPLEMENTAÇÃO V1.2 - EVENTO appReady
-    document.addEventListener('appReady', () => {
-      console.log('🚀 appReady recebido em ProfissionaisPage');
-      this.initializeSpecificPage();
-    });
-  }
-
-  needsAgendamentos() {
-    return true; // Profissionais precisa de agendamentos para estatísticas
+    this.profissionaisPorId = {};
+    this.coresProfissionais = {};
   }
 
   async initializeSpecificPage() {
-    console.log('👩 Inicializando página de profissionais...');
+    console.log('Inicializando página de profissionais...');
+    await this.initialize();
+    this.renderProfessionalTable();
+  }
+
+  async initialize() {
+    console.log('ProfissionaisPage iniciada');
     
-    // Configurar botões específicos
+    // Configurar botões
     this.setupProfessionalButtons();
     
-    // Configurar color picker
-    this.setupColorPicker();
-    
-    // Renderizar tabela inicial
-    await this.renderPage();
-    
-    // Carregar estatísticas
-    await this.updateStatistics();
+    // Carregar profissionais
+    await this.loadProfissionais();
+    this.renderProfessionalTable();
   }
 
   setupProfessionalButtons() {
@@ -49,437 +29,372 @@ class ProfissionaisPage extends PageManager {
     const btnNovo = document.getElementById('btnNovoProfissional');
     if (btnNovo) {
       btnNovo.addEventListener('click', () => this.openNewProfessionalModal());
+      console.log('✅ Botão Novo Profissional configurado');
+    } else {
+      console.error('❌ Botão Novo Profissional não encontrado!');
     }
 
     // Botão salvar profissional
     const btnSalvar = document.getElementById('btnSalvar');
     if (btnSalvar) {
       btnSalvar.addEventListener('click', () => this.saveProfessional());
+      console.log('✅ Botão Salvar configurado');
+    } else {
+      console.error('❌ Botão Salvar não encontrado!');
     }
 
     // Botão excluir profissional
     const btnExcluir = document.getElementById('btnExcluir');
     if (btnExcluir) {
-      btnExcluir.addEventListener('click', () => this.deleteProfessional());
+      btnExcluir.addEventListener('click', () => this.confirmDelete());
+      console.log('✅ Botão Excluir configurado');
+    } else {
+      console.error('❌ Botão Excluir não encontrado!');
     }
+
+    // Botão fechar modal
+    const btnFecharModal = document.getElementById('btnFecharModal');
+    if (btnFecharModal) {
+      btnFecharModal.addEventListener('click', () => this.closeModal());
+      console.log('✅ Botão Fechar Modal configurado');
+    } else {
+      console.error('❌ Botão Fechar Modal não encontrado!');
+    }
+
+    // Configurar formatação automática do telefone
+    this.setupPhoneFormatting();
   }
 
-  setupColorPicker() {
-    // Sincronizar color picker com campo hex
-    const colorPicker = document.getElementById('corCalendario');
-    const colorHex = document.getElementById('corHex');
-    const btnCorAleatoria = document.getElementById('btnCorAleatoria');
-
-    if (colorPicker && colorHex) {
-      colorPicker.addEventListener('input', (e) => {
-        colorHex.value = e.target.value;
-      });
-
-      colorHex.addEventListener('input', (e) => {
-        if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
-          colorPicker.value = e.target.value;
+  setupPhoneFormatting() {
+    const telefoneInput = document.getElementById('telefoneProfissional');
+    if (telefoneInput) {
+      telefoneInput.addEventListener('input', (e) => {
+        // Remover todos os caracteres não numéricos
+        let digits = e.target.value.replace(/\D/g, '');
+        
+        // Formatar para celular (11 dígitos): (DDD) XXXXX-XXXX
+        // Formatar para fixo (10 dígitos): (DD) XXXX-XXXX
+        if (digits.length === 0) {
+          e.target.value = '';
+        } else if (digits.length <= 2) {
+          e.target.value = `(${digits}`;
+        } else if (digits.length <= 6) {
+          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+        } else if (digits.length === 7) {
+          // Início do hífen no formato fixo
+          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+        } else if (digits.length <= 10) {
+          // Formato fixo: (DD) XXXX-XXXX
+          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
+        } else if (digits.length === 11) {
+          // Formato celular: (DD) XXXXX-XXXX
+          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+        } else {
+          // Limitar a 11 dígitos
+          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
         }
       });
-    }
-
-    if (btnCorAleatoria) {
-      btnCorAleatoria.addEventListener('click', () => {
-        const cor = this.generateRandomColor();
-        if (colorPicker) colorPicker.value = cor;
-        if (colorHex) colorHex.value = cor;
-      });
+      console.log('✅ Formatação automática de telefone configurada');
     }
   }
 
   async renderPage() {
-    console.log("🔄 Renderizando página de profissionais...");
-    
-    // NOVA IMPLEMENTAÇÃO V1.2 - FORÇAR CARREGAMENTO DIRETO
-    try {
-      console.log("🔍 Forçando carregamento direto do Supabase...");
-      this.profissionais = await window.dataManager.loadProfissionais();  // Força carregamento
-      console.log("✅ Profissionais obtidos do DataManager:", this.profissionais);
-      console.log("📊 Quantidade de profissionais:", this.profissionais.length);
-    } catch (error) {
-      console.error("❌ Erro ao carregar profissionais:", error);
-      this.profissionais = [];
-    }
-    
-    // Renderizar tabela
+    console.log('Renderizando página de profissionais...');
+    await this.loadProfissionais();
     this.renderProfessionalTable();
   }
 
+  async updateStatistics() {
+    console.log('Atualizando estatísticas de profissionais...');
+    // Implementar se necessário
+  }
+
+  async loadProfissionais() {
+    try {
+      console.log('Carregando profissionais...');
+      this.profissionais = await window.dataManager.getProfissionais();
+      
+      // Criar mapa de profissionais por ID
+      this.profissionaisPorId = {};
+      this.profissionais.forEach(p => {
+        this.profissionaisPorId[p.id] = p;
+      });
+      
+      // Gerar cores para profissionais
+      this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
+      
+      console.log('Profissionais carregados:', this.profissionais.length);
+    } catch (error) {
+      console.error('Erro ao carregar profissionais:', error);
+      UIUtils.showAlert('Erro ao carregar profissionais', 'error');
+    }
+  }
+
+  gerarCoresProfissionais(profissionais) {
+    const cores = {};
+    profissionais.forEach(profissional => {
+      cores[profissional.id] = profissional.cor_calendario || '#8b5cf6';
+    });
+    return cores;
+  }
+
   renderProfessionalTable() {
-    console.log("🎨 Iniciando renderProfessionalTable...");
+    console.log('🎨 Iniciando renderProfessionalTable...');
+    console.log('📊 Profissionais disponíveis:', this.profissionais);
     
     const tbody = document.getElementById('tabelaProfissionais');
     if (!tbody) {
-      console.error('❌ Tabela de profissionais não encontrada');
+      console.error('❌ Elemento tabelaProfissionais não encontrado!');
       return;
     }
-    
+
+    console.log('✅ Elemento tbody encontrado:', tbody);
     tbody.innerHTML = '';
 
     if (this.profissionais.length === 0) {
-      this.renderEmptyState(tbody, 'Nenhum profissional cadastrado', '👩', 'openNewProfessionalModal()');
+      console.log('⚠️ Nenhum profissional encontrado');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="3" class="text-center">Nenhum profissional encontrado</td>
+        </tr>
+      `;
       return;
     }
 
     console.log(`📊 Renderizando ${this.profissionais.length} profissionais...`);
     this.profissionais.forEach((profissional, index) => {
-      const agendamentosCount = window.dataManager.agendamentos.filter(a => a.profissional === profissional.nome).length;
-      
+      console.log(`👤 Renderizando profissional ${index + 1}:`, profissional);
       const tr = document.createElement('tr');
       tr.innerHTML = `
+        <td>${profissional.nome}</td>
+        <td>${profissional.telefone || '-'}</td>
         <td>
-          <div class="professional-name">
-            <strong>${profissional.nome}</strong>
-            ${profissional.telefone ? `<br><small class="text-muted">${this.formatPhone(profissional.telefone)}</small>` : ''}
-          </div>
-        </td>
-        <td>${profissional.email || '-'}</td>
-        <td>${profissional.especialidade || '-'}</td>
-        <td>
-          <div class="color-sample" style="background-color: ${profissional.cor_calendario || '#3b82f6'}; width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ddd;"></div>
-        </td>
-        <td>
-          <span class="badge badge-primary">${agendamentosCount} agendamentos</span>
-        </td>
-        <td>
-          <div class="table-actions">
-            <button class="btn btn-sm btn-warning" onclick="pageManager.editProfessional('${profissional.nome}')" title="Editar">
-              <span class="btn-icon">✏️</span>
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="pageManager.confirmDelete('${profissional.nome}')" title="Excluir">
-              <span class="btn-icon">🗑️</span>
-            </button>
-          </div>
+          <button class="btn btn-sm btn-primary" onclick="window.profissionaisPage.editProfessional(${profissional.id})">
+            <i class="fas fa-edit"></i> Editar
+          </button>
+          <button class="btn btn-sm btn-danger" onclick="window.profissionaisPage.deleteProfessional(${profissional.id})">
+            <i class="fas fa-trash"></i> Excluir
+          </button>
         </td>
       `;
       tbody.appendChild(tr);
     });
     
-    console.log("✅ Renderização concluída!");
-  }
-
-  async updateStatistics() {
-    try {
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      const amanha = new Date(hoje);
-      amanha.setDate(amanha.getDate() + 1);
-
-      // Agendamentos hoje
-      const agendamentosHoje = dataManager.agendamentos.filter(a => {
-        const dataAg = new Date(a.inicio);
-        return dataAg >= hoje && dataAg < amanha;
-      });
-
-      // Profissional mais ativo (com mais agendamentos)
-      const contagemPorProfissional = {};
-      dataManager.agendamentos.forEach(a => {
-        contagemPorProfissional[a.profissional] = (contagemPorProfissional[a.profissional] || 0) + 1;
-      });
-
-      const profissionalMaisAtivo = Object.entries(contagemPorProfissional)
-        .sort(([,a], [,b]) => b - a)[0];
-
-      this.updateStatisticsDOM(
-        this.profissionais.length, 
-        agendamentosHoje.length, 
-        profissionalMaisAtivo ? profissionalMaisAtivo[0] : '-'
-      );
-    } catch (error) {
-      console.error('Erro ao atualizar estatísticas:', error);
-    }
-  }
-
-  updateStatisticsDOM(total, agendamentosHoje, maisAtivo) {
-    const totalElement = document.getElementById('totalProfissionais');
-    const agendamentosElement = document.getElementById('agendamentosHoje');
-    const ativoElement = document.getElementById('profissionalAtivo');
-
-    if (totalElement) totalElement.textContent = total;
-    if (agendamentosElement) agendamentosElement.textContent = agendamentosHoje;
-    if (ativoElement) ativoElement.textContent = maisAtivo;
-  }
-
-  handleSearch(term) {
-    const filtrados = this.profissionais.filter(profissional => 
-      profissional.nome.toLowerCase().includes(term.toLowerCase()) ||
-      (profissional.especialidade && profissional.especialidade.toLowerCase().includes(term.toLowerCase())) ||
-      (profissional.telefone && profissional.telefone.includes(term))
-    );
-    
-    const tbody = document.getElementById('tabelaProfissionais');
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-
-    if (filtrados.length === 0) {
-      this.renderEmptyState(tbody, `Nenhum profissional encontrado para "${term}"`, '🔍');
-      return;
-    }
-
-    filtrados.forEach(profissional => {
-      const agendamentosCount = dataManager.agendamentos.filter(a => a.profissional === profissional.nome).length;
-      const cor = profissional.cor_calendario || '#3b82f6';
-      
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><strong>${profissional.nome}</strong></td>
-        <td>${this.formatPhone(profissional.telefone)}</td>
-        <td>${profissional.especialidade || '-'}</td>
-        <td>
-          <div class="color-display">
-            <span class="color-badge" style="background-color: ${cor}"></span>
-            <code class="color-code">${cor}</code>
-          </div>
-        </td>
-        <td><span class="badge badge-primary">${agendamentosCount}</span></td>
-        <td>
-          <button class="btn btn-sm btn-warning" onclick="pageManager.editProfessional('${profissional.nome}')">✏️</button>
-          <button class="btn btn-sm btn-danger" onclick="pageManager.confirmDelete('${profissional.nome}')">🗑️</button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
+    console.log('✅ Renderização concluída!');
   }
 
   openNewProfessionalModal() {
     this.profissionalEditando = null;
+    this.clearForm();
     document.getElementById('modalTitulo').textContent = 'Novo Profissional';
     document.getElementById('btnExcluir').style.display = 'none';
-    this.clearForm('modalProfissional');
-    
-    // Gerar cor aleatória para novo profissional
-    const cor = this.generateRandomColor();
-    const colorPicker = document.getElementById('corCalendario');
-    const colorHex = document.getElementById('corHex');
-    
-    if (colorPicker) colorPicker.value = cor;
-    if (colorHex) colorHex.value = cor;
-    
     this.showModal('modalProfissional');
   }
 
-  editProfessional(nome) {
-    const profissional = this.profissionais.find(p => p.nome === nome);
+  editProfessional(id) {
+    const profissional = this.profissionaisPorId[id];
     if (!profissional) return;
 
     this.profissionalEditando = profissional;
+    this.fillForm(profissional);
     document.getElementById('modalTitulo').textContent = 'Editar Profissional';
     document.getElementById('btnExcluir').style.display = 'inline-block';
-    
-    // Preencher formulário
-    document.getElementById('nomeProfissional').value = profissional.nome || '';
-    document.getElementById('telefoneProfissional').value = profissional.telefone || '';
-    document.getElementById('especialidadeProfissional').value = profissional.especialidade || '';
-    
-    const cor = profissional.cor_calendario || '#3b82f6';
-    const colorPicker = document.getElementById('corCalendario');
-    const colorHex = document.getElementById('corHex');
-    
-    if (colorPicker) colorPicker.value = cor;
-    if (colorHex) colorHex.value = cor;
-    
-    // Desabilitar edição do nome
-    document.getElementById('nomeProfissional').disabled = true;
-    
     this.showModal('modalProfissional');
   }
 
+  fillForm(profissional) {
+    document.getElementById('nomeProfissional').value = profissional.nome || '';
+    document.getElementById('telefoneProfissional').value = profissional.telefone || '';
+    document.getElementById('emailProfissional').value = profissional.email || '';
+    
+    // Verificar se usuário é admin para permitir edição do nome
+    const userProfile = window.authManager?.currentUserProfile;
+    const isAdmin = userProfile?.role === 'admin';
+    
+    if (!isAdmin) {
+      // Desabilitar edição do nome apenas para não-admins
+      document.getElementById('nomeProfissional').disabled = true;
+    } else {
+      // Permitir edição do nome para admin
+      document.getElementById('nomeProfissional').disabled = false;
+      console.log('👑 Admin detectado - edição de nome permitida');
+    }
+  }
+
+  clearForm() {
+    // Limpar campos individualmente
+    document.getElementById('nomeProfissional').value = '';
+    document.getElementById('telefoneProfissional').value = '';
+    document.getElementById('emailProfissional').value = '';
+    document.getElementById('nomeProfissional').disabled = false;
+    console.log('✅ Formulário limpo');
+  }
+
   async saveProfessional() {
-    const nome = document.getElementById('nomeProfissional').value.trim();
-    const telefone = document.getElementById('telefoneProfissional').value.trim();
-    const especialidade = document.getElementById('especialidadeProfissional').value.trim();
-    const corCalendario = document.getElementById('corCalendario').value;
+    console.log('saveProfessional chamado');
+    
+    try {
+        // Coletar dados
+        const nome = document.getElementById('nomeProfissional').value.trim();
+        const telefone = document.getElementById('telefoneProfissional').value.trim();
+        const email = document.getElementById('emailProfissional').value.trim();
 
-    // VERSÃO ORIGINAL
-    // Validação
-    // const errors = this.validateForm(['nomeProfissional']);
-    // if (errors.length > 0) {
-    //   this.showError(errors[0]);
-    //   return;
-    // }
+        console.log('Dados coletados:', { nome, telefone, email });
 
-    // Validar formato da cor
-    // if (!/^#[0-9A-F]{6}$/i.test(corCalendario)) {
-    //   this.showError('Cor inválida');
-    //   return;
-    // }
+        // Validacao
+        const errors = [];
+        
+        if (!nome) {
+            errors.push('O nome do profissional e obrigatorio');
+        } else if (nome.length < 3) {
+            errors.push('O nome deve ter pelo menos 3 caracteres');
+        }
+        
+        if (!telefone) {
+            errors.push('WhatsApp do profissional e obrigatorio');
+        }
+        
+        if (telefone && !this.isValidPhone(telefone)) {
+            errors.push('WhatsApp invalido. Use o formato (DDD) 00000-0000');
+        }
+        
+        if (!email) {
+            errors.push('Email do profissional e obrigatorio');
+        } else if (!this.isValidEmail(email)) {
+            errors.push('Email invalido');
+        }
+        
+        if (errors.length > 0) {
+            this.showError(errors[0]);
+            return;
+        }
 
-    // Validar telefone se fornecido
-    // if (telefone && !this.isValidPhone(telefone)) {
-    //   this.showError('Telefone inválido');
-    //   return;
-    // }
-    
-    // NOVA IMPLEMENTAÇÃO V1.2 - VALIDAÇÃO COMPLETA
-    const errors = [];
-    
-    // Validação de nome obrigatório
-    if (!nome) {
-      errors.push('O nome do profissional é obrigatório');
-    } else if (nome.length < 3) {
-      errors.push('O nome deve ter pelo menos 3 caracteres');
+        const btnSalvar = document.getElementById('btnSalvar');
+        UIUtils.showLoading(btnSalvar);
+
+        // DADOS APENAS CAMPOS EXISTENTES NO BANCO
+        const dadosParaSalvar = {
+            nome: nome,
+            telefone: telefone,
+            email: email
+        };
+
+        console.log('Salvando profissional:', dadosParaSalvar);
+
+        if (this.profissionalEditando) {
+            await window.dataManager.updateProfissional(this.profissionalEditando.id, dadosParaSalvar);
+            this.showSuccess('Profissional atualizado com sucesso');
+        } else {
+            if (this.profissionais.some(p => p.nome === nome)) {
+                this.showError('Ja existe um profissional com este nome');
+                return;
+            }
+            
+            await window.dataManager.addProfissional(dadosParaSalvar);
+            this.showSuccess('Profissional criado com sucesso');
+        }
+        
+        await this.renderPage();
+        this.closeModal();
+        console.log('saveProfessional concluido com sucesso');
+        
+    } catch (error) {
+        console.error('Erro no saveProfessional():', error);
+        this.showError('Erro ao salvar profissional: ' + error.message);
+    } finally {
+        const btnSalvar = document.getElementById('btnSalvar');
+        UIUtils.hideLoading(btnSalvar);
     }
+  }
+
+  isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  isValidPhone(phone) {
+    // Aceita ambos os formatos: (DD) XXXX-XXXX (14 chars) ou (DDD) XXXXX-XXXX (15 chars)
+    const phoneRegex = /^\(\d{2}\) \d{4,5}-\d{4}$/;
+    const isValid = phoneRegex.test(phone);
     
-    // Validação de telefone (opcional mas se preenchido deve ser válido)
-    if (telefone && !this.isValidPhone(telefone)) {
-      errors.push('Telefone inválido. Use o formato (XX) XXXXX-XXXX');
+    // Verificar se tem exatamente 14 ou 15 caracteres (incluindo espaço)
+    const hasCorrectLength = phone.length === 14 || phone.length === 15;
+    
+    return isValid && hasCorrectLength;
+  }
+
+  showError(message) {
+    UIUtils.showAlert(message, 'error');
+  }
+
+  showSuccess(message) {
+    UIUtils.showAlert(message, 'success');
+  }
+
+  showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
     }
-    
-    // Validação de especialidade (opcional mas se preenchida deve ter mínimo)
-    if (especialidade && especialidade.length < 3) {
-      errors.push('A especialidade deve ter pelo menos 3 caracteres');
+  }
+
+  closeModal() {
+    const modal = document.getElementById('modalProfissional');
+    if (modal) {
+      modal.style.display = 'none';
+      document.body.style.overflow = 'auto';
     }
-    
-    // Validação de formato da cor
-    if (!/^#[0-9A-F]{6}$/i.test(corCalendario)) {
-      errors.push('Cor inválida. Use o formato #RRGGBB (ex: #FF0000)');
-    }
-    
-    // Se houver erros, mostrar primeiro erro
-    if (errors.length > 0) {
-      this.showToast(errors[0], 'error');
+  }
+
+  async deleteProfessional(id) {
+    const profissional = this.profissionaisPorId[id];
+    if (!profissional) return;
+
+    const confirmed = await window.ConfirmDialog.confirmDelete({
+      title: 'Excluir Profissional',
+      message: 'Tem certeza que deseja excluir este profissional?',
+      itemName: profissional.nome,
+      confirmText: 'Excluir Profissional'
+    });
+
+    if (!confirmed) {
       return;
     }
 
-    const btnSalvar = document.getElementById('btnSalvar');
-    UIUtils.showLoading(btnSalvar);
-
     try {
-      if (this.profissionalEditando) {
-        // Atualizar profissional
-        await dataManager.updateProfissional(this.profissionalEditando.id, {
-          nome, telefone, especialidade, cor_calendario: corCalendario
-        });
-        this.showSuccess('Profissional atualizado com sucesso');
-      } else {
-        // Verificar se já existe
-        if (this.profissionais.some(p => p.nome === nome)) {
-          this.showError('Já existe um profissional com este nome');
-          return;
-        }
-        
-        // Criar novo profissional
-        await dataManager.addProfissional({ 
-          nome, 
-          telefone, 
-          especialidade, 
-          cor_calendario: corCalendario 
-        });
-        this.showSuccess('Profissional criado com sucesso');
-      }
-
-      await this.renderPage();
-      await this.updateStatistics();
-      this.closeModal();
-    } catch (error) {
-      console.error('Erro ao salvar profissional:', error);
-      this.showError('Erro ao salvar profissional');
-    } finally {
-      UIUtils.hideLoading(btnSalvar);
-    }
-  }
-
-  confirmDelete(nome) {
-    if (confirm(`Tem certeza que deseja excluir o profissional "${nome}"? Esta ação não pode ser desfeita.`)) {
-      this.deleteProfessionalByName(nome);
-    }
-  }
-
-  async deleteProfessionalByName(nome) {
-    const profissional = this.profissionais.find(p => p.nome === nome);
-    if (!profissional) return;
-
-    try {
-      await dataManager.deleteProfissional(profissional.id);
+      await window.dataManager.deleteProfissional(id);
       this.showSuccess('Profissional excluído com sucesso');
-      await this.renderPage();
-      await this.updateStatistics();
+      
+      // Forçar recarregamento dos dados do banco e renderizar novamente
+      await this.loadProfissionais();
+      await this.renderProfessionalTable();
     } catch (error) {
       console.error('Erro ao excluir profissional:', error);
       this.showError('Erro ao excluir profissional');
     }
   }
 
-  async deleteProfessional() {
-    if (!this.profissionalEditando) return;
-    this.deleteProfessionalByName(this.profissionalEditando.nome);
-  }
-
-  // Métodos utilitários
-  generateRandomColor() {
-    return this.coresDisponiveis[Math.floor(Math.random() * this.coresDisponiveis.length)];
-  }
-
-  isValidPhone(phone) {
-    // Aceita formatos: (00) 00000-0000, 00000000000, 0000-0000
-    const regex = /^(\(\d{2}\)\s?)?\d{4,5}-?\d{4}$/;
-    return regex.test(phone.replace(/\s/g, ''));
-  }
-
-  // NOVA IMPLEMENTAÇÃO V1.2 - TOAST NOTIFICATIONS
-  showToast(message, type = 'success') {
-    // Criar elemento toast
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    
-    // Adicionar estilos inline
-    toast.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 12px 20px;
-      border-radius: 4px;
-      color: white;
-      font-weight: 500;
-      z-index: 10000;
-      opacity: 0;
-      transform: translateX(100%);
-      transition: all 0.3s ease;
-      max-width: 300px;
-      word-wrap: break-word;
-    `;
-    
-    // Estilo por tipo
-    switch(type) {
-      case 'success':
-        toast.style.backgroundColor = '#10b981';
-        break;
-      case 'error':
-        toast.style.backgroundColor = '#ef4444';
-        break;
-      case 'warning':
-        toast.style.backgroundColor = '#f59e0b';
-        break;
-      default:
-        toast.style.backgroundColor = '#6b7280';
-    }
-    
-    // Adicionar ao DOM
-    document.body.appendChild(toast);
-    
-    // Animar entrada
-    setTimeout(() => {
-      toast.style.opacity = '1';
-      toast.style.transform = 'translateX(0)';
-    }, 100);
-    
-    // Remover após 3 segundos
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
+  async loadProfissionais() {
+    try {
+      console.log('Carregando profissionais...');
+      // Forçar recarregamento para obter dados atualizados
+      this.profissionais = await window.dataManager.getProfissionais(true);
       
-      setTimeout(() => {
-        if (toast.parentNode) {
-          toast.parentNode.removeChild(toast);
-        }
-      }, 300);
-    }, 3000);
+      // Criar mapa de profissionais por ID
+      this.profissionaisPorId = {};
+      this.profissionais.forEach(p => {
+        this.profissionaisPorId[p.id] = p;
+      });
+      
+      // Gerar cores para profissionais
+      this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
+      
+      console.log('Profissionais carregados:', this.profissionais.length);
+    } catch (error) {
+      console.error('Erro ao carregar profissionais:', error);
+      UIUtils.showAlert('Erro ao carregar profissionais', 'error');
+    }
   }
 }
 

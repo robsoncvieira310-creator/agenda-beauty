@@ -1,9 +1,85 @@
 // Gerenciamento do calendário FullCalendar
+// VERSÃO: 8.3.0 - CONFLITO COM TRIGGER RESOLVIDO
+// CACHE-BREAKER: 20260313250000&t=1710255600000
+console.log('🗓️ CalendarManager V8.3.0 carregado - Conflito com trigger resolvido');
+
 class CalendarManager {
   constructor(calendarId) {
     this.calendar = null;
     this.calendarId = calendarId;
     this.eventos = [];
+    
+    // Mapa de cores baseado em serviços (nova lógica)
+    this.coresServicos = {
+      // Manicure
+      'manicure': '#e91e63',           // Rosa
+      'manicure tradicional': '#e91e63',
+      'manicure francesa': '#c2185b',
+      'manicure com esmaltação': '#d81b60',
+      
+      // Pedicure
+      'pedicure': '#2196f3',           // Azul
+      'pedicure tradicional': '#2196f3',
+      'pedicure com esmaltação': '#1976d2',
+      
+      // Alongamento
+      'alongamento': '#4caf50',         // Verde
+      'alongamento em gel': '#4caf50',
+      'alongamento acrílico': '#388e3c',
+      'alongamento de fibra': '#43a047',
+      
+      // Manutenção
+      'manutenção': '#ff9800',         // Laranja
+      'manutenção alongamento': '#f57c00',
+      'reforço': '#ff6f00',
+      'manutenção de gel': '#ef6c00',
+      
+      // Tratamentos
+      'tratamento': '#9c27b0',        // Roxo
+      'tratamento cutícula': '#7b1fa2',
+      'hidratação': '#8e24aa',
+      'spa das mãos': '#6a1b9a',
+      
+      // Serviços diversos
+      'depilação': '#795548',          // Marrom
+      'design': '#607d8b',             // Azul cinza
+      'massagem': '#00bcd4',           // Ciano
+      
+      // Categoria genérica
+      'outros': '#607d8b',             // Azul cinza
+      'geral': '#78909c'               // Cinza
+    };
+  }
+
+  // Método para obter cor baseada no serviço (nova lógica)
+  getCorPorServico(nomeServico, servicoId) {
+    // Primeiro, tentar obter cor personalizada do serviço pelo ID
+    if (servicoId && dataManager.servicosPorId && dataManager.servicosPorId[servicoId]) {
+      const servico = dataManager.servicosPorId[servicoId];
+      if (servico.cor) {
+        return servico.cor;
+      }
+    }
+    
+    // Se não tiver cor personalizada, usar o mapa de cores padrão
+    if (!nomeServico) return '#78909c'; // Cinza padrão
+    
+    const servicoLower = nomeServico.toLowerCase();
+    
+    // Buscar correspondência exata
+    if (this.coresServicos[servicoLower]) {
+      return this.coresServicos[servicoLower];
+    }
+    
+    // Buscar por palavras-chave
+    for (const [chave, cor] of Object.entries(this.coresServicos)) {
+      if (servicoLower.includes(chave)) {
+        return cor;
+      }
+    }
+    
+    // Se não encontrar, retorna cor padrão
+    return '#78909c';
   }
 
   async initialize() {
@@ -48,18 +124,76 @@ class CalendarManager {
     this.calendar = new FullCalendar.Calendar(calendarEl, {
       locale: "pt-br",
       height: "auto",
-      slotMinTime: "08:00:00",
-      slotMaxTime: "19:00:00",
+      aspectRatio: 1.8,
+      slotMinTime: "06:00:00",
+      slotMaxTime: "23:00:00",
+      slotDuration: "00:30:00",
+      slotLabelInterval: "01:00:00",
+      slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
       initialView: "timeGridWeek",
 
       headerToolbar: {
         left: "prev,next today",
         center: "title",
-        right: "timeGridDay,timeGridWeek,dayGridMonth"
+        right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek"
       },
 
+      // Configurações Google Agenda style
+      allDaySlot: false,
+      nowIndicator: true,
+      scrollTime: "08:00:00",
+      businessHours: {
+        daysOfWeek: [1, 2, 3, 4, 5], // Segunda a Sexta
+        startTime: '09:00',
+        endTime: '18:00'
+      },
+
+      // Traduções personalizadas
+      buttonText: {
+        today:    'Hoje',
+        month:    'Mês',
+        week:     'Semana',
+        day:      'Dia',
+        list:     'Lista'
+      },
+      
+      allDayText: 'Dia inteiro',
+      moreLinkText: function(n) {
+        return '+ mais ' + n
+      },
+      noEventsText: 'Nenhum evento para mostrar',
+      
+      // Configurações de tooltip e mensagens
+      eventLimitText: function(num) {
+        return '+' + num + ' mais'
+      },
+      
+      // Títulos das views
+      views: {
+        month: {
+          titleFormat: { month: 'long', year: 'numeric' }
+        },
+        week: {
+          titleFormat: { day: 'numeric', month: 'short', year: 'numeric' }
+        },
+        day: {
+          titleFormat: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
+        },
+        listWeek: {
+          titleFormat: { month: 'long', year: 'numeric' }
+        }
+      },
+      
+      // Formatação de datas
+      dayHeaderFormat: { weekday: 'short' },
+      slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+      
+      // Configurações explícitas para drag and drop
       editable: true,
+      eventStartEditable: true,
+      eventDurationEditable: true,
       selectable: true,
+      droppable: true,
 
       events: this.eventos,
 
@@ -108,27 +242,35 @@ class CalendarManager {
 
   processarEventos(agendamentos, bloqueios) {
     const eventosAg = agendamentos.map(a => {
-      const corBase = dataManager.coresProfissionais[a.profissional] || "#3b82f6";
-      const corStatus = dataManager.gerarCorPorStatus(a.status, corBase);
+      // NOVA LÓGICA: Cor baseada no serviço (personalizada ou padrão)
+      const corServico = this.getCorPorServico(a.servico, a.servico_id);
+      const corStatus = dataManager.gerarCorPorStatus(a.status, corServico);
       
       return {
         id: String(a.id),
-        title: `${a.cliente} - ${a.servico} (${a.profissional})`,
+        title: `${a.cliente} - ${a.servico}`,
         start: a.inicio,
         end: a.fim,
         editable: true,
         extendedProps: {
           tipo: "agendamento",
           realId: a.id,
+          cliente_id: a.cliente_id,
+          servico_id: a.servico_id,
+          profissional_id: a.profissional_id,
           cliente: a.cliente,
           servico: a.servico,
           profissional: a.profissional,
           status: a.status || "agendado",
           observacoes: a.observacoes || ""
         },
-        backgroundColor: corStatus,
-        borderColor: corStatus,
-        classNames: [`status-${a.status || "agendado"}`]
+        // Estilo Google Agenda com cores baseadas em serviço
+        backgroundColor: corServico,
+        borderColor: corServico,
+        textColor: "#ffffff",
+        classNames: [`evento-agendamento`, `status-${a.status || "agendado"}`, `servico-${a.servico_id}`],
+        // Formatação do título
+        display: 'block'
       };
     });
 
@@ -139,7 +281,7 @@ class CalendarManager {
         title: b.titulo || "Bloqueio",
         start: b.inicio,
         end: b.fim,
-        classNames: ["bloqueio"],
+        classNames: ["evento-bloqueio"],
         editable: false,
         extendedProps: {
           tipo: "bloqueio",
@@ -148,7 +290,12 @@ class CalendarManager {
           motivo: b.motivo || "",
           tipoBloqueio: b.tipo || "",
           profissionalId: b.profissional_id || null
-        }
+        },
+        // Estilo Google Agenda para bloqueios
+        backgroundColor: "#5f6368",
+        borderColor: "#3c4043",
+        textColor: "#ffffff",
+        display: 'block'
       };
 
       if (b.profissional_id) {
@@ -159,7 +306,7 @@ class CalendarManager {
             title: `${b.titulo || "Bloqueio"} (${prof.nome})`,
             start: b.inicio,
             end: b.fim,
-            classNames: ["bloqueio"],
+            classNames: ["evento-bloqueio"],
             editable: false,
             extendedProps: {
               tipo: "bloqueio",
@@ -169,7 +316,12 @@ class CalendarManager {
               tipoBloqueio: b.tipo || "",
               profissionalId: b.profissional_id,
               profissional: prof.nome
-            }
+            },
+            // Estilo Google Agenda para bloqueios
+            backgroundColor: "#5f6368",
+            borderColor: "#3c4043",
+            textColor: "#ffffff",
+            display: 'block'
           });
         }
       } else {
@@ -267,52 +419,140 @@ class CalendarManager {
   async handleEventDrop(info) {
     const ev = info.event;
     const tipo = ev.extendedProps && ev.extendedProps.tipo;
+    const eventoData = ev.extendedProps;
+
+    console.log('🔄 EventDrop acionado:', {
+      id: ev.id,
+      title: ev.title,
+      tipo: tipo,
+      oldStart: info.oldEvent.start,
+      newStart: ev.start,
+      oldEnd: info.oldEvent.end,
+      newEnd: ev.end
+    });
+
+    console.log('📦 Dados completos do evento:', eventoData);
+    console.log('🔍 IDs disponíveis:', {
+      cliente_id: eventoData.cliente_id,
+      servico_id: eventoData.servico_id,
+      profissional_id: eventoData.profissional_id
+    });
 
     if (tipo === "bloqueio") {
+      console.log('🚫 Bloqueio detectado, revertendo...');
       info.revert();
       UIUtils.showAlert('Edite bloqueios pelo modal', 'warning');
       return;
     }
 
     try {
-      // Simplificar - não usar recursos
-      const profissionalNovo = ev.extendedProps.profissional;
+      // Obter dados do evento - CORREÇÃO: Extrair IDs corretamente
+      console.log('📦 Dados do evento:', eventoData);
 
-      await dataManager.updateAgendamento(ev.id, {
-        profissional: profissionalNovo,
-        inicio: ev.start,
-        fim: ev.end
+      // CORREÇÃO: Extrair IDs dos dados do evento
+      // CORREÇÃO CRÍTICA: Converter para horário local antes de enviar
+      const dadosAtualizacao = {
+        cliente_id: eventoData.cliente_id,
+        servico_id: eventoData.servico_id,
+        profissional_id: eventoData.profissional_id,
+        data_inicio: new Date(ev.start.getTime() - ev.start.getTimezoneOffset() * 60000).toISOString().slice(0, 19),
+        data_fim: new Date(ev.end.getTime() - ev.end.getTimezoneOffset() * 60000).toISOString().slice(0, 19),
+        status: eventoData.status || 'agendado',
+        observacoes: eventoData.observacoes || null
+      };
+
+      console.log('📝 Atualizando agendamento:', dadosAtualizacao);
+      console.log('🔍 Horários do evento:', {
+        start: ev.start,
+        end: ev.end,
+        startISO: ev.start.toISOString(),
+        endISO: ev.end.toISOString(),
+        startLocal: new Date(ev.start.getTime() - ev.start.getTimezoneOffset() * 60000).toISOString().slice(0, 19),
+        endLocal: new Date(ev.end.getTime() - ev.end.getTimezoneOffset() * 60000).toISOString().slice(0, 19)
       });
+
+      await dataManager.updateAgendamento(ev.id, dadosAtualizacao);
+
+      // Limpar cache para forçar recarregamento
+      dataManager.cache.agendamentos = null;
 
       await this.refreshEvents();
       UIUtils.showAlert('Agendamento movido com sucesso', 'success');
+      console.log('✅ Agendamento movido com sucesso');
     } catch (error) {
+      console.error('❌ Erro ao mover agendamento:', error);
       info.revert();
-      UIUtils.showAlert('Erro ao mover agendamento', 'error');
+      UIUtils.showAlert('Erro ao mover agendamento: ' + error.message, 'error');
     }
   }
 
   async handleEventResize(info) {
     const ev = info.event;
     const tipo = ev.extendedProps && ev.extendedProps.tipo;
+    const eventoData = ev.extendedProps;
+
+    console.log('📏 EventResize acionado:', {
+      id: ev.id,
+      title: ev.title,
+      tipo: tipo,
+      oldStart: info.oldEvent.start,
+      newStart: ev.start,
+      oldEnd: info.oldEvent.end,
+      newEnd: ev.end
+    });
+
+    console.log('📦 Dados completos do evento:', eventoData);
+    console.log('🔍 IDs disponíveis:', {
+      cliente_id: eventoData.cliente_id,
+      servico_id: eventoData.servico_id,
+      profissional_id: eventoData.profissional_id
+    });
 
     if (tipo === "bloqueio") {
+      console.log('🚫 Bloqueio detectado, revertendo...');
       info.revert();
       UIUtils.showAlert('Edite bloqueios pelo modal', 'warning');
       return;
     }
 
     try {
-      await dataManager.updateAgendamento(ev.id, {
-        inicio: ev.start,
-        fim: ev.end
+      // Obter dados do evento
+      console.log('📦 Dados do evento:', eventoData);
+
+      // CORREÇÃO: Extrair IDs dos dados do evento
+      // CORREÇÃO CRÍTICA: Converter para horário local antes de enviar
+      const dadosAtualizacao = {
+        cliente_id: eventoData.cliente_id,
+        servico_id: eventoData.servico_id,
+        profissional_id: eventoData.profissional_id,
+        data_inicio: new Date(ev.start.getTime() - ev.start.getTimezoneOffset() * 60000).toISOString().slice(0, 19),
+        data_fim: new Date(ev.end.getTime() - ev.end.getTimezoneOffset() * 60000).toISOString().slice(0, 19),
+        status: eventoData.status || 'agendado',
+        observacoes: eventoData.observacoes || null
+      };
+
+      console.log('📝 Atualizando duração do agendamento:', dadosAtualizacao);
+      console.log('🔍 Horários do evento:', {
+        start: ev.start,
+        end: ev.end,
+        startISO: ev.start.toISOString(),
+        endISO: ev.end.toISOString(),
+        startLocal: new Date(ev.start.getTime() - ev.start.getTimezoneOffset() * 60000).toISOString().slice(0, 19),
+        endLocal: new Date(ev.end.getTime() - ev.end.getTimezoneOffset() * 60000).toISOString().slice(0, 19)
       });
+
+      await dataManager.updateAgendamento(ev.id, dadosAtualizacao);
+
+      // Limpar cache para forçar recarregamento
+      dataManager.cache.agendamentos = null;
 
       await this.refreshEvents();
       UIUtils.showAlert('Duração atualizada com sucesso', 'success');
+      console.log('✅ Duração do agendamento atualizada com sucesso');
     } catch (error) {
+      console.error('❌ Erro ao redimensionar agendamento:', error);
       info.revert();
-      UIUtils.showAlert('Erro ao redimensionar agendamento', 'error');
+      UIUtils.showAlert('Erro ao redimensionar agendamento: ' + error.message, 'error');
     }
   }
 

@@ -1,4 +1,9 @@
 // Gerenciamento centralizado de dados com Supabase
+// DataManager - Gerenciamento de dados e cache
+// VERSÃO: 1.3.3 - DIAGNÓSTICO DE SALVAMENTO
+// CACHE-BREAKER: 20260312160500
+console.log('💾 DataManager V1.3.3 carregado - Diagnóstico de salvamento');
+
 class DataManager {
   constructor(supabaseClient) {
     this.supabase = supabaseClient;
@@ -27,6 +32,7 @@ class DataManager {
     
     // Cache de nomes para performance
     this.servicosPorNome = {};
+    this.servicosPorId = {};
     this.profissionaisPorId = {};
     this.coresProfissionais = {};
     
@@ -82,27 +88,112 @@ class DataManager {
 
   // Método getClientes() para compatibilidade
   async getClientes() {
-    console.log("📋 getClientes() chamado - carregando clientes...");
+    console.log("getClientes() chamado - carregando clientes...");
     return await this.loadClientes();
   }
 
   async addCliente(cliente) {
     try {
-      // VERSÃO ORIGINAL
-      // const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.CLIENTES, cliente);
-      // this.clientes.push(novo);
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - LIMPAR CACHE DE CLIENTES
-      const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.CLIENTES, cliente);
-      this.clientes.push(novo);
-      
-      // Limpar cache de clientes após CREATE
-      this.cache.clientes = null;
-      console.log("🗑️ Cache de clientes limpo após CREATE");
-      
-      return novo;
+      if (this.supabase) {
+        // Gerar token único para ficha de anamnese
+        const fichaToken = this.generateUniqueToken();
+        
+        // Apenas campos que existem na tabela clientes
+        const clienteWithToken = {
+          nome: cliente.nome,
+          telefone: cliente.telefone,
+          ficha_token: fichaToken
+        };
+        
+        console.log("Criando cliente com token:", clienteWithToken);
+        const { data, error } = await this.supabase
+          .from("clientes")
+          .insert([clienteWithToken])
+          .select();
+
+        if (error) {
+          console.error("Erro ao criar cliente:", error);
+          throw error;
+        }
+
+        console.log("Cliente criado:", data);
+        
+        // Limpar cache de clientes após CREATE
+        this.cache.clientes = null;
+        console.log("Cache de clientes limpo após CREATE");
+        
+        return data;
+      } else {
+        // Fallback para API local
+        const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.CLIENTES, cliente);
+        this.clientes.push(novo);
+        
+        // Limpar cache de clientes após CREATE
+        this.cache.clientes = null;
+        console.log("🗑️ Cache de clientes limpo após CREATE");
+        
+        return novo;
+      }
     } catch (error) {
       console.error('Erro ao adicionar cliente:', error);
+      throw error;
+    }
+  }
+
+  async updateCliente(id, cliente) {
+    try {
+      if (this.supabase) {
+        const { data, error } = await this.supabase
+          .from("clientes")
+          .update({ 
+            nome: cliente.nome,
+            telefone: cliente.telefone
+          })
+          .eq('id', id)
+          .select();
+
+        if (error) {
+          console.error("Erro ao atualizar cliente:", error);
+          throw error;
+        }
+
+        console.log("✅ Cliente atualizado:", data);
+        
+        // Limpar cache de clientes após UPDATE
+        this.cache.clientes = null;
+        console.log("🗑️ Cache de clientes limpo após UPDATE");
+        
+        return data;
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar cliente:", error);
+      throw error;
+    }
+  }
+
+  async deleteCliente(id) {
+    try {
+      if (this.supabase) {
+        const { error } = await this.supabase
+          .from("clientes")
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error("Erro ao excluir cliente:", error);
+          throw error;
+        }
+
+        console.log("✅ Cliente excluído com sucesso");
+        
+        // Limpar cache de clientes após DELETE
+        this.cache.clientes = null;
+        console.log("🗑️ Cache de clientes limpo após DELETE");
+        
+        return true;
+      }
+    } catch (error) {
+      console.error("Erro ao excluir cliente:", error);
       throw error;
     }
   }
@@ -145,8 +236,10 @@ class DataManager {
       console.log("💾 Serviços salvos no cache:", this.cache.servicos.length);
       
       this.servicosPorNome = {};
+      this.servicosPorId = {};
       this.servicos.forEach(s => {
         this.servicosPorNome[s.nome] = s;
+        this.servicosPorId[s.id] = s;
       });
       return this.servicos;
     } catch (error) {
@@ -159,17 +252,6 @@ class DataManager {
   async getServicos() {
     console.log("📋 getServicos() chamado - carregando serviços...");
     return await this.loadServicos();
-  }
-
-  // Dados mock como fallback
-  async loadServicosMock() {
-    this.servicos = [
-      { id: 1, nome: "Corte Masculino", duracao: 30, preco: 50 },
-      { id: 2, nome: "Corte Feminino", duracao: 60, preco: 80 },
-      { id: 3, nome: "Coloração", duracao: 120, preco: 150 },
-      { id: 4, nome: "Manicure", duracao: 45, preco: 40 }
-    ];
-    return this.servicos;
   }
 
   async addServico(servico) {
@@ -189,12 +271,14 @@ class DataManager {
         console.log("✅ Serviço adicionado no Supabase:", data);
         this.servicos.push(data[0]);
         this.servicosPorNome[data[0].nome] = data[0];
+        this.servicosPorId[data[0].id] = data[0];
         return data[0];
       } else {
         // Fallback para API local
         const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.SERVICOS, servico);
         this.servicos.push(novo);
         this.servicosPorNome[novo.nome] = novo;
+        this.servicosPorId[novo.id] = novo;
         return novo;
       }
     } catch (error) {
@@ -223,6 +307,7 @@ class DataManager {
         if (index !== -1) {
           this.servicos[index] = data[0];
           this.servicosPorNome[data[0].nome] = data[0];
+          this.servicosPorId[data[0].id] = data[0];
         }
         return data[0];
       } else {
@@ -232,6 +317,7 @@ class DataManager {
         if (index !== -1) {
           this.servicos[index] = atualizado;
           this.servicosPorNome[atualizado.nome] = atualizado;
+          this.servicosPorId[atualizado.id] = atualizado;
         }
         return atualizado;
       }
@@ -263,6 +349,10 @@ class DataManager {
             delete this.servicosPorNome[nome];
           }
         });
+        // Remover do mapa de IDs
+        delete this.servicosPorId[id];
+        // Limpar cache de serviços após exclusão
+        this.cache.servicos = null;
       } else {
         // Fallback para API local
         await ApiClient.delete(`${API_CONFIG.ENDPOINTS.SERVICOS}/${id}`);
@@ -272,6 +362,8 @@ class DataManager {
             delete this.servicosPorNome[nome];
           }
         });
+        // Remover do mapa de IDs
+        delete this.servicosPorId[id];
       }
     } catch (error) {
       console.error('Erro ao excluir serviço:', error);
@@ -280,15 +372,15 @@ class DataManager {
   }
 
   // Profissionais
-  async loadProfissionais() {
+  async loadProfissionais(forceReload = false) {
     try {
       // VERSÃO ORIGINAL
       // console.log("🔍 Carregando profissionais do Supabase...");
       
       // NOVA IMPLEMENTAÇÃO V1.2 - CACHE
-      console.log("🔍 Carregando profissionais...");
+      console.log("🔍 Carregando profissionais...", forceReload ? "(forçado)" : "(cache)");
       
-      if (this.cache.profissionais !== null) {
+      if (!forceReload && this.cache.profissionais !== null) {
         console.log("📦 Retornando profissionais do cache:", this.cache.profissionais.length);
         this.profissionais = this.cache.profissionais;
         return this.profissionais;
@@ -332,23 +424,133 @@ class DataManager {
   }
 
   // Método getProfissionais() para compatibilidade
-  async getProfissionais() {
-    console.log("📋 getProfissionais() chamado - carregando profissionais...");
-    return await this.loadProfissionais();
+  async getProfissionais(forceReload = false) {
+    console.log("📋 getProfissionais() chamado - carregando profissionais...", forceReload ? "(forçado)" : "(cache)");
+    return await this.loadProfissionais(forceReload);
   }
 
-  async addProfissional(profissional) {
+  // Função para verificar estrutura da tabela profissionais
+  async verificarEstruturaProfissionais() {
     try {
-      const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.PROFISSIONAIS, profissional);
-      this.profissionais.push(novo);
-      this.profissionaisPorId[novo.id] = novo;
+      console.log('🔍 Verificando estrutura da tabela profissionais...');
+      
+      // Tentar obter a estrutura da tabela
+      const { data, error } = await this.supabase
+        .from("profissionais")
+        .select("*")
+        .limit(1);
+
+      if (error) {
+        console.error('❌ Erro ao verificar estrutura:', error);
+        return false;
+      }
+
+      if (data && data.length > 0) {
+        const exemplo = data[0];
+        console.log('✅ Estrutura da tabela profissionais:', Object.keys(exemplo));
+        console.log('📋 Exemplo de registro:', exemplo);
+        
+        // Verificar campos esperados - CAMPOS CORRIGIDOS CONFORME BANCO REAL
+        const camposEsperados = ['id', 'nome', 'telefone', 'email', 'senha_hash', 'created_at', 'profile_id'];
+        const camposExistentes = Object.keys(exemplo);
+        
+        const camposFaltando = camposEsperados.filter(campo => !camposExistentes.includes(campo));
+        const camposExtras = camposExistentes.filter(campo => !camposEsperados.includes(campo));
+        
+        if (camposFaltando.length > 0) {
+          console.warn('⚠️ Campos faltando na tabela:', camposFaltando);
+        }
+        
+        if (camposExtras.length > 0) {
+          console.info('ℹ️ Campos extras na tabela:', camposExtras);
+        }
+        
+        console.log('✅ Verificação de estrutura concluída');
+        return true;
+      } else {
+        console.log('ℹ️ Tabela profissionais vazia, mas estrutura OK');
+        return true;
+      }
+    } catch (error) {
+      console.error('Erro na verificação da estrutura:', error);
+      return false;
+    }
+  }
+        
+  async addProfissional(profissional) {
+    console.log('Adicionando profissional:', profissional);
+    
+    try {
+      // Chamar Edge Function para criar profissional
+      console.log('🔐 CHAMANDO EDGE FUNCTION: create-profissional...');
+      
+      const response = await fetch(`${this.supabase.supabaseUrl}/functions/v1/create-profissional`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.supabase.supabaseKey}`,
+          'apikey': this.supabase.supabaseKey
+        },
+        body: JSON.stringify({
+          nome: profissional.nome,
+          telefone: profissional.telefone,
+          email: profissional.email,
+          cor: profissional.cor || this.gerarCorAleatoria()
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ ERRO NA EDGE FUNCTION:', errorData);
+        
+        // Tratar erro de email já existente
+        if (response.status === 409 && errorData.code === 'EMAIL_ALREADY_EXISTS') {
+          throw new Error('Este email já está registrado. Use um email diferente ou verifique se o profissional já existe.');
+        }
+        
+        throw new Error(errorData.error || 'Erro ao criar profissional');
+      }
+
+      const result = await response.json();
+      console.log('✅ PROFISSIONAL CRIADO COM SUCESSO:', result);
+
+      // Atualizar cache e lista local
+      this.profissionais.push(result.data.profissional);
+      this.profissionaisPorId[result.data.profissional.id] = result.data.profissional;
       this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
-      return novo;
+      
+      // Limpar cache para forçar recarregamento
+      this.cache.profissionais = null;
+      
+      return {
+        ...result.data.profissional,
+        message: result.message
+      };
+      
     } catch (error) {
       console.error('Erro ao adicionar profissional:', error);
       throw error;
     }
   }
+
+  // Gerar senha temporária aleatória
+  gerarSenhaTemporaria() {
+    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+    let senha = '';
+    for (let i = 0; i < 12; i++) {
+      senha += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    }
+    return senha;
+  }
+
+  // Gerar cor aleatória
+  gerarCorAleatoria() {
+    const cores = ['#e91e63', '#2196f3', '#4caf50', '#ff9800', '#9c27b0', '#795548'];
+    return cores[Math.floor(Math.random() * cores.length)];
+  }
+
+  // MÉTODOS ANTIGOS REMOVIDOS - AGORA USA APENAS SUPABASE AUTH
+// senha_hash, senha_criada, primeiro login foram removidos do fluxo
 
   // CORREÇÃO: Método para garantir dados de referência antes de processar agendamentos
   async garantirDadosReferencia() {
@@ -609,6 +811,22 @@ class DataManager {
       
       console.log("📊 Dados formatados para o banco:", dadosParaBanco);
       
+      // VALIDAÇÃO CRÍTICA
+      if (!dadosParaBanco.cliente_id || isNaN(dadosParaBanco.cliente_id)) {
+        console.error('❌ cliente_id inválido:', dadosParaBanco.cliente_id);
+        throw new Error('cliente_id inválido');
+      }
+      if (!dadosParaBanco.servico_id || isNaN(dadosParaBanco.servico_id)) {
+        console.error('❌ servico_id inválido:', dadosParaBanco.servico_id);
+        throw new Error('servico_id inválido');
+      }
+      if (!dadosParaBanco.profissional_id || isNaN(dadosParaBanco.profissional_id)) {
+        console.error('❌ profissional_id inválido:', dadosParaBanco.profissional_id);
+        throw new Error('profissional_id inválido');
+      }
+      
+      console.log('✅ Dados validados, enviando para Supabase...');
+      
       // CORREÇÃO: Usar Supabase diretamente em vez da API
       const { data, error } = await this.supabase
         .from('agendamentos')
@@ -617,30 +835,25 @@ class DataManager {
         .select()
         .single();
       
+      console.log('📦 Resposta do Supabase:', { data, error });
+      
       if (error) {
         console.error('❌ Erro do Supabase:', error);
         throw error;
       }
       
-      console.log("✅ Agendamento atualizado no Supabase:", data);
+      console.log('✅ Agendamento atualizado no Supabase:', data);
+      console.log('🔍 Verificação do que foi salvo:', {
+        id: data.id,
+        data_inicio_original: data.data_inicio,
+        data_fim_original: data.data_fim,
+        data_inicio_formatado: new Date(data.data_inicio).toLocaleString(),
+        data_fim_formatado: new Date(data.data_fim).toLocaleString()
+      });
       
-      // Atualizar cache local
-      const index = this.agendamentos.findIndex(a => a.id === id);
-      if (index !== -1) {
-        // Mapear dados para formato compatível
-        this.agendamentos[index] = {
-          ...data,
-          cliente: this.getClientNameById(data.cliente_id) || 'Cliente não encontrado',
-          servico: this.getServiceNameById(data.servico_id) || 'Serviço não encontrado',
-          profissional: this.getProfessionalNameById(data.profissional_id) || 'Profissional não encontrado',
-          inicio: data.data_inicio,
-          fim: data.data_fim,
-          cliente_id: data.cliente_id,
-          servico_id: data.servico_id,
-          profissional_id: data.profissional_id
-        };
-        this.cache.agendamentos = this.agendamentos;
-      }
+      // Limpar cache para forçar recarregamento
+      this.cache.agendamentos = null;
+      console.log('🗑️ Cache de agendamentos limpo');
       
       return data;
     } catch (error) {
@@ -705,28 +918,8 @@ class DataManager {
 
       if (error) {
         console.error('Erro ao carregar bloqueios do Supabase:', error);
-        // Fallback para dados mock apenas em caso de erro
-        const hoje = new Date();
-        this.bloqueios = [
-          {
-            id: 1,
-            titulo: "Almoço",
-            inicio: new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 12, 0),
-            fim: new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 13, 0),
-            profissional_id: 1,
-            tipo: "bloqueio",
-            motivo: "Horário de almoço"
-          },
-          {
-            id: 2,
-            titulo: "Manutenção",
-            inicio: new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1, 9, 0),
-            fim: new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1, 12, 0),
-            tipo: "manutencao",
-            motivo: "Manutenção do salão"
-          }
-        ];
-        console.log('🔧 Usando dados mock de bloqueios devido a erro no Supabase');
+        this.bloqueios = [];
+        console.log('🔧 Nenhum bloqueio carregado devido a erro no Supabase');
       } else {
         this.bloqueios = data || [];
         console.log('✅ Bloqueios carregados do Supabase:', this.bloqueios.length);
@@ -757,26 +950,44 @@ class DataManager {
 
   async updateCliente(id, cliente) {
     try {
-      // VERSÃO ORIGINAL
-      // const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.CLIENTES}/${id}`, cliente);
-      // const index = this.clientes.findIndex(c => c.id === id);
-      // if (index !== -1) {
-      //   this.clientes[index] = atualizado;
-      // }
-      // return atualizado;
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - LIMPAR CACHE DE CLIENTES
-      const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.CLIENTES}/${id}`, cliente);
-      const index = this.clientes.findIndex(c => c.id === id);
-      if (index !== -1) {
-        this.clientes[index] = atualizado;
+      if (this.supabase) {
+        console.log("🔄 Atualizando cliente no Supabase:", id);
+        const { data, error } = await this.supabase
+          .from("clientes")
+          .update(cliente)
+          .eq("id", id)
+          .select();
+
+        if (error) {
+          console.error("❌ Erro ao atualizar cliente no Supabase:", error);
+          throw error;
+        }
+
+        console.log("✅ Cliente atualizado no Supabase:", data);
+        const index = this.clientes.findIndex(c => c.id === id);
+        if (index !== -1) {
+          this.clientes[index] = data[0];
+        }
+        
+        // Limpar cache de clientes após UPDATE
+        this.cache.clientes = null;
+        console.log("🗑️ Cache de clientes limpo após UPDATE");
+        
+        return data[0];
+      } else {
+        // Fallback para API local
+        const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.CLIENTES}/${id}`, cliente);
+        const index = this.clientes.findIndex(c => c.id === id);
+        if (index !== -1) {
+          this.clientes[index] = atualizado;
+        }
+        
+        // Limpar cache de clientes após UPDATE
+        this.cache.clientes = null;
+        console.log("🗑️ Cache de clientes limpo após UPDATE");
+        
+        return atualizado;
       }
-      
-      // Limpar cache de clientes após UPDATE
-      this.cache.clientes = null;
-      console.log("🗑️ Cache de clientes limpo após UPDATE");
-      
-      return atualizado;
     } catch (error) {
       console.error('Erro ao atualizar cliente:', error);
       throw error;
@@ -785,64 +996,72 @@ class DataManager {
 
   async deleteCliente(id) {
     try {
-      // VERSÃO ORIGINAL
-      // await ApiClient.delete(`${API_CONFIG.ENDPOINTS.CLIENTES}/${id}`);
-      // this.clientes = this.clientes.filter(c => c.id !== id);
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - LIMPAR CACHE DE CLIENTES
-      await ApiClient.delete(`${API_CONFIG.ENDPOINTS.CLIENTES}/${id}`);
-      this.clientes = this.clientes.filter(c => c.id !== id);
-      
-      // Limpar cache de clientes após DELETE
-      this.cache.clientes = null;
-      console.log("🗑️ Cache de clientes limpo após DELETE");
-      
+      if (this.supabase) {
+        console.log("🗑️ Excluindo cliente no Supabase:", id);
+        const { error } = await this.supabase
+          .from("clientes")
+          .delete()
+          .eq("id", id);
+
+        if (error) {
+          console.error("❌ Erro ao excluir cliente no Supabase:", error);
+          throw error;
+        }
+
+        console.log("✅ Cliente excluído no Supabase");
+        this.clientes = this.clientes.filter(c => c.id !== id);
+        
+        // Limpar cache de clientes após DELETE
+        this.cache.clientes = null;
+        console.log("🗑️ Cache de clientes limpo após DELETE");
+      } else {
+        // Fallback para API local
+        await ApiClient.delete(`${API_CONFIG.ENDPOINTS.CLIENTES}/${id}`);
+        this.clientes = this.clientes.filter(c => c.id !== id);
+        
+        // Limpar cache de clientes após DELETE
+        this.cache.clientes = null;
+        console.log("🗑️ Cache de clientes limpo após DELETE");
+      }
     } catch (error) {
       console.error('Erro ao excluir cliente:', error);
       throw error;
     }
   }
 
-  async updateServico(id, servico) {
-    try {
-      const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.SERVICOS}/${id}`, servico);
-      const index = this.servicos.findIndex(s => s.id === id);
-      if (index !== -1) {
-        this.servicos[index] = atualizado;
-        this.servicosPorNome[atualizado.nome] = atualizado;
-      }
-      return atualizado;
-    } catch (error) {
-      console.error('Erro ao atualizar serviço:', error);
-      throw error;
-    }
-  }
-
-  async deleteServico(id) {
-    try {
-      await ApiClient.delete(`${API_CONFIG.ENDPOINTS.SERVICOS}/${id}`);
-      this.servicos = this.servicos.filter(s => s.id !== id);
-      // Atualizar o mapa de serviços por nome
-      this.servicosPorNome = {};
-      this.servicos.forEach(s => {
-        this.servicosPorNome[s.nome] = s;
-      });
-    } catch (error) {
-      console.error('Erro ao excluir serviço:', error);
-      throw error;
-    }
-  }
-
   async updateProfissional(id, profissional) {
     try {
-      const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.PROFISSIONAIS}/${id}`, profissional);
+      // Verificar estrutura antes de atualizar
+      await this.verificarEstruturaProfissionais();
+      
+      console.log('📝 Atualizando profissional via Supabase:', { id, profissional });
+      
+      const { data, error } = await this.supabase
+        .from("profissionais")
+        .update(profissional)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Erro ao atualizar profissional no Supabase:', error);
+        throw error;
+      }
+
+      console.log('✅ Profissional atualizado com sucesso:', data);
+      
+      // Atualizar cache e lista local
       const index = this.profissionais.findIndex(p => p.id === id);
       if (index !== -1) {
-        this.profissionais[index] = atualizado;
-        this.profissionaisPorId[atualizado.id] = atualizado;
+        this.profissionais[index] = data;
+        this.profissionaisPorId[data.id] = data;
+        this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
       }
-      this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
-      return atualizado;
+      
+      // Limpar cache para forçar recarregamento
+      this.cache.profissionais = null;
+      
+      return data;
     } catch (error) {
       console.error('Erro ao atualizar profissional:', error);
       throw error;
@@ -851,7 +1070,19 @@ class DataManager {
 
   async deleteProfissional(id) {
     try {
-      await ApiClient.delete(`${API_CONFIG.ENDPOINTS.PROFISSIONAIS}/${id}`);
+      // Verificar estrutura antes de excluir
+      await this.verificarEstruturaProfissionais();
+      
+      console.log('🗑️ Excluindo profissional via Supabase:', id);
+      const { error } = await this.supabase
+        .from('profissionais')
+        .delete()
+        .eq('id', id);
+        
+      if (error) {
+        throw error;
+      }
+      
       this.profissionais = this.profissionais.filter(p => p.id !== id);
       // Atualizar o mapa de profissionais por ID
       this.profissionaisPorId = {};
@@ -859,6 +1090,9 @@ class DataManager {
         this.profissionaisPorId[p.id] = p;
       });
       this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
+      
+      // Limpar cache de profissionais para forçar recarregamento
+      this.cache.profissionais = null;
     } catch (error) {
       console.error('Erro ao excluir profissional:', error);
       throw error;
@@ -919,5 +1153,358 @@ class DataManager {
       "nao_compareceu": "#f97316"
     };
     return coresPorStatus[status] || corBase;
+  }
+
+  // Gerar token único para ficha de anamnese
+  generateUniqueToken() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 8);
+    return `ficha_${timestamp}_${random}`;
+  }
+
+  // Buscar cliente por token da ficha
+  async getClienteByToken(token) {
+    try {
+      console.log("🔍 Buscando cliente por token:", token);
+      
+      if (this.supabase) {
+        const { data, error } = await this.supabase
+          .from("clientes")
+          .select("*")
+          .eq("ficha_token", token)
+          .single();
+
+        if (error) {
+          console.error("❌ Erro ao buscar cliente por token:", error);
+          if (error.code === 'PGRST116') {
+            return null; // Token não encontrado
+          }
+          throw error;
+        }
+
+        console.log("✅ Cliente encontrado por token:", data);
+        return data;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("❌ Erro ao buscar cliente por token:", error);
+      throw error;
+    }
+  }
+
+  // Salvar ficha de anamnese pública
+  async savePublicAnamnese(token, anamneseData) {
+    try {
+      console.log("🔄 Salvando ficha pública:", { token, anamneseData });
+      console.log("📋 Campos sendo salvos no banco:", Object.keys(anamneseData));
+      console.log("📊 Valores dos campos:", anamneseData);
+      
+      // Primeiro, buscar o cliente pelo token
+      const cliente = await this.getClienteByToken(token);
+      if (!cliente) {
+        throw new Error("Token inválido ou não encontrado");
+      }
+      
+      // Verificar se já existe ficha para este cliente
+      const existingAnamnese = await this.loadAnamneseByCliente(cliente.id);
+      
+      if (existingAnamnese) {
+        // Atualizar ficha existente
+        const { data, error } = await this.supabase
+          .from("anamnese_clientes")
+          .update(anamneseData)
+          .eq("id", existingAnamnese.id)
+          .select();
+
+        if (error) {
+          console.error("❌ Erro ao atualizar ficha pública:", error);
+          throw error;
+        }
+
+        console.log("✅ Ficha pública atualizada com sucesso:", data);
+        return { success: true, action: 'updated', data: data[0] };
+      } else {
+        // Criar nova ficha
+        const anamneseWithClientId = {
+          ...anamneseData,
+          cliente_id: cliente.id
+        };
+
+        const { data, error } = await this.supabase
+          .from("anamnese_clientes")
+          .insert([anamneseWithClientId])
+          .select();
+
+        if (error) {
+          console.error("❌ Erro ao criar ficha pública:", error);
+          throw error;
+        }
+
+        console.log("✅ Ficha pública criada com sucesso:", data);
+        return { success: true, action: 'created', data: data[0] };
+      }
+    } catch (error) {
+      console.error("❌ Erro ao salvar ficha pública:", error);
+      throw error;
+    }
+  }
+  
+  async loadAnamneseByCliente(clienteId) {
+    try {
+      console.log("🔍 Carregando anamnese do cliente:", clienteId);
+      
+      if (this.supabase) {
+        // Tenta fazer uma consulta simples para ver se a tabela existe e quais colunas tem
+        console.log("🔍 Tentando descobrir estrutura da tabela anamnese_clientes...");
+        
+        try {
+          // Tentativa 1: Verificar se podemos consultar a tabela
+          const { data: testData, error: testError } = await this.supabase
+            .from("anamnese_clientes")
+            .select("*")
+            .limit(1);
+
+          if (testError) {
+            console.log("❌ Erro ao testar tabela:", testError);
+            
+            // Se o erro for de coluna não encontrada, a tabela existe mas com estrutura diferente
+            if (testError.message?.includes('column') || testError.code === 'PGRST204') {
+              console.log("📋 Tabela existe mas com estrutura diferente");
+              console.log("📋 Erro específico:", testError.message);
+              
+              // Vamos tentar criar um registro mínimo para descobrir as colunas
+              console.log("🔍 Tentando criar registro mínimo para descobrir colunas...");
+              const minimalData = {
+                cliente_id: clienteId,
+                nome_completo: "Teste"
+              };
+              
+              const { data: insertData, error: insertError } = await this.supabase
+                .from("anamnese_clientes")
+                .insert([minimalData])
+                .select();
+                
+              if (insertError) {
+                console.log("❌ Erro ao inserir registro teste:", insertError);
+                if (insertError.message?.includes('column')) {
+                  console.log("📋 Colunas mencionadas no erro:", insertError.message);
+                }
+              } else {
+                console.log("✅ Registro teste criado:", insertData);
+                console.log("📋 Colunas disponíveis:", insertData && insertData.length > 0 ? Object.keys(insertData[0]) : 'Nenhuma');
+                
+                // Limpar o registro de teste
+                await this.supabase
+                  .from("anamnese_clientes")
+                  .delete()
+                  .eq("id", insertData[0].id);
+              }
+            }
+          } else {
+            console.log("✅ Tabela acessível:", testData);
+            console.log("📋 Colunas disponíveis:", testData && testData.length > 0 ? Object.keys(testData[0]) : 'Tabela vazia');
+          }
+        } catch (diagError) {
+          console.log("❌ Erro no diagnóstico:", diagError);
+        }
+
+        // Continuar com a consulta original
+        const { data, error } = await this.supabase
+          .from("anamnese_clientes")
+          .select("*")
+          .eq("cliente_id", clienteId)
+          .maybeSingle();
+
+        if (error) {
+          console.error("❌ Erro ao carregar anamnese:", error);
+          // Se for erro de tabela não existir, retorna null
+          if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+            console.log("📋 Tabela anamnese_clientes não encontrada");
+            return null;
+          }
+          throw error;
+        }
+
+        console.log("✅ Anamnese carregada:", data);
+        return data;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("❌ Erro ao carregar anamnese:", error);
+      // Se for erro de tabela não existir, retorna null
+      if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+        console.log("📋 Tabela anamnese_clientes não encontrada");
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async createAnamnese(anamnese) {
+    try {
+      if (this.supabase) {
+        console.log("🔄 Criando anamnese no Supabase:", anamnese);
+        
+        // Se a tabela está vazia, vamos tentar descobrir a estrutura primeiro
+        console.log("🔍 Tentando descobrir estrutura através de inserção controlada...");
+        
+        // Tentativa 1: Inserir apenas com campos básicos
+        try {
+          const basicData = {
+            cliente_id: anamnese.cliente_id,
+            nome_completo: anamnese.nome_completo || "Teste"
+          };
+          
+          console.log("🔍 Testando inserção básica:", basicData);
+          const { data: basicInsert, error: basicError } = await this.supabase
+            .from("anamnese_clientes")
+            .insert([basicData])
+            .select();
+            
+          if (basicError) {
+            console.log("❌ Erro na inserção básica:", basicError);
+            throw basicError;
+          } else {
+            console.log("✅ Inserção básica funcionou:", basicInsert);
+            console.log("📋 Estrutura descoberta:", basicInsert && basicInsert.length > 0 ? Object.keys(basicInsert[0]) : 'Nenhuma');
+            
+            // Limpar registro de teste
+            await this.supabase
+              .from("anamnese_clientes")
+              .delete()
+              .eq("id", basicInsert[0].id);
+              
+            // Agora tentar inserir com todos os campos, mas adaptando aos que existem
+            return await this.insertWithKnownStructure(anamnese, basicInsert[0]);
+          }
+        } catch (discoverError) {
+          console.log("❌ Erro ao descobrir estrutura:", discoverError);
+          
+          // Se falhar, vamos tentar uma abordagem mais agressiva
+          console.log("🔍 Tentando abordagem alternativa...");
+          return await this.alternativeInsert(anamnese);
+        }
+      }
+    } catch (error) {
+      console.error("❌ Erro ao criar anamnese:", error);
+      throw error;
+    }
+  }
+
+  async insertWithKnownStructure(anamnese, structure) {
+    try {
+      console.log("🔍 Inserindo com estrutura conhecida:", structure);
+      
+      // Adaptar dados apenas para colunas que existem
+      const availableColumns = Object.keys(structure);
+      console.log("📋 Colunas disponíveis:", availableColumns);
+      
+      const adaptedData = {};
+      
+      // Mapear campos do formulário para colunas disponíveis
+      if (availableColumns.includes('cliente_id')) adaptedData.cliente_id = anamnese.cliente_id;
+      if (availableColumns.includes('nome_completo')) adaptedData.nome_completo = anamnese.nome_completo;
+      if (availableColumns.includes('idade')) adaptedData.idade = anamnese.idade;
+      if (availableColumns.includes('ocupacao')) adaptedData.ocupacao = anamnese.ocupacao;
+      if (availableColumns.includes('endereco')) adaptedData.endereco = anamnese.endereco;
+      if (availableColumns.includes('cep')) adaptedData.cep = anamnese.cep;
+      if (availableColumns.includes('cpf')) adaptedData.cpf = anamnese.cpf;
+      
+      // Adicionar campos booleanos se existirem
+      const booleanFields = [
+        'menor_idade', 'gestacao', 'diabetes', 'roe_unhas', 'unha_encravada',
+        'alergia', 'cuticula', 'micose', 'medicamento', 'atividade_fisica',
+        'piscina_praia', 'autorizacao'
+      ];
+      
+      booleanFields.forEach(field => {
+        if (availableColumns.includes(field)) {
+          adaptedData[field] = anamnese[field] || false;
+        }
+      });
+      
+      // Adicionar campos de texto se existirem
+      const textFields = ['responsavel', 'contato_responsavel', 'medicamentos', 'servico_escolhido'];
+      textFields.forEach(field => {
+        if (availableColumns.includes(field)) {
+          adaptedData[field] = anamnese[field] || '';
+        }
+      });
+      
+      console.log("🔄 Dados adaptados:", adaptedData);
+      
+      const { data, error } = await this.supabase
+        .from("anamnese_clientes")
+        .insert([adaptedData])
+        .select();
+
+      if (error) {
+        console.error("❌ Erro ao criar anamnese no Supabase:", error);
+        throw error;
+      }
+
+      console.log("✅ Anamnese criada com sucesso:", data);
+      return data;
+    } catch (error) {
+      console.error("❌ Erro ao inserir com estrutura conhecida:", error);
+      throw error;
+    }
+  }
+
+  async alternativeInsert(anamnese) {
+    try {
+      console.log("🔍 Tentando inserção alternativa mínima...");
+      
+      // Tentar inserção com apenas os campos essenciais
+      const minimalData = {
+        cliente_id: anamnese.cliente_id,
+        nome_completo: anamnese.nome_completo
+      };
+      
+      const { data, error } = await this.supabase
+        .from("anamnese_clientes")
+        .insert([minimalData])
+        .select();
+
+      if (error) {
+        console.error("❌ Erro na inserção alternativa:", error);
+        throw error;
+      }
+
+      console.log("✅ Inserção alternativa funcionou:", data);
+      return data;
+    } catch (error) {
+      console.error("❌ Erro na inserção alternativa:", error);
+      throw error;
+    }
+  }
+
+  async updateAnamnese(id, anamnese) {
+    try {
+      if (this.supabase) {
+        console.log("🔄 Atualizando anamnese no Supabase:", id);
+        const { data, error } = await this.supabase
+          .from("anamnese_clientes")
+          .update(anamnese)
+          .eq("id", id)
+          .select();
+
+        if (error) {
+          console.error("❌ Erro ao atualizar anamnese no Supabase:", error);
+          throw error;
+        }
+
+        console.log("✅ Anamnese atualizada no Supabase:", data);
+        return data[0];
+      } else {
+        // Fallback para API local
+        throw new Error("API local não implementada para anamnese");
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar anamnese:', error);
+      throw error;
+    }
   }
 }
