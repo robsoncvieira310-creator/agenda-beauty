@@ -72,11 +72,13 @@ class FirstLoginManager {
      */
     async justCreatedPassword() {
         try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const hasTokens = urlParams.has('access_token') && urlParams.has('refresh_token');
+            // Ler tokens da URL hash (formato #access_token=xxx&refresh_token=yyy&type=invite)
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const hasTokens = hashParams.has('access_token') && hashParams.has('refresh_token');
+            const type = hashParams.get('type');
             
-            if (hasTokens) {
-                console.log('🔐 Detectado fluxo de criação de senha pela URL');
+            if (hasTokens && type === 'invite') {
+                console.log('🔐 Detectado fluxo de criação de senha pela URL hash');
                 return true;
             }
             

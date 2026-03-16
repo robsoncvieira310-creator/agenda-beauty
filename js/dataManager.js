@@ -1171,15 +1171,40 @@ class DataManager {
       await this.verificarEstruturaProfissionais();
       
       console.log('🗑️ Excluindo profissional via Supabase:', id);
-      const { error } = await this.supabase
+      
+      // NOVA IMPLEMENTAÇÃO: Excluir profile para cascade remover profissional
+      // Primeiro buscar profile_id do profissional
+      const { data: profissional, error: fetchError } = await this.supabase
         .from('profissionais')
+        .select('profile_id')
+        .eq('id', id)
+        .single();
+        
+      if (fetchError) {
+        console.error('❌ Erro ao buscar profile_id:', fetchError);
+        throw fetchError;
+      }
+      
+      if (!profissional || !profissional.profile_id) {
+        throw new Error('Profile não encontrado para este profissional');
+      }
+      
+      console.log('🔗 Excluindo profile para cascade remover profissional:', profissional.profile_id);
+      
+      // Excluir profile (cascade removerá profissional automaticamente)
+      const { error } = await this.supabase
+        .from('profiles')
         .delete()
-        .eq('id', id);
+        .eq('id', profissional.profile_id);
         
       if (error) {
+        console.error('❌ Erro ao excluir profile:', error);
         throw error;
       }
       
+      console.log('✅ Profile excluído com sucesso, profissional removido por CASCADE');
+      
+      // Atualizar lista local
       this.profissionais = this.profissionais.filter(p => p.id !== id);
       // Atualizar o mapa de profissionais por ID
       this.profissionaisPorId = {};

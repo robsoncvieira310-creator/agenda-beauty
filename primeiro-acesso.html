@@ -272,11 +272,11 @@
       async init() {
         console.log('🔐 Inicializando Primeiro Acesso Manager...');
         
-        // Capturar tokens da URL
-        this.captureTokensFromURL();
+        // Capturar tokens da URL hash
+        const hasValidTokens = this.captureTokensFromURL();
         
-        // Se tiver tokens, criar sessão
-        if (this.accessToken && this.refreshToken) {
+        // Se tiver tokens válidos, criar sessão
+        if (hasValidTokens) {
           await this.createSessionFromTokens();
         } else {
           this.showAlert('error', 'Link de convite inválido ou expirado. Por favor, solicite um novo convite.');
@@ -285,15 +285,28 @@
       }
 
       captureTokensFromURL() {
-        const urlParams = new URLSearchParams(window.location.search);
+        // Ler tokens da URL hash (formato #access_token=xxx&refresh_token=yyy&type=invite)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
         
-        this.accessToken = urlParams.get('access_token');
-        this.refreshToken = urlParams.get('refresh_token');
+        this.accessToken = hashParams.get('access_token');
+        this.refreshToken = hashParams.get('refresh_token');
+        this.type = hashParams.get('type');
         
-        console.log('🔍 Tokens capturados da URL:', {
+        console.log('🔍 Tokens capturados da URL hash:', {
           hasAccessToken: !!this.accessToken,
-          hasRefreshToken: !!this.refreshToken
+          hasRefreshToken: !!this.refreshToken,
+          type: this.type,
+          hash: window.location.hash
         });
+        
+        // Verificar se é um convite válido
+        if (this.type !== 'invite') {
+          console.warn('⚠️ Tipo de token inválido:', this.type);
+          this.showAlert('error', 'Link inválido. Este link não é um convite válido.');
+          return false;
+        }
+        
+        return !!(this.accessToken && this.refreshToken);
       }
 
       async createSessionFromTokens() {
@@ -410,7 +423,7 @@
           
           // Redirecionar após 2 segundos
           setTimeout(() => {
-            window.location.href = 'login.html';
+            window.location.href = 'login-profissional.html';
           }, 2000);
           
         } catch (error) {
