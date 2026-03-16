@@ -45,7 +45,7 @@ serve(async (req: Request) => {
     )
 
     // 1. Convidar usuário pelo email
-    console.log('� PASSO 1: Convidando profissional pelo email...')
+    console.log(' PASSO 1: Convidando profissional pelo email...')
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
@@ -53,12 +53,15 @@ serve(async (req: Request) => {
           nome: nome,
           telefone: telefone,
           role: 'profissional'
+        },
+        options: {
+          redirectTo: 'https://robsoncvieira310-creator.github.io/agenda-beauty/primeiro-acesso'
         }
       }
     )
 
     if (inviteError) {
-      console.error('❌ ERRO AO CONVIDAR USUÁRIO:', inviteError)
+      console.error(' ERRO AO CONVIDAR USUÁRIO:', inviteError)
       
       // Verificar se o erro é de email já existente
       if (inviteError.message.includes('already been registered') || inviteError.message.includes('duplicate')) {

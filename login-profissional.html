@@ -244,7 +244,32 @@
                 console.log('🔐 LOGIN: Resultado Supabase Auth:', { data: !!data, error: !!error });
                 
                 if (error) {
-                    console.log('� LOGIN: Erro na autenticação:', error);
+                    console.log(' LOGIN: Erro na autenticação:', error);
+                    
+                    // Verificar se é erro de senha não definida (primeiro acesso)
+                    if (error.message.includes('Invalid login credentials')) {
+                        // Verificar se usuário existe mas não tem senha
+                        try {
+                            const { data: userData, error: userError } = await window.supabase.auth.admin.getUserByEmail(email);
+                            
+                            if (!userError && userData.user) {
+                                console.log('🔐 LOGIN: Usuário encontrado mas sem senha - primeiro acesso');
+                                showAlert('Este email foi convidado mas ainda não criou senha. Verifique seu email ou solicite um novo convite.', 'info');
+                                
+                                // Opcional: Redirecionar para reenviar convite
+                                setTimeout(() => {
+                                    if (confirm('Deseja receber um novo email de convite?')) {
+                                        // TODO: Implementar reenvio de convite
+                                        console.log('📧 TODO: Implementar reenvio de convite');
+                                    }
+                                }, 2000);
+                                return;
+                            }
+                        } catch (adminError) {
+                            console.error('❌ Erro ao verificar usuário:', adminError);
+                        }
+                    }
+                    
                     showAlert('Email ou senha incorretos', 'error');
                     return;
                 }

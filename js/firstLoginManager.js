@@ -58,9 +58,31 @@ class FirstLoginManager {
                 return false;
             }
 
+            console.log('🔍 Estado do primeiro login:', profile);
             return !profile.first_login_completed;
         } catch (error) {
             console.error('❌ Erro no isFirstLogin:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Verifica se usuário acabou de criar senha (fluxo de primeiro acesso)
+     * @returns {Promise<boolean>} - true se acabou de criar senha
+     */
+    async justCreatedPassword() {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasTokens = urlParams.has('access_token') && urlParams.has('refresh_token');
+            
+            if (hasTokens) {
+                console.log('🔐 Detectado fluxo de criação de senha pela URL');
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.error('❌ Erro ao detectar criação de senha:', error);
             return false;
         }
     }
@@ -145,6 +167,12 @@ class FirstLoginManager {
      * Inicializa o gerenciador de primeiro login
      */
     async init() {
+        // Verificar se está na página de primeiro acesso
+        if (window.location.pathname.includes('primeiro-acesso.html')) {
+            console.log('🔐 Página de primeiro acesso detectada - não processar primeiro login');
+            return;
+        }
+        
         // Verificar se usuário está logado
         const { data: { user } } = await this.supabase.auth.getUser();
         
