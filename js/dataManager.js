@@ -392,10 +392,80 @@ class DataManager {
     }
   }
 
+  // NOVO MÉTODO: Criar tabela profissional_servicos automaticamente
+  async criarTabelaProfissionalServicos() {
+    try {
+      console.log("🔧 Criando tabela profissional_servicos automaticamente...");
+      
+      // SQL para criar a tabela
+      const createTableSQL = `
+        CREATE TABLE IF NOT EXISTS profissional_servicos (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            profissional_id UUID NOT NULL REFERENCES profissionais(id) ON DELETE CASCADE,
+            servico_id UUID NOT NULL REFERENCES servicos(id) ON DELETE CASCADE,
+            duracao INTEGER NOT NULL,
+            valor DECIMAL(10,2) NOT NULL,
+            ativo BOOLEAN DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            UNIQUE(profissional_id, servico_id)
+        );
+        
+        -- Índices para performance
+        CREATE INDEX IF NOT EXISTS idx_profissional_servicos_profissional_id ON profissional_servicos(profissional_id);
+        CREATE INDEX IF NOT EXISTS idx_profissional_servicos_servico_id ON profissional_servicos(servico_id);
+        CREATE INDEX IF NOT EXISTS idx_profissional_servicos_ativo ON profissional_servicos(ativo);
+        
+        -- Habilitar RLS
+        ALTER TABLE profissional_servicos ENABLE ROW LEVEL SECURITY;
+        
+        -- Políticas RLS
+        CREATE POLICY IF NOT EXISTS "Professionals can view their own services" ON profissional_servicos
+            FOR SELECT USING (
+                EXISTS (
+                    SELECT 1 FROM profiles 
+                    WHERE profiles.id = profissional_servicos.profissional_id 
+                    AND profiles.id = auth.uid()
+                )
+            );
+            
+        CREATE POLICY IF NOT EXISTS "Admins can manage professional services" ON profissional_servicos
+            FOR ALL USING (
+                EXISTS (
+                    SELECT 1 FROM profiles 
+                    WHERE profiles.id = auth.uid() 
+                    AND profiles.role = 'admin'
+                )
+            );
+      `;
+      
+      // Executar SQL via RPC (se disponível) ou retornar erro para execução manual
+      console.log("⚠️ Execute a migration manualmente no Supabase Dashboard:");
+      console.log("📁 Arquivo: supabase/migrations/20260316_create_profissional_servicos.sql");
+      
+      return false; // Indica que precisa ser executado manualmente
+      
+    } catch (error) {
+      console.error("❌ Erro ao criar tabela profissional_servicos:", error);
+      return false;
+    }
+  }
+
   // NOVO MÉTODO: Inicializar serviços para profissional
   async inicializarServicosProfissional(profissionalId) {
     try {
       console.log("🔧 Inicializando serviços para profissional:", profissionalId);
+      
+      // PRIMEIRO: Verificar se tabela existe
+      const { error: tableError } = await this.supabase
+        .from("profissional_servicos")
+        .select("id")
+        .limit(1);
+      
+      if (tableError && tableError.code === 'PGRST116') {
+        console.log("⚠️ Tabela profissional_servicos não existe. Execute a migration:");
+        console.log("📁 Arquivo: supabase/migrations/20260316_create_profissional_servicos.sql");
+        return false;
+      }
       
       // Buscar todos os serviços ativos
       const { data: servicos, error: servicosError } = await this.supabase
@@ -1293,27 +1363,63 @@ class DataManager {
       console.log("📝 Enviando agendamento para Supabase:", agendamento);
       
       // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
-      // Obter profissional logado para garantir consistência
+      // Verificar se é admin ou profissional
       const profissionalLogado = await this.getProfissionalLogado();
       
+      // ✅ ADMIN: Pode criar agendamentos para qualquer profissional
       if (!profissionalLogado) {
-        throw new Error('Nenhum profissional logado encontrado para criar agendamento');
+        console.log("👑 Admin criando agendamento - usando profissional selecionado");
+        
+        // Admin usa o profissional selecionado no formulário
+        if (!agendamento.profissional) {
+          throw new Error('Admin deve selecionar um profissional para o agendamento');
+        }
+        
+        const dadosParaBanco = {
+          cliente_id: parseInt(agendamento.cliente),
+          servico_id: parseInt(agendamento.servico),
+          profissional_id: parseInt(agendamento.profissional), // Profissional selecionado
+          data_inicio: agendamento.inicio,
+          data_fim: agendamento.fim,
+          status: agendamento.status || 'confirmado',
+          observacoes: agendamento.observacoes || null
+        };
+        
+        console.log("📊 Dados formatados para o banco (Admin):", dadosParaBanco);
+        
+        const { data, error } = await this.supabase
+          .from('agendamentos')
+          .insert(dadosParaBanco)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Erro ao salvar agendamento no Supabase:', error);
+          throw error;
+        }
+
+        console.log("✅ Agendamento criado com sucesso (Admin):", data);
+        
+        // CORREÇÃO: Limpar cache de agendamentos
+        this.cache.agendamentos = null;
+        
+        return data;
       }
       
-      console.log("👤 Criando agendamento para profissional:", profissionalLogado.id, profissionalLogado.nome);
+      // ✅ PROFISSIONAL: Só pode criar para si mesmo
+      console.log("👤 Profissional criando agendamento para si mesmo:", profissionalLogado.id, profissionalLogado.nome);
       
-      // CORREÇÃO: Usar Supabase diretamente com nomes corretos das colunas
       const dadosParaBanco = {
-        cliente_id: parseInt(agendamento.cliente), // ID do cliente
-        servico_id: parseInt(agendamento.servico), // ID do serviço
-        profissional_id: profissionalLogado.id, // FORÇAR ID do profissional logado
-        data_inicio: agendamento.inicio, // timestamp completo
-        data_fim: agendamento.fim, // timestamp completo
+        cliente_id: parseInt(agendamento.cliente),
+        servico_id: parseInt(agendamento.servico),
+        profissional_id: profissionalLogado.id, // Forçar ID do profissional logado
+        data_inicio: agendamento.inicio,
+        data_fim: agendamento.fim,
         status: agendamento.status || 'confirmado',
         observacoes: agendamento.observacoes || null
       };
       
-      console.log("📊 Dados formatados para o banco:", dadosParaBanco);
+      console.log("📊 Dados formatados para o banco (Profissional):", dadosParaBanco);
       
       // CORREÇÃO: Usar Supabase diretamente em vez da API
       const { data, error } = await this.supabase
