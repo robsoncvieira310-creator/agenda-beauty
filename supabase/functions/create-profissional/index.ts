@@ -66,6 +66,19 @@ serve(async (req: Request) => {
     if (inviteError) {
       console.error(' ERRO AO CONVIDAR USUÁRIO:', inviteError)
       
+      // Verificar se o erro é de rate limit
+      if (inviteError.message.includes('rate limit') || inviteError.message.includes('exceeded')) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Limite de criação de usuários excedido. Aguarde alguns minutos e tente novamente.`, 
+            code: 'RATE_LIMIT_EXCEEDED',
+            details: 'Aguarde 5-15 minutos antes de tentar criar outro profissional',
+            retry_after: '5-15 minutos'
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
       // Verificar se o erro é de email já existente
       if (inviteError.message.includes('already been registered') || inviteError.message.includes('duplicate')) {
         return new Response(

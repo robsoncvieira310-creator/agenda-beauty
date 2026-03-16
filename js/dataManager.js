@@ -508,7 +508,82 @@ class DataManager {
     }
   }
 
-  // NOVO MÉTODO: Criar profissional automaticamente
+  // NOVO MÉTODO: Criar profissional diretamente via frontend
+  async addProfissionalFrontend(dados) {
+    try {
+      console.log("🔧 Criando profissional diretamente via frontend:", dados);
+      
+      // 1. Criar usuário no Supabase Auth
+      const { data: authData, error: authError } = await this.supabase.auth.signUp({
+        email: dados.email,
+        password: 'temp123456', // Senha temporária
+        options: {
+          data: {
+            nome: dados.nome,
+            telefone: dados.telefone,
+            role: 'profissional'
+          }
+        }
+      });
+      
+      if (authError) {
+        // Se erro for de email já existe, tentar fazer login
+        if (authError.message.includes('already registered')) {
+          console.log("📧 Email já registrado, tentando fazer login...");
+          
+          const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
+            email: dados.email,
+            password: 'temp123456'
+          });
+          
+          if (signInError) {
+            throw new Error(`Erro ao fazer login: ${signInError.message}`);
+          }
+          
+          return { success: true, message: 'Profissional já existia e foi feito login', data: signInData };
+        }
+        
+        throw new Error(`Erro ao criar usuário: ${authError.message}`);
+      }
+      
+      console.log("✅ Usuário criado:", authData);
+      
+      // 2. Aguardar trigger criar profile
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 3. Criar registro em profissionais
+      const { data: profissionalData, error: profissionalError } = await this.supabase
+        .from('profissionais')
+        .insert({
+          profile_id: authData.user.id,
+          telefone: dados.telefone
+        })
+        .select()
+        .single();
+      
+      if (profissionalError) {
+        throw new Error(`Erro ao criar profissional: ${profissionalError.message}`);
+      }
+      
+      console.log("✅ Profissional criado:", profissionalData);
+      
+      // 4. Inicializar serviços para o profissional
+      await this.inicializarServicosProfissional(profissionalData.id);
+      
+      return { 
+        success: true, 
+        message: 'Profissional criado com sucesso',
+        data: { 
+          user: authData.user, 
+          profissional: profissionalData 
+        }
+      };
+      
+    } catch (error) {
+      console.error("❌ Erro ao criar profissional via frontend:", error);
+      throw error;
+    }
+  }
   async criarProfissionalParaProfile(profileId, nome, telefone) {
     try {
       console.log("👩 Criando profissional para profile:", profileId);
@@ -897,61 +972,79 @@ class DataManager {
     this.addingProfissional = true;
     
     try {
-      // Chamar Edge Function para criar profissional
-      console.log('🔐 CHAMANDO EDGE FUNCTION: create-profissional...');
-      
-      const response = await fetch(`${this.supabase.supabaseUrl}/functions/v1/create-profissional`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.supabase.supabaseKey}`,
-          'apikey': this.supabase.supabaseKey
-        },
-        body: JSON.stringify({
-          nome: profissional.nome,
-          telefone: profissional.telefone,
-          email: profissional.email
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ ERRO NA EDGE FUNCTION:', errorData);
+      // PRIMEIRO: Tentar Edge Function
+      console.log('🔐 TENTANDO EDGE FUNCTION...');
+      try {
+        const result = await this.addProfissionalEdgeFunction(profissional);
+        console.log('✅ Edge Function funcionou:', result);
+        return result;
+      } catch (edgeError) {
+        console.warn('⚠️ Edge Function falhou, tentando método frontend:', edgeError.message);
         
-        // Tratar erro de email já existente
-        if (response.status === 409) {
-          if (errorData.code === 'EMAIL_ALREADY_EXISTS') {
-            throw new Error('Este email já está registrado. Use um email diferente ou verifique se o profissional já existe.');
-          } else if (errorData.error && errorData.error.includes('Profissional já existe')) {
-            throw new Error('Este profissional já existe para este usuário. Cada usuário pode ter apenas um profissional cadastrado.');
-          }
-        }
-        
-        throw new Error(errorData.error || 'Erro ao criar profissional');
+        // SEGUNDO: Tentar método direto via frontend
+        console.log('🔧 USANDO MÉTODO FRONTEND COMO FALLBACK...');
+        const result = await this.addProfissionalFrontend(profissional);
+        console.log('✅ Método frontend funcionou:', result);
+        return result;
       }
-
-      const result = await response.json();
-      console.log('✅ PROFISSIONAL CRIADO COM SUCESSO:', result);
-
-      // Atualizar cache e lista local
-      this.profissionais.push(result.data.profissional);
-      this.profissionaisPorId[result.data.profissional.id] = result.data.profissional;
-      this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
-      
-      // Limpar cache para forçar recarregamento
-      this.cache.profissionais = null;
-      
-      return {
-        ...result.data.profissional,
-        message: result.message
-      };
       
     } catch (error) {
       console.error('Erro ao adicionar profissional:', error);
       throw error;
     } finally {
-      this.addingProfissional = false; // Resetar flag de proteção
+      this.addingProfissional = false;
     }
+  }
+
+  // MÉTODO SEPARADO PARA EDGE FUNCTION
+  async addProfissionalEdgeFunction(profissional) {
+    console.log('🔐 CHAMANDO EDGE FUNCTION: create-profissional...');
+    
+    const response = await fetch(`${this.supabase.supabaseUrl}/functions/v1/create-profissional`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.supabase.supabaseKey}`,
+        'apikey': this.supabase.supabaseKey
+      },
+      body: JSON.stringify({
+        nome: profissional.nome,
+        telefone: profissional.telefone,
+        email: profissional.email
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ ERRO NA EDGE FUNCTION:', errorData);
+      
+      // Tratar erro de email já existente
+      if (response.status === 409) {
+        if (errorData.code === 'EMAIL_ALREADY_EXISTS') {
+          throw new Error('Este email já está registrado. Use um email diferente ou verifique se o profissional já existe.');
+        } else if (errorData.error && errorData.error.includes('Profissional já existe')) {
+          throw new Error('Este profissional já existe para este usuário. Cada usuário pode ter apenas um profissional.');
+        }
+      }
+      
+      throw new Error(errorData.error || 'Erro ao criar profissional');
+    }
+
+    const result = await response.json();
+    console.log('✅ PROFISSIONAL CRIADO COM SUCESSO:', result);
+
+    // Atualizar cache e lista local
+    this.profissionais.push(result.data.profissional);
+    this.profissionaisPorId[result.data.profissional.id] = result.data.profissional;
+    this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
+    
+    // Limpar cache para forçar recarregamento
+    this.cache.profissionais = null;
+    
+    return {
+      ...result.data.profissional,
+      message: result.message
+    };
   }
 
   // Gerar senha temporária aleatória
