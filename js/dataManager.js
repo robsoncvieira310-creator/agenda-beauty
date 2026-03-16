@@ -1222,16 +1222,6 @@ class DataManager {
             cor,
             duracao_min,
             valor
-          ),
-          profissionais!inner (
-            id,
-            profile_id,
-            telefone,
-            profiles (
-              id,
-              nome,
-              email
-            )
           )
         `)
         .eq("profissional_id", profissionalLogado.id)
@@ -1254,15 +1244,14 @@ class DataManager {
         servico_cor: ag.servicos?.cor || '#3b82f6',
         servico_duracao: ag.servicos?.duracao_min || 0,
         servico_valor: ag.servicos?.valor || 0,
-        profissional: ag.profissionais?.profiles?.nome || ag.profissionais?.nome || 'Profissional não encontrado',
-        profissional_telefone: ag.profissionais?.telefone || '',
+        // ✅ CORRIGIDO: Usar profissionalLogado em vez de JOIN
+        profissional: profissionalLogado.nome || 'Profissional não encontrado',
+        profissional_telefone: profissionalLogado.telefone || '',
         // Mapear datas para nomes esperados
         inicio: ag.data_inicio,
         fim: ag.data_fim,
-        // Manter IDs originais
-        cliente_id: ag.cliente_id,
-        servico_id: ag.servico_id,
-        profissional_id: ag.profissional_id
+        // Garantir que status seja string
+        status: ag.status || 'confirmado'
       }));
       
       return agendaFormatada;
