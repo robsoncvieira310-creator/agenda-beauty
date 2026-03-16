@@ -830,37 +830,47 @@ class DataManager {
       let data, error;
       
       try {
-        // Tentar com JOIN primeiro
+        // ✅ MUDANÇA: Buscar apenas profissionais sem JOIN para evitar erro 500
         const result = await this.supabase
           .from("profissionais")
-          .select(`
-            id,
-            profile_id,
-            telefone,
-            created_at,
-            profiles (
-              id,
-              nome,
-              email,
-              role
-            )
-          `)
-          .order("id", { ascending: true }); // ✅ CORRIGIDO: Order por ID
+          .select("*")
+          .order("id", { ascending: true });
         
         data = result.data;
         error = result.error;
         
-      } catch (joinError) {
-        console.warn("⚠️ Erro no JOIN, tentando sem profiles:", joinError);
+        // Se funcionar, buscar profiles separadamente
+        if (!error && data && data.length > 0) {
+          try {
+            const profileIds = data.map(p => p.profile_id).filter(Boolean);
+            if (profileIds.length > 0) {
+              const { data: profilesData } = await this.supabase
+                .from("profiles")
+                .select("id, nome, email, role")
+                .in("id", profileIds);
+              
+              // Mapear profiles por ID
+              const profilesMap = {};
+              if (profilesData) {
+                profilesData.forEach(profile => {
+                  profilesMap[profile.id] = profile;
+                });
+              }
+              
+              // Adicionar dados do profile
+              data = data.map(prof => ({
+                ...prof,
+                profiles: profilesMap[prof.profile_id] || null
+              }));
+            }
+          } catch (profileError) {
+            console.warn("⚠️ Erro ao buscar profiles, usando dados básicos:", profileError);
+          }
+        }
         
-        // Fallback: buscar apenas profissionais sem JOIN
-        const fallback = await this.supabase
-          .from("profissionais")
-          .select("*")
-          .order("id", { ascending: true }); // ✅ CORRIGIDO: Order por ID
-        
-        data = fallback.data;
-        error = fallback.error;
+      } catch (queryError) {
+        console.error("❌ Erro na query de profissionais:", queryError);
+        throw queryError;
       }
 
       if (error) {
@@ -1298,18 +1308,26 @@ class DataManager {
         return null;
       }
       
-      // Buscar profile do usuário
-      const { data: profile, error: profileError } = await this.supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-        
-      if (profileError || !profile) {
-        console.warn("⚠️ Profile não encontrado");
+      // ✅ SIMPLIFICAR: Buscar profile sem JOIN para evitar erro 500
+      let profile = null;
+      try {
+        const { data: profileData, error: profileError } = await this.supabase
+          .from('profiles')
+          .select('id, nome, email, role, telefone, first_login_completed')
+          .eq('id', user.id)
+          .single();
+          
+        if (!profileError && profileData) {
+          profile = profileData;
+        } else {
+          console.warn("⚠️ Profile não encontrado");
+          return null;
+        }
+      } catch (profileQueryError) {
+        console.warn("⚠️ Erro ao buscar profile:", profileQueryError);
         return null;
       }
-      
+        
       // Se for admin, retornar null (admin pode ver todos)
       if (profile.role === 'admin') {
         console.log("👑 Usuário admin detectado - pode ver todos os agendamentos");
@@ -1318,36 +1336,39 @@ class DataManager {
       
       // Se for profissional, buscar dados do profissional
       if (profile.role === 'profissional') {
-        const { data: profissional, error: profissionalError } = await this.supabase
-          .from('profissionais')
-          .select('*')
-          .eq('profile_id', user.id)
-          .single();
-          
-        if (profissionalError || !profissional) {
-          console.warn("⚠️ Profissional não encontrado, criando automaticamente...");
-          
-          // ✅ CRIAR PROFISSIONAL AUTOMATICAMENTE
-          const novoProfissional = await this.criarProfissionalParaProfile(
-            user.id, 
-            profile.nome, 
-            profile.telefone || ''
-          );
-          
-          if (novoProfissional) {
-            console.log("✅ Profissional criado automaticamente:", novoProfissional);
-            return novoProfissional;
+        try {
+          const { data: profissional, error: profissionalError } = await this.supabase
+            .from('profissionais')
+            .select('*')
+            .eq('profile_id', user.id)
+            .single();
+            
+          if (profissionalError || !profissional) {
+            console.warn("⚠️ Profissional não encontrado, criando automaticamente...");
+            
+            // ✅ CRIAR PROFISSIONAL AUTOMATICAMENTE
+            const novoProfissional = await this.criarProfissionalParaProfile(
+              user.id, 
+              profile.nome, 
+              profile.telefone || ''
+            );
+            
+            if (novoProfissional) {
+              console.log("✅ Profissional criado automaticamente:", novoProfissional);
+              return novoProfissional;
+            }
+            
+            return null;
           }
           
+          console.log("👩 Profissional encontrado:", profissional);
+          return profissional;
+        } catch (profissionalQueryError) {
+          console.warn("⚠️ Erro ao buscar profissional:", profissionalQueryError);
           return null;
         }
-        
-        console.log("👩 Profissional encontrado:", profissional);
-        return profissional;
       }
       
-      // Outros roles
-      console.warn("⚠️ Role não reconhecido:", profile.role);
       return null;
       
     } catch (error) {
