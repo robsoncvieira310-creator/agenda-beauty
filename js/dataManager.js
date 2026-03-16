@@ -1034,16 +1034,20 @@ class DataManager {
       const errorData = await response.json();
       console.error('❌ ERRO NA EDGE FUNCTION:', errorData);
       
-      // Tratar erro de email já existente
+      // Tratar erros específicos
       if (response.status === 409) {
         if (errorData.code === 'EMAIL_ALREADY_EXISTS') {
           throw new Error('Este email já está registrado. Use um email diferente ou verifique se o profissional já existe.');
         } else if (errorData.error && errorData.error.includes('Profissional já existe')) {
           throw new Error('Este profissional já existe para este usuário. Cada usuário pode ter apenas um profissional.');
+        } else if (errorData.error && errorData.error.includes('Too Many Requests')) {
+          throw new Error('Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.');
+        } else if (errorData.error && errorData.error.includes('rate limit')) {
+          throw new Error('Limite de criação excedido. Tente novamente em alguns minutos.');
         }
       }
       
-      throw new Error(errorData.error || 'Erro ao criar profissional');
+      throw new Error(errorData.error || 'Erro ao criar profissional. Tente novamente.');
     }
 
     const result = await response.json();
