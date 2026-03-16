@@ -161,6 +161,14 @@
   <script src="js/appInit.js"></script>
   
   <script>
+    // Garantir que ProfissionaisPage esteja disponível globalmente
+    if (typeof ProfissionaisPage !== 'undefined') {
+      window.ProfissionaisPage = ProfissionaisPage;
+      console.log('✅ ProfissionaisPage disponível globalmente');
+    }
+  </script>
+  
+  <script>
     console.log(' PROFISSIONAIS_AUTH: Início do script inline');
     
     // AuthManager completo com Supabase
@@ -337,12 +345,6 @@
     console.log('✅ PROFISSIONAIS_AUTH: AuthManager completo carregado');
   </script>
   
-  <script src="js/dataManager.js"></script>
-  <script src="js/pageManager.js"></script>
-  <script src="js/menuManager.js"></script>
-  <script src="js/profissionaisPage.js"></script>
-  <script src="js/appInit.js"></script>
-  
   <script>
     // NOVA IMPLEMENTAÇÃO V1.2 - GARANTIR ORDEM CORRETA
     // Esperar um pouco para garantir que appInit.js tenha tempo de disparar o evento
@@ -374,35 +376,31 @@
       const logoutBtn = document.getElementById('logoutButton');
       if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
-          console.log('🚪 LOGOUT: Botão clicado');
-          
-          // Confirmar logout
-          const confirmed = confirm('Tem certeza que deseja sair do sistema?');
-          if (!confirmed) {
-            console.log('⏹️ LOGOUT: Cancelado pelo usuário');
-            return;
-          }
+          console.log('🚪 Botão de logout clicado');
           
           try {
-            // Executar logout
-            const result = await window.authManager.logout();
-            
-            if (result.success) {
-              console.log('✅ LOGOUT: Sucesso!');
-              window.location.href = 'login.html';
+            // Usar PageManager para logout
+            if (window.pageManager) {
+              await window.pageManager.logout();
             } else {
-              console.error('❌ LOGOUT: Erro:', result.error);
-              alert('Erro ao fazer logout: ' + result.error);
+              // Fallback: logout direto
+              const { error } = await window.supabase.auth.signOut();
+              if (error) {
+                console.error('❌ Erro no logout:', error);
+                alert('Erro ao sair: ' + error.message);
+              } else {
+                window.location.href = 'login.html';
+              }
             }
           } catch (error) {
-            console.error('❌ LOGOUT: Erro inesperado:', error);
-            alert('Ocorreu um erro inesperado ao fazer logout');
+            console.error('❌ Erro ao fazer logout:', error);
+            alert('Erro ao sair: ' + error.message);
           }
         });
         
         console.log('✅ LOGOUT: Botão configurado');
       }
-    }, 100);
+    }, 500); // Reduzir tempo para evitar duplicação
   </script>
 </body>
 </html>

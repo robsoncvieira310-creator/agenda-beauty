@@ -1,5 +1,15 @@
 // Inicialização centralizada da aplicação V1.3 - Com Autenticação
+let appInitialized = false; // Flag para evitar inicialização duplicada
+
 async function initApp() {
+  // PROTEÇÃO CONTRA INICIALIZAÇÃO DUPLICADA
+  if (appInitialized) {
+    console.log('⚠️ APP já foi inicializado, ignorando chamada duplicada');
+    return;
+  }
+  
+  appInitialized = true;
+  
   try {
     console.log('🔄 Iniciando aplicação...');
     
@@ -125,6 +135,13 @@ window.initDataManager = initApp;
 
 // Inicializar quando DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
+  // NOVA IMPLEMENTAÇÃO V1.3 - VERIFICAR CLASSES EXISTENTES
+  console.log('🔍 APP_INIT: Verificando classes existentes antes de declarar...');
+  console.log('  - DataManager existe:', typeof DataManager !== 'undefined');
+  console.log('  - PageManager existe:', typeof PageManager !== 'undefined');
+  console.log('  - MenuManager existe:', typeof MenuManager !== 'undefined');
+  console.log('  - ProfissionaisPage existe:', typeof ProfissionaisPage !== 'undefined');
+  
   // NOVA IMPLEMENTAÇÃO V1.3 - AGUARDAR CARREGAMENTO DOS SCRIPTS
   setTimeout(() => {
     console.log('🔄 APP_INIT: Iniciando após delay para carregamento de scripts...');

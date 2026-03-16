@@ -63,6 +63,7 @@ class ClientesPage {
     this.setupModalListeners();
   }
 
+  setupModalListeners() {
     // Fechar modal clicando fora
     const modalCliente = document.getElementById('modalCliente');
     if (modalCliente) {
@@ -296,14 +297,18 @@ class ClientesPage {
   // Método para obter próximo atendimento
   async getProximoAtendimento(clienteId) {
     try {
+      // ✅ CORRIGIDO: Formato de data compatível com Supabase
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
+      
+      // Formatar data sem timezone para Supabase
+      const dataFormatoSupabase = hoje.toISOString().split('T')[0];
       
       const { data, error } = await this.supabase
         .from('agendamentos')
         .select('data_inicio, servico_id, profissional_id, status')
         .eq('cliente_id', clienteId)
-        .gte('data_inicio', hoje.toISOString())
+        .gte('data_inicio', dataFormatoSupabase)
         .order('data_inicio', { ascending: true })
         .limit(1)
         .single();
@@ -326,14 +331,18 @@ class ClientesPage {
   // Método para obter último atendimento
   async getUltimoAtendimento(clienteId) {
     try {
+      // ✅ CORRIGIDO: Formato de data compatível com Supabase
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
+      
+      // Formatar data sem timezone para Supabase
+      const dataFormatoSupabase = hoje.toISOString().split('T')[0];
       
       const { data, error } = await this.supabase
         .from('agendamentos')
         .select('data_inicio, servico_id, profissional_id, status')
         .eq('cliente_id', clienteId)
-        .lt('data_inicio', hoje.toISOString())
+        .lt('data_inicio', dataFormatoSupabase)
         .order('data_inicio', { ascending: false })
         .limit(1)
         .single();
@@ -662,27 +671,42 @@ class ClientesPage {
     try {
       console.log('🔄 Carregando serviços para o formulário admin...');
       
+      // ✅ CORRIGIDO: Usar campos específicos da nova estrutura
       const { data, error } = await window.dataManager.supabase
         .from('servicos')
-        .select('*')
+        .select(`
+          id, 
+          nome, 
+          categoria, 
+          duracao_min, 
+          descricao, 
+          valor, 
+          cor, 
+          ativo, 
+          created_at
+        `)
+        .eq('ativo', true)
         .order('nome');
 
       if (error) {
         console.error('Erro ao carregar serviços:', error);
-        // Se falhar, carregar opções padrão
-        this.loadDefaultServicos();
+        this.servicos = [];
         return;
       }
+
+      // ✅ MAPEAR PARA COMPATIBILIDADE
+      this.servicos = (data || []).map(servico => ({
+        ...servico,
+        duracao: servico.duracao_min,
+        duracao_minutos: servico.duracao_min,
+        preco: servico.valor
+      }));
+
+      console.log('✅ Serviços carregados:', this.servicos.length);
       
-      console.log('✅ Serviços carregados:', data);
-      
-      // Preencher select com serviços do banco
-      const selectServico = document.getElementById('anamneseServico');
+      // Adicionar serviços ao select
+      const selectServico = document.getElementById('servico');
       if (selectServico) {
-        // Limpar opções existentes (exceto a primeira)
-        selectServico.innerHTML = '<option value="">Selecione um serviço...</option>';
-        
-        // Adicionar serviços do banco
         data.forEach(servico => {
           const option = document.createElement('option');
           option.value = servico.nome;

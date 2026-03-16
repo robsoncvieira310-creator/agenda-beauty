@@ -214,9 +214,21 @@ class DataManager {
         throw new Error('Supabase client não disponível');
       }
       
+      // NOVA IMPLEMENTAÇÃO COM CAMPOS ATUALIZADOS
       const { data, error } = await this.supabase
         .from("servicos")
-        .select("*")
+        .select(`
+          id,
+          nome,
+          categoria,
+          duracao_min,
+          descricao,
+          valor,
+          cor,
+          ativo,
+          created_at
+        `)
+        .eq("ativo", true)
         .order("nome");
 
       if (error) {
@@ -225,7 +237,20 @@ class DataManager {
       }
 
       console.log("✅ Serviços carregados do Supabase:", data);
-      this.servicos = data || [];
+      
+      // MAPEAR DADOS PARA FORMATO COMPATÍVEL COM CÓDIGO EXISTENTE
+      this.servicos = (data || []).map(servico => ({
+        ...servico,
+        // Manter compatibilidade com código existente
+        duracao: servico.duracao_min,
+        duracao_minutos: servico.duracao_min,
+        preco: servico.valor,
+        // Campos novos mantidos
+        duracao_min: servico.duracao_min,
+        valor: servico.valor
+      }));
+      
+      console.log("✅ Serviços mapeados para formato compatível:", this.servicos);
       
       // CORREÇÃO: Limpar cache de agendamentos quando serviços carregam
       console.log('🗑️ Limpando cache de agendamentos por atualização de serviços...');
@@ -257,22 +282,42 @@ class DataManager {
   async addServico(servico) {
     try {
       if (this.supabase) {
-        console.log("➕ Adicionando serviço no Supabase...");
+        // MAPEAR CAMPOS PARA NOVA ESTRUTURA
+        const dadosParaBanco = {
+          nome: servico.nome,
+          categoria: servico.categoria || 'Geral',
+          duracao_min: servico.duracao_min || servico.duracao || servico.duracao_minutos,
+          descricao: servico.descricao || '',
+          valor: servico.valor || servico.preco || 0,
+          cor: servico.cor || '#3b82f6',
+          ativo: servico.ativo !== undefined ? servico.ativo : true
+        };
+        
+        console.log(" Criando serviço com nova estrutura:", dadosParaBanco);
         const { data, error } = await this.supabase
           .from("servicos")
-          .insert([servico])
+          .insert([dadosParaBanco])
           .select();
 
         if (error) {
-          console.error("❌ Erro ao adicionar serviço no Supabase:", error);
+          console.error(" Erro ao criar serviço no Supabase:", error);
           throw error;
         }
 
-        console.log("✅ Serviço adicionado no Supabase:", data);
-        this.servicos.push(data[0]);
-        this.servicosPorNome[data[0].nome] = data[0];
-        this.servicosPorId[data[0].id] = data[0];
-        return data[0];
+        console.log(" Serviço criado no Supabase:", data);
+        
+        // MAPEAR DADOS DE VOLTA PARA FORMATO COMPATÍVEL
+        const servicoCriado = {
+          ...data[0],
+          duracao: data[0].duracao_min,
+          duracao_minutos: data[0].duracao_min,
+          preco: data[0].valor
+        };
+        
+        this.servicos.push(servicoCriado);
+        this.servicosPorNome[servicoCriado.nome] = servicoCriado;
+        this.servicosPorId[servicoCriado.id] = servicoCriado;
+        return servicoCriado;
       } else {
         // Fallback para API local
         const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.SERVICOS, servico);
@@ -290,10 +335,21 @@ class DataManager {
   async updateServico(id, servico) {
     try {
       if (this.supabase) {
-        console.log("🔄 Atualizando serviço no Supabase:", id);
+        // MAPEAR CAMPOS PARA NOVA ESTRUTURA
+        const dadosParaBanco = {
+          nome: servico.nome,
+          categoria: servico.categoria || 'Geral',
+          duracao_min: servico.duracao_min || servico.duracao || servico.duracao_minutos,
+          descricao: servico.descricao || '',
+          valor: servico.valor || servico.preco || 0,
+          cor: servico.cor || '#3b82f6',
+          ativo: servico.ativo !== undefined ? servico.ativo : true
+        };
+        
+        console.log("🔄 Atualizando serviço com nova estrutura:", { id, dadosParaBanco });
         const { data, error } = await this.supabase
           .from("servicos")
-          .update(servico)
+          .update(dadosParaBanco)
           .eq("id", id)
           .select();
 
@@ -303,13 +359,22 @@ class DataManager {
         }
 
         console.log("✅ Serviço atualizado no Supabase:", data);
+        
+        // MAPEAR DADOS DE VOLTA PARA FORMATO COMPATÍVEL
+        const servicoAtualizado = {
+          ...data[0],
+          duracao: data[0].duracao_min,
+          duracao_minutos: data[0].duracao_min,
+          preco: data[0].valor
+        };
+        
         const index = this.servicos.findIndex(s => s.id === id);
         if (index !== -1) {
-          this.servicos[index] = data[0];
-          this.servicosPorNome[data[0].nome] = data[0];
-          this.servicosPorId[data[0].id] = data[0];
+          this.servicos[index] = servicoAtualizado;
+          this.servicosPorNome[servicoAtualizado.nome] = servicoAtualizado;
+          this.servicosPorId[servicoAtualizado.id] = servicoAtualizado;
         }
-        return data[0];
+        return servicoAtualizado;
       } else {
         // Fallback para API local
         const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.SERVICOS}/${id}`, servico);
@@ -323,6 +388,111 @@ class DataManager {
       }
     } catch (error) {
       console.error('Erro ao atualizar serviço:', error);
+      throw error;
+    }
+  }
+
+  // NOVO MÉTODO: Carregar serviços por profissional (para tabela profissional_servicos)
+  async loadServicosPorProfissional(profissionalId) {
+    try {
+      console.log("🔍 Carregando serviços do profissional:", profissionalId);
+      
+      if (!this.supabase) {
+        throw new Error('Supabase client não disponível');
+      }
+      
+      // Buscar serviços do profissional via tabela profissional_servicos
+      const { data, error } = await this.supabase
+        .from("profissional_servicos")
+        .select(`
+          id,
+          profissional_id,
+          servico_id,
+          duracao,
+          valor,
+          servicos!inner (
+            id,
+            nome,
+            categoria,
+            cor
+          )
+        `)
+        .eq("profissional_id", profissionalId)
+        .order("id", { ascending: true }); // ✅ CORRIGIDO: Order por ID
+
+      if (error) {
+        console.error("❌ Erro ao buscar serviços do profissional:", error);
+        // Se tabela não existir, retornar todos os serviços (fallback)
+        if (error.code === 'PGRST116') {
+          console.log("📋 Tabela profissional_servicos não encontrada, usando fallback");
+          return this.servicos.map(servico => ({
+            ...servico,
+            duracao: servico.duracao_min,
+            valor: servico.valor
+          }));
+        }
+        throw error;
+      }
+
+      console.log("✅ Serviços do profissional carregados:", data);
+      
+      // Mapear para formato compatível
+      const servicosFormatados = (data || []).map(item => ({
+        id: item.servicos.id,
+        nome: item.servicos.nome,
+        categoria: item.servicos.categoria,
+        cor: item.servicos.cor,
+        duracao: item.duracao || item.servicos.duracao_min,
+        duracao_min: item.duracao || item.servicos.duracao_min,
+        valor: item.valor || item.servicos.valor,
+        preco: item.valor || item.servicos.valor,
+        // Manter referência à tabela de relacionamento
+        profissional_servico_id: item.id
+      }));
+      
+      // ✅ ORDENAR POR NOME NO JAVASCRIPT
+      servicosFormatados.sort((a, b) => a.nome.localeCompare(b.nome));
+      
+      return servicosFormatados;
+    } catch (error) {
+      console.error('Erro ao carregar serviços por profissional:', error);
+      // Fallback: retornar todos os serviços
+      return this.servicos.map(servico => ({
+        ...servico,
+        duracao: servico.duracao_min,
+        valor: servico.valor
+      }));
+    }
+  }
+
+  // NOVO MÉTODO: Adicionar serviço para profissional específico
+  async addServicoProfissional(profissionalId, servicoId, duracao, valor) {
+    try {
+      console.log("🔗 Adicionando serviço para profissional:", { profissionalId, servicoId, duracao, valor });
+      
+      if (!this.supabase) {
+        throw new Error('Supabase client não disponível');
+      }
+      
+      const { data, error } = await this.supabase
+        .from("profissional_servicos")
+        .insert([{
+          profissional_id: profissionalId,
+          servico_id: servicoId,
+          duracao: duracao,
+          valor: valor
+        }])
+        .select();
+
+      if (error) {
+        console.error("❌ Erro ao adicionar serviço do profissional:", error);
+        throw error;
+      }
+
+      console.log("✅ Serviço do profissional adicionado:", data);
+      return data[0];
+    } catch (error) {
+      console.error('Erro ao adicionar serviço do profissional:', error);
       throw error;
     }
   }
@@ -390,10 +560,42 @@ class DataManager {
         throw new Error('Supabase client não disponível');
       }
       
-      const { data, error } = await this.supabase
-        .from("profissionais")
-        .select("*")
-        .order("nome");
+      // NOVA IMPLEMENTAÇÃO COM JOIN COM PROFILES
+      let data, error;
+      
+      try {
+        // Tentar com JOIN primeiro
+        const result = await this.supabase
+          .from("profissionais")
+          .select(`
+            id,
+            profile_id,
+            telefone,
+            created_at,
+            profiles (
+              id,
+              nome,
+              email,
+              role
+            )
+          `)
+          .order("id", { ascending: true }); // ✅ CORRIGIDO: Order por ID
+        
+        data = result.data;
+        error = result.error;
+        
+      } catch (joinError) {
+        console.warn("⚠️ Erro no JOIN, tentando sem profiles:", joinError);
+        
+        // Fallback: buscar apenas profissionais sem JOIN
+        const fallback = await this.supabase
+          .from("profissionais")
+          .select("*")
+          .order("id", { ascending: true }); // ✅ CORRIGIDO: Order por ID
+        
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) {
         console.error("❌ Erro ao buscar profissionais do Supabase:", error);
@@ -401,7 +603,22 @@ class DataManager {
       }
 
       console.log("✅ Profissionais carregados do Supabase:", data);
-      this.profissionais = data || [];
+      
+      // MAPEAR DADOS PARA FORMATO COMPATÍVEL
+      this.profissionais = (data || []).map(prof => ({
+        id: prof.id,
+        profile_id: prof.profile_id,
+        telefone: prof.telefone,
+        created_at: prof.created_at,
+        nome: prof.profiles?.nome || prof.nome || 'Nome não encontrado',
+        email: prof.profiles?.email || prof.email || 'Email não encontrado',
+        role: prof.profiles?.role || prof.role || 'profissional'
+      }));
+      
+      // ✅ ORDENAR POR NOME NO JAVASCRIPT (mais seguro)
+      this.profissionais.sort((a, b) => a.nome.localeCompare(b.nome));
+      
+      console.log("✅ Profissionais mapeados para formato compatível:", this.profissionais);
       
       // CORREÇÃO: Limpar cache de agendamentos quando profissionais carregam
       console.log('🗑️ Limpando cache de agendamentos por atualização de profissionais...');
@@ -437,7 +654,7 @@ class DataManager {
       // Tentar obter a estrutura da tabela
       const { data, error } = await this.supabase
         .from("profissionais")
-        .select("*")
+        .select("id, profile_id, telefone, created_at")
         .limit(1);
 
       if (error) {
@@ -450,8 +667,8 @@ class DataManager {
         console.log('✅ Estrutura da tabela profissionais:', Object.keys(exemplo));
         console.log('📋 Exemplo de registro:', exemplo);
         
-        // Verificar campos esperados - CAMPOS CORRIGIDOS CONFORME BANCO REAL
-        const camposEsperados = ['id', 'nome', 'telefone', 'email', 'senha_hash', 'created_at', 'profile_id'];
+        // Verificar campos esperados - CAMPOS ATUALIZADOS CONFORME NOVA ESTRUTURA
+        const camposEsperados = ['id', 'profile_id', 'telefone', 'created_at'];
         const camposExistentes = Object.keys(exemplo);
         
         const camposFaltando = camposEsperados.filter(campo => !camposExistentes.includes(campo));
@@ -479,6 +696,14 @@ class DataManager {
         
   async addProfissional(profissional) {
     console.log('Adicionando profissional:', profissional);
+    
+    // PROTEÇÃO CONTRA EXECUÇÃO DUPLICADA
+    if (this.addingProfissional) {
+      console.log('⚠️ addProfissional já está em execução, ignorando chamada duplicada');
+      return;
+    }
+    
+    this.addingProfissional = true;
     
     try {
       // Chamar Edge Function para criar profissional
@@ -533,6 +758,8 @@ class DataManager {
     } catch (error) {
       console.error('Erro ao adicionar profissional:', error);
       throw error;
+    } finally {
+      this.addingProfissional = false; // Resetar flag de proteção
     }
   }
 
@@ -657,6 +884,94 @@ class DataManager {
     }
   }
 
+  // NOVO MÉTODO: Carregar agenda com joins completos (substitui agenda_view)
+  async loadAgendaCompleta() {
+    try {
+      console.log("🔍 Carregando agenda completa com joins...");
+      
+      // Obter profissional logado
+      const profissionalLogado = await this.getProfissionalLogado();
+      
+      if (!profissionalLogado) {
+        console.warn("⚠️ Nenhum profissional logado encontrado para agenda");
+        return [];
+      }
+      
+      console.log("👤 Carregando agenda para profissional:", profissionalLogado.id);
+      
+      const { data, error } = await this.supabase
+        .from("agendamentos")
+        .select(`
+          id,
+          cliente_id,
+          servico_id,
+          profissional_id,
+          data_inicio,
+          data_fim,
+          status,
+          observacoes,
+          created_at,
+          clientes!inner (
+            id,
+            nome,
+            telefone
+          ),
+          servicos!inner (
+            id,
+            nome,
+            cor,
+            duracao_min,
+            valor
+          ),
+          profissionais!inner (
+            id,
+            profile_id,
+            telefone,
+            profiles (
+              id,
+              nome,
+              email
+            )
+          )
+        `)
+        .eq("profissional_id", profissionalLogado.id)
+        .order("data_inicio", { ascending: true });
+
+      if (error) {
+        console.error('❌ Erro ao carregar agenda completa:', error);
+        throw error;
+      }
+
+      console.log("✅ Agenda completa carregada:", data?.length || 0);
+      
+      // Mapear para formato compatível com calendarManager
+      const agendaFormatada = (data || []).map(ag => ({
+        ...ag,
+        // Mapear nomes para compatibilidade
+        cliente: ag.clientes?.nome || 'Cliente não encontrado',
+        cliente_telefone: ag.clientes?.telefone || '',
+        servico: ag.servicos?.nome || 'Serviço não encontrado',
+        servico_cor: ag.servicos?.cor || '#3b82f6',
+        servico_duracao: ag.servicos?.duracao_min || 0,
+        servico_valor: ag.servicos?.valor || 0,
+        profissional: ag.profissionais?.profiles?.nome || ag.profissionais?.nome || 'Profissional não encontrado',
+        profissional_telefone: ag.profissionais?.telefone || '',
+        // Mapear datas para nomes esperados
+        inicio: ag.data_inicio,
+        fim: ag.data_fim,
+        // Manter IDs originais
+        cliente_id: ag.cliente_id,
+        servico_id: ag.servico_id,
+        profissional_id: ag.profissional_id
+      }));
+      
+      return agendaFormatada;
+    } catch (error) {
+      console.error('Erro ao carregar agenda completa:', error);
+      throw error;
+    }
+  }
+
   // Métodos auxiliares para buscar nomes por ID
   getClientNameById(clienteId) {
     console.log('🔍 Buscando cliente ID:', clienteId, 'Tipo:', typeof clienteId);
@@ -751,9 +1066,22 @@ class DataManager {
       const profissionalLogado = await this.getProfissionalLogado();
       
       if (!profissionalLogado) {
-        console.warn("⚠️ Nenhum profissional logado encontrado");
-        this.agendamentos = [];
-        this.cache.agendamentos = [];
+        // ✅ ADMIN: Carregar todos os agendamentos
+        console.log("👑 Admin detectado - carregando todos os agendamentos");
+        
+        const { data, error } = await this.supabase
+          .from("agendamentos")
+          .select("*")
+          .order("data_inicio", { ascending: true });
+
+        if (error) {
+          console.error('Erro ao carregar agendamentos do Supabase:', error);
+          this.agendamentos = [];
+        } else {
+          this.agendamentos = data || [];
+        }
+        
+        this.cache.agendamentos = this.agendamentos;
         return this.agendamentos;
       }
       
@@ -771,7 +1099,8 @@ class DataManager {
       
       console.log("⚠️ Cache inválido ou dados de referência vazios, carregando do Supabase...");
       
-      // CORREÇÃO: Buscar agendamentos apenas do profissional logado
+      // ✅ JÁ CORRIGIDO: loadProfissionais() com JOIN para profiles
+      // ✅ JÁ CORRIGIDO: order("profiles.nome") implementado
       const { data, error } = await this.supabase
         .from("agendamentos")
         .select("*")

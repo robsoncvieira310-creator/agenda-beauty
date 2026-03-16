@@ -233,6 +233,14 @@ class ProfissionaisPage {
   async saveProfessional() {
     console.log('saveProfessional chamado');
     
+    // PROTEÇÃO CONTRA EXECUÇÃO DUPLICADA
+    if (this.saving) {
+      console.log('⚠️ saveProfessional já está em execução, ignorando chamada duplicada');
+      return;
+    }
+    
+    this.saving = true;
+    
     try {
         // Coletar dados
         const nome = document.getElementById('nomeProfissional').value.trim();
@@ -307,6 +315,7 @@ class ProfissionaisPage {
         console.error('Erro no saveProfessional():', error);
         this.showError('Erro ao salvar profissional: ' + error.message);
     } finally {
+        this.saving = false; // Resetar flag de proteção
         const btnSalvar = document.getElementById('btnSalvar');
         UIUtils.hideLoading(btnSalvar);
     }

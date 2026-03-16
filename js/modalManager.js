@@ -311,7 +311,8 @@ class ModalManager {
     if (tipoRegistro !== 'agendamento') return;
 
     const servicoSelect = document.getElementById('servico');
-    const duracao = parseInt(servicoSelect.selectedOptions[0]?.dataset.duracao_minutos || "0", 10);
+    // Usar campos com compatibilidade para nova estrutura
+    const duracao = parseInt(servicoSelect.selectedOptions[0]?.dataset.duracao_min || servicoSelect.selectedOptions[0]?.dataset.duracao_minutos || "0", 10);
     
     if (!duracao) return;
 
