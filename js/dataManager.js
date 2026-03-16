@@ -1000,6 +1000,11 @@ class DataManager {
   async addProfissionalEdgeFunction(profissional) {
     console.log('🔐 CHAMANDO EDGE FUNCTION: create-profissional...');
     
+    // ✅ VERIFICAR SE SENHA TEMPORÁRIA FOI FORNECIDA
+    if (!profissional.senha_temporaria) {
+      throw new Error('Senha temporária é obrigatória para criar profissional');
+    }
+    
     const response = await fetch(`${this.supabase.supabaseUrl}/functions/v1/create-profissional`, {
       method: 'POST',
       headers: {
@@ -1010,7 +1015,8 @@ class DataManager {
       body: JSON.stringify({
         nome: profissional.nome,
         telefone: profissional.telefone,
-        email: profissional.email
+        email: profissional.email,
+        senha_temporaria: profissional.senha_temporaria // ✅ NOVO CAMPO OBRIGATÓRIO
       })
     });
 

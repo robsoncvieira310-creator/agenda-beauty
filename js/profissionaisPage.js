@@ -226,6 +226,7 @@ class ProfissionaisPage {
     document.getElementById('nomeProfissional').value = '';
     document.getElementById('telefoneProfissional').value = '';
     document.getElementById('emailProfissional').value = '';
+    document.getElementById('senhaTemporaria').value = ''; // ✅ LIMPAR SENHA TEMPORÁRIA
     document.getElementById('nomeProfissional').disabled = false;
     console.log('✅ Formulário limpo');
   }
@@ -246,8 +247,9 @@ class ProfissionaisPage {
         const nome = document.getElementById('nomeProfissional').value.trim();
         const telefone = document.getElementById('telefoneProfissional').value.trim();
         const email = document.getElementById('emailProfissional').value.trim();
+        const senha_temporaria = document.getElementById('senhaTemporaria').value.trim();
 
-        console.log('Dados coletados:', { nome, telefone, email });
+        console.log('Dados coletados:', { nome, telefone, email, senha_temporaria });
 
         // Validacao
         const errors = [];
@@ -272,6 +274,12 @@ class ProfissionaisPage {
             errors.push('Email invalido');
         }
         
+        if (!senha_temporaria) {
+            errors.push('Senha temporaria e obrigatoria');
+        } else if (senha_temporaria.length < 6) {
+            errors.push('A senha deve ter pelo menos 6 caracteres');
+        }
+        
         if (errors.length > 0) {
             this.showError(errors[0]);
             return;
@@ -280,11 +288,12 @@ class ProfissionaisPage {
         const btnSalvar = document.getElementById('btnSalvar');
         UIUtils.showLoading(btnSalvar);
 
-        // DADOS APENAS CAMPOS EXISTENTES NO BANCO
+        // ✅ DADOS COM SENHA TEMPORARIA
         const dadosParaSalvar = {
             nome: nome,
             telefone: telefone,
-            email: email
+            email: email,
+            senha_temporaria: senha_temporaria
         };
 
         console.log('Salvando profissional:', dadosParaSalvar);
