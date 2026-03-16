@@ -132,26 +132,41 @@ class AgendaPage extends PageManager {
 
   // NOVA IMPLEMENTAÇÃO V1.2 - CONFIGURAR FILTROS DINÂMICOS
   async setupFiltros() {
-    console.log('🔍 Configurando filtros dinâmicos...');
+    console.log(' Configurando filtros dinâmicos...');
     
     try {
-      // Carregar dados para os filtros
-      const profissionais = await window.dataManager.getProfissionais();
-      const servicos = await window.dataManager.getServicos();
+      // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
+      // Obter profissional logado
+      const profissionalLogado = await window.dataManager.getProfissionalLogado();
       
-      // Preencher filtro de profissionais
-      const filtroProfissional = document.getElementById('filtroProfissional');
-      if (filtroProfissional) {
-        filtroProfissional.innerHTML = '<option value="">Todos</option>';
-        profissionais.forEach(profissional => {
-          const option = document.createElement('option');
-          option.value = profissional.nome;
-          option.textContent = profissional.nome;
-          filtroProfissional.appendChild(option);
-        });
+      if (profissionalLogado) {
+        // Se for profissional, esconder filtro de profissionais e mostrar apenas ele
+        const filtroProfissional = document.getElementById('filtroProfissional');
+        if (filtroProfissional) {
+          filtroProfissional.innerHTML = `<option value="${profissionalLogado.nome}" selected>${profissionalLogado.nome}</option>`;
+          filtroProfissional.disabled = true; // Desabilitar pois só pode ver o próprio
+          console.log(' Filtro de profissional configurado para profissional logado:', profissionalLogado.nome);
+        }
+      } else {
+        // Se for admin, mostrar todos os profissionais
+        const profissionais = await window.dataManager.getProfissionais();
+        
+        // Preencher filtro de profissionais
+        const filtroProfissional = document.getElementById('filtroProfissional');
+        if (filtroProfissional) {
+          filtroProfissional.innerHTML = '<option value="">Todos</option>';
+          profissionais.forEach(profissional => {
+            const option = document.createElement('option');
+            option.value = profissional.nome;
+            option.textContent = profissional.nome;
+            filtroProfissional.appendChild(option);
+          });
+          console.log(' Filtro de profissional configurado para admin - todos visíveis');
+        }
       }
       
       // Preencher filtro de serviços
+      const servicos = await window.dataManager.getServicos();
       const filtroServico = document.getElementById('filtroServico');
       if (filtroServico) {
         filtroServico.innerHTML = '<option value="">Todos</option>';

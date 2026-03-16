@@ -503,8 +503,12 @@ class DataManager {
         console.error('❌ ERRO NA EDGE FUNCTION:', errorData);
         
         // Tratar erro de email já existente
-        if (response.status === 409 && errorData.code === 'EMAIL_ALREADY_EXISTS') {
-          throw new Error('Este email já está registrado. Use um email diferente ou verifique se o profissional já existe.');
+        if (response.status === 409) {
+          if (errorData.code === 'EMAIL_ALREADY_EXISTS') {
+            throw new Error('Este email já está registrado. Use um email diferente ou verifique se o profissional já existe.');
+          } else if (errorData.error && errorData.error.includes('Profissional já existe')) {
+            throw new Error('Este profissional já existe para este usuário. Cada usuário pode ter apenas um profissional cadastrado.');
+          }
         }
         
         throw new Error(errorData.error || 'Erro ao criar profissional');
@@ -678,6 +682,62 @@ class DataManager {
     return profissional ? profissional.nome : null;
   }
 
+  // NOVO MÉTODO: Obter profissional logado
+  async getProfissionalLogado() {
+    try {
+      // Obter usuário autenticado
+      const { data: { user }, error: userError } = await this.supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.warn("⚠️ Usuário não autenticado");
+        return null;
+      }
+      
+      // Buscar profile do usuário
+      const { data: profile, error: profileError } = await this.supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+        
+      if (profileError || !profile) {
+        console.warn("⚠️ Profile não encontrado");
+        return null;
+      }
+      
+      // Se for admin, retornar null (admin pode ver todos)
+      if (profile.role === 'admin') {
+        console.log("👑 Usuário admin detectado - pode ver todos os agendamentos");
+        return null; // Admin não tem filtro
+      }
+      
+      // Se for profissional, buscar dados do profissional
+      if (profile.role === 'profissional') {
+        const { data: profissional, error: profissionalError } = await this.supabase
+          .from('profissionais')
+          .select('*')
+          .eq('profile_id', user.id)
+          .single();
+          
+        if (profissionalError || !profissional) {
+          console.warn("⚠️ Profissional não encontrado para o profile:", user.id);
+          return null;
+        }
+        
+        console.log("👩 Profissional encontrado:", profissional);
+        return profissional;
+      }
+      
+      // Outros roles
+      console.warn("⚠️ Role não reconhecido:", profile.role);
+      return null;
+      
+    } catch (error) {
+      console.error("❌ Erro ao obter profissional logado:", error);
+      return null;
+    }
+  }
+
   // Agendamentos
   async loadAgendamentos() {
     try {
@@ -685,6 +745,19 @@ class DataManager {
       
       // CORREÇÃO V1.3: Garantir dados de referência primeiro
       await this.garantirDadosReferencia();
+      
+      // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
+      // Obter ID do profissional logado
+      const profissionalLogado = await this.getProfissionalLogado();
+      
+      if (!profissionalLogado) {
+        console.warn("⚠️ Nenhum profissional logado encontrado");
+        this.agendamentos = [];
+        this.cache.agendamentos = [];
+        return this.agendamentos;
+      }
+      
+      console.log("👤 Profissional logado:", profissionalLogado.id, profissionalLogado.nome);
       
       // NOVA IMPLEMENTAÇÃO V1.3 - VERIFICAR CACHE E DADOS DE REFERÊNCIA
       if (this.cache.agendamentos !== null && 
@@ -698,10 +771,11 @@ class DataManager {
       
       console.log("⚠️ Cache inválido ou dados de referência vazios, carregando do Supabase...");
       
-      // CORREÇÃO: Buscar sem JOINs para evitar erro de relacionamento
+      // CORREÇÃO: Buscar agendamentos apenas do profissional logado
       const { data, error } = await this.supabase
         .from("agendamentos")
         .select("*")
+        .eq("profissional_id", profissionalLogado.id)
         .order("data_inicio", { ascending: true });
 
       if (error) {
@@ -755,11 +829,21 @@ class DataManager {
     try {
       console.log("📝 Enviando agendamento para Supabase:", agendamento);
       
+      // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
+      // Obter profissional logado para garantir consistência
+      const profissionalLogado = await this.getProfissionalLogado();
+      
+      if (!profissionalLogado) {
+        throw new Error('Nenhum profissional logado encontrado para criar agendamento');
+      }
+      
+      console.log("👤 Criando agendamento para profissional:", profissionalLogado.id, profissionalLogado.nome);
+      
       // CORREÇÃO: Usar Supabase diretamente com nomes corretos das colunas
       const dadosParaBanco = {
         cliente_id: parseInt(agendamento.cliente), // ID do cliente
         servico_id: parseInt(agendamento.servico), // ID do serviço
-        profissional_id: parseInt(agendamento.profissional), // ID do profissional
+        profissional_id: profissionalLogado.id, // FORÇAR ID do profissional logado
         data_inicio: agendamento.inicio, // timestamp completo
         data_fim: agendamento.fim, // timestamp completo
         status: agendamento.status || 'confirmado',
@@ -895,6 +979,19 @@ class DataManager {
       console.log("🔍 Carregando bloqueios...");
       console.log("🔍 Verificando this.supabase:", this.supabase);
       
+      // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
+      // Obter ID do profissional logado
+      const profissionalLogado = await this.getProfissionalLogado();
+      
+      if (!profissionalLogado) {
+        console.warn("⚠️ Nenhum profissional logado encontrado para bloqueios");
+        this.bloqueios = [];
+        this.cache.bloqueios = [];
+        return this.bloqueios;
+      }
+      
+      console.log("👤 Carregando bloqueios para profissional:", profissionalLogado.id, profissionalLogado.nome);
+      
       // NOVA IMPLEMENTAÇÃO V1.2 - VERIFICAR CACHE PRIMEIRO
       if (this.cache.bloqueios) {
         console.log("📦 Retornando bloqueios do cache:", this.cache.bloqueios.length);
@@ -909,10 +1006,11 @@ class DataManager {
         return this.bloqueios;
       }
       
-      // Buscar bloqueios do Supabase
+      // Buscar bloqueios apenas do profissional logado
       const { data, error } = await this.supabase
         .from('bloqueios')
         .select('*')
+        .eq('profissional_id', profissionalLogado.id)
         .order('inicio', { ascending: true });
 
       if (error) {

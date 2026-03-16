@@ -290,6 +290,11 @@ class ProfissionaisPage {
                 return;
             }
             
+            if (this.profissionais.some(p => p.email === email)) {
+                this.showError('Este email já está cadastrado para outro profissional');
+                return;
+            }
+            
             await window.dataManager.addProfissional(dadosParaSalvar);
             this.showSuccess('Profissional criado com sucesso');
         }

@@ -153,14 +153,20 @@
   <script src="js/utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js"></script>
+  <script src="js/firstLoginManager.js"></script>
+  <script src="js/dataManager.js"></script>
+  <script src="js/pageManager.js"></script>
+  <script src="js/menuManager.js"></script>
+  <script src="js/profissionaisPage.js"></script>
+  <script src="js/appInit.js"></script>
   
-  <!-- AuthManager completo inline -->
   <script>
-    console.log('🔍 PROFISSIONAIS_AUTH: Início do script inline');
+    console.log(' PROFISSIONAIS_AUTH: Início do script inline');
     
     // AuthManager completo com Supabase
     class AuthManager {
       constructor() {
+        console.log(' PROFISSIONAIS_AUTH: Construtor iniciado');
         console.log('🔍 PROFISSIONAIS_AUTH: Construtor iniciado');
         
         // Verificar se Supabase está disponível

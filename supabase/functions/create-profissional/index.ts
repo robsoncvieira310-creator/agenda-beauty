@@ -44,39 +44,58 @@ serve(async (req: Request) => {
       }
     )
 
-    // 1. Criar usuário no Supabase Auth
-    console.log('🔐 PASSO 1: Criando usuário no Supabase Auth...')
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
-      email_confirm: true,
-      user_metadata: {
-        nome: nome,
-        role: 'profissional'
+    // 1. Convidar usuário pelo email
+    console.log('� PASSO 1: Convidando profissional pelo email...')
+    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+      email,
+      {
+        data: {
+          nome: nome,
+          telefone: telefone,
+          role: 'profissional'
+        }
       }
-    })
+    )
 
-    if (authError) {
-      console.error('❌ ERRO AO CRIAR USUÁRIO:', authError)
+    if (inviteError) {
+      console.error('❌ ERRO AO CONVIDAR USUÁRIO:', inviteError)
       
       // Verificar se o erro é de email já existente
-      if (authError.message.includes('already been registered') || authError.message.includes('duplicate')) {
+      if (inviteError.message.includes('already been registered') || inviteError.message.includes('duplicate')) {
         return new Response(
           JSON.stringify({ 
             error: `Este email já está registrado. Use um email diferente ou verifique se o profissional já existe.`, 
             code: 'EMAIL_ALREADY_EXISTS',
-            details: authError.message 
+            details: inviteError.message 
           }),
           { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
       
       return new Response(
-        JSON.stringify({ error: `Erro ao criar usuário: ${authError.message}` }),
+        JSON.stringify({ error: `Erro ao convidar usuário: ${inviteError.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('✅ USUÁRIO CRIADO:', authData.user)
+    console.log('✅ USUÁRIO CONVIDADO:', inviteData)
+
+    // Se não tiver dados do usuário, buscar pelo email
+    let userId = null;
+    if (inviteData.user && inviteData.user.id) {
+      userId = inviteData.user.id;
+    } else {
+      // Buscar usuário pelo email
+      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+      if (userError || !userData.user) {
+        console.error('❌ ERRO AO BUSCAR USUÁRIO:', userError);
+        return new Response(
+          JSON.stringify({ error: 'Erro ao buscar dados do usuário convidado' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      userId = userData.user.id;
+    }
 
     // 2. Aguardar a criação automática do profile
     console.log('👤 PASSO 2: Aguardando trigger criar profile...')
@@ -87,7 +106,7 @@ serve(async (req: Request) => {
     const { data: existingProfissional, error: checkError } = await supabaseAdmin
       .from('profissionais')
       .select('id')
-      .eq('profile_id', authData.user.id)
+      .eq('profile_id', userId)
       .single()
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -118,7 +137,7 @@ serve(async (req: Request) => {
     const { data: profissionalData, error: profissionalError } = await supabaseAdmin
       .from('profissionais')
       .insert({
-        profile_id: authData.user.id,
+        profile_id: userId,
         nome: nome,
         telefone: telefone,
         email: email
@@ -144,9 +163,9 @@ serve(async (req: Request) => {
 
     const response = {
       success: true,
-      message: 'Profissional criado com sucesso! Email de convite enviado.',
+      message: 'Profissional convidado com sucesso! Email de convite enviado para criação de senha.',
       data: {
-        user: authData.user,
+        user: { id: userId, email: email },
         profissional: profissionalData
       }
     }
