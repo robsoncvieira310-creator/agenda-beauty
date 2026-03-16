@@ -494,8 +494,7 @@ class DataManager {
         body: JSON.stringify({
           nome: profissional.nome,
           telefone: profissional.telefone,
-          email: profissional.email,
-          cor: profissional.cor || this.gerarCorAleatoria()
+          email: profissional.email
         })
       });
 

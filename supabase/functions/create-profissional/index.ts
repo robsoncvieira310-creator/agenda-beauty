@@ -21,7 +21,7 @@ serve(async (req: Request) => {
       )
     }
 
-    const { nome, telefone, email, cor } = await req.json()
+    const { nome, telefone, email } = await req.json()
 
     if (!nome || !telefone || !email) {
       return new Response(
@@ -30,7 +30,7 @@ serve(async (req: Request) => {
       )
     }
 
-    console.log('🔐 CRIANDO PROFISSIONAL:', { nome, telefone, email, cor })
+    console.log('🔐 CRIANDO PROFISSIONAL:', { nome, telefone, email })
 
     // Criar cliente Supabase com Service Role Key
     const supabaseAdmin = createClient(
@@ -78,41 +78,37 @@ serve(async (req: Request) => {
 
     console.log('✅ USUÁRIO CRIADO:', authData.user)
 
-    // 2. Aguardar um momento para o trigger criar o profile
-    console.log('👤 PASSO 2: Aguardando trigger criar profile...')
-    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 segundo
+    // 2. O trigger do banco criará o profile e o profissional automaticamente
+    console.log('👤 PASSO 2: Aguardando trigger criar profile e profissional...')
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 segundos para ambos os triggers
     
-    // 3. Criar profissional
-    console.log('💼 PASSO 3: Criando profissional...')
+    // 3. Buscar profissional criado automaticamente
+    console.log('💼 PASSO 3: Buscando profissional criado pelo trigger...')
     const { data: profissionalData, error: profissionalError } = await supabaseAdmin
       .from('profissionais')
-      .insert({
-        nome: nome,
-        telefone: telefone,
-        email: email,
-        cor: cor || '#e91e63',
-        profile_id: authData.user.id,
-        created_at: new Date().toISOString()
-      })
-      .select()
+      .select('*')
+      .eq('profile_id', authData.user.id)
       .single()
 
     if (profissionalError) {
-      console.error('❌ ERRO AO CRIAR PROFISSIONAL:', profissionalError)
+      console.error('❌ ERRO AO BUSCAR PROFISSIONAL:', profissionalError)
       return new Response(
-        JSON.stringify({ error: `Erro ao criar profissional: ${profissionalError.message}` }),
+        JSON.stringify({ 
+          error: `Erro ao buscar profissional criado automaticamente: ${profissionalError.message}`,
+          details: 'Verifique se o trigger foi executado corretamente'
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('✅ PROFISSIONAL CRIADO:', profissionalData)
+    console.log('✅ PROFISSIONAL CRIADO AUTOMATICAMENTE:', profissionalData)
 
     // 4. Enviar email de convite (automático via Supabase)
     console.log('📧 PASSO 4: Email de convite enviado automaticamente')
 
     const response = {
       success: true,
-      message: 'Profissional criado com sucesso! Email de convite enviado.',
+      message: 'Profissional criado com sucesso! Email de convite enviado. Profissional criado automaticamente pelo banco.',
       data: {
         user: authData.user,
         profissional: profissionalData
