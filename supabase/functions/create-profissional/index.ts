@@ -78,37 +78,73 @@ serve(async (req: Request) => {
 
     console.log('✅ USUÁRIO CRIADO:', authData.user)
 
-    // 2. O trigger do banco criará o profile e o profissional automaticamente
-    console.log('👤 PASSO 2: Aguardando trigger criar profile e profissional...')
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 segundos para ambos os triggers
+    // 2. Aguardar a criação automática do profile
+    console.log('👤 PASSO 2: Aguardando trigger criar profile...')
+    await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 segundos para o trigger
     
-    // 3. Buscar profissional criado automaticamente
-    console.log('💼 PASSO 3: Buscando profissional criado pelo trigger...')
-    const { data: profissionalData, error: profissionalError } = await supabaseAdmin
+    // 3. Verificar se já existe profissional com esse profile_id
+    console.log('🔍 PASSO 3: Verificando se profissional já existe...')
+    const { data: existingProfissional, error: checkError } = await supabaseAdmin
       .from('profissionais')
-      .select('*')
+      .select('id')
       .eq('profile_id', authData.user.id)
       .single()
 
-    if (profissionalError) {
-      console.error('❌ ERRO AO BUSCAR PROFISSIONAL:', profissionalError)
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('❌ ERRO AO VERIFICAR PROFISSIONAL:', checkError)
       return new Response(
         JSON.stringify({ 
-          error: `Erro ao buscar profissional criado automaticamente: ${profissionalError.message}`,
-          details: 'Verifique se o trigger foi executado corretamente'
+          error: `Erro ao verificar profissional existente: ${checkError.message}`,
+          details: 'Falha na consulta de verificação'
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('✅ PROFISSIONAL CRIADO AUTOMATICAMENTE:', profissionalData)
+    if (existingProfissional) {
+      console.log('⚠️ PROFISSIONAL JÁ EXISTE:', existingProfissional)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Profissional já existe para este usuário',
+          details: 'Cada profile pode ter apenas um profissional',
+          profissional_id: existingProfissional.id
+        }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    // 4. Enviar email de convite (automático via Supabase)
-    console.log('📧 PASSO 4: Email de convite enviado automaticamente')
+    // 4. Criar profissional manualmente
+    console.log('💼 PASSO 4: Criando profissional manualmente...')
+    const { data: profissionalData, error: profissionalError } = await supabaseAdmin
+      .from('profissionais')
+      .insert({
+        profile_id: authData.user.id,
+        nome: nome,
+        telefone: telefone,
+        email: email
+      })
+      .select()
+      .single()
+
+    if (profissionalError) {
+      console.error('❌ ERRO AO CRIAR PROFISSIONAL:', profissionalError)
+      return new Response(
+        JSON.stringify({ 
+          error: `Erro ao criar profissional: ${profissionalError.message}`,
+          details: 'Verifique se o profile foi criado corretamente'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('✅ PROFISSIONAL CRIADO MANUALMENTE:', profissionalData)
+
+    // 5. Enviar email de convite (automático via Supabase)
+    console.log('📧 PASSO 5: Email de convite enviado automaticamente')
 
     const response = {
       success: true,
-      message: 'Profissional criado com sucesso! Email de convite enviado. Profissional criado automaticamente pelo banco.',
+      message: 'Profissional criado com sucesso! Email de convite enviado.',
       data: {
         user: authData.user,
         profissional: profissionalData
