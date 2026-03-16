@@ -392,7 +392,83 @@ class DataManager {
     }
   }
 
-  // NOVO MÉTODO: Carregar serviços por profissional (para tabela profissional_servicos)
+  // NOVO MÉTODO: Inicializar serviços para profissional
+  async inicializarServicosProfissional(profissionalId) {
+    try {
+      console.log("🔧 Inicializando serviços para profissional:", profissionalId);
+      
+      // Buscar todos os serviços ativos
+      const { data: servicos, error: servicosError } = await this.supabase
+        .from("servicos")
+        .select("*")
+        .eq("ativo", true);
+      
+      if (servicosError) {
+        console.error("❌ Erro ao buscar serviços:", servicosError);
+        return false;
+      }
+      
+      // Para cada serviço, criar relação com o profissional
+      for (const servico of servicos) {
+        const { error: insertError } = await this.supabase
+          .from("profissional_servicos")
+          .upsert({
+            profissional_id: profissionalId,
+            servico_id: servico.id,
+            duracao: servico.duracao_min,
+            valor: servico.valor || 0,
+            ativo: true
+          }, {
+            onConflict: 'profissional_id,servico_id'
+          });
+        
+        if (insertError) {
+          console.warn(`⚠️ Erro ao inserir serviço ${servico.nome}:`, insertError);
+        } else {
+          console.log(`✅ Serviço ${servico.nome} adicionado ao profissional`);
+        }
+      }
+      
+      console.log("✅ Serviços inicializados com sucesso");
+      return true;
+      
+    } catch (error) {
+      console.error("❌ Erro ao inicializar serviços do profissional:", error);
+      return false;
+    }
+  }
+
+  // NOVO MÉTODO: Criar profissional automaticamente
+  async criarProfissionalParaProfile(profileId, nome, telefone) {
+    try {
+      console.log("👩 Criando profissional para profile:", profileId);
+      
+      const { data, error } = await this.supabase
+        .from("profissionais")
+        .insert({
+          profile_id: profileId,
+          telefone: telefone || ''
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error("❌ Erro ao criar profissional:", error);
+        return null;
+      }
+      
+      console.log("✅ Profissional criado:", data);
+      
+      // Inicializar serviços para o novo profissional
+      await this.inicializarServicosProfissional(data.id);
+      
+      return data;
+      
+    } catch (error) {
+      console.error("❌ Erro ao criar profissional:", error);
+      return null;
+    }
+  }
   async loadServicosPorProfissional(profissionalId) {
     try {
       console.log("🔍 Carregando serviços do profissional:", profissionalId);
@@ -401,7 +477,7 @@ class DataManager {
         throw new Error('Supabase client não disponível');
       }
       
-      // Buscar serviços do profissional via tabela profissional_servicos
+      // PRIMEIRO: Tentar buscar da tabela profissional_servicos
       const { data, error } = await this.supabase
         .from("profissional_servicos")
         .select(`
@@ -418,24 +494,69 @@ class DataManager {
           )
         `)
         .eq("profissional_id", profissionalId)
-        .order("id", { ascending: true }); // ✅ CORRIGIDO: Order por ID
+        .eq("ativo", true)
+        .order("id", { ascending: true });
 
       if (error) {
-        console.error("❌ Erro ao buscar serviços do profissional:", error);
-        // Se tabela não existir, retornar todos os serviços (fallback)
         if (error.code === 'PGRST116') {
-          console.log("📋 Tabela profissional_servicos não encontrada, usando fallback");
-          return this.servicos.map(servico => ({
-            ...servico,
-            duracao: servico.duracao_min,
-            valor: servico.valor
+          // Tabela não existe - criar automaticamente
+          console.log("📋 Tabela profissional_servicos não encontrada, inicializando...");
+          
+          // Inicializar serviços para o profissional
+          await this.inicializarServicosProfissional(profissionalId);
+          
+          // Tentar novamente
+          const retry = await this.supabase
+            .from("profissional_servicos")
+            .select(`
+              id,
+              profissional_id,
+              servico_id,
+              duracao,
+              valor,
+              servicos!inner (
+                id,
+                nome,
+                categoria,
+                cor
+              )
+            `)
+            .eq("profissional_id", profissionalId)
+            .eq("ativo", true)
+            .order("id", { ascending: true });
+          
+          if (retry.error) {
+            console.error("❌ Erro ao carregar serviços após inicialização:", retry.error);
+            // Fallback: retornar todos os serviços
+            return this.servicos.map(servico => ({
+              ...servico,
+              duracao: servico.duracao_min,
+              valor: servico.valor
+            }));
+          }
+          
+          const servicosFormatados = (retry.data || []).map(item => ({
+            id: item.servicos.id,
+            nome: item.servicos.nome,
+            categoria: item.servicos.categoria,
+            cor: item.servicos.cor,
+            duracao: item.duracao || item.servicos.duracao_min,
+            duracao_min: item.duracao || item.servicos.duracao_min,
+            valor: item.valor || item.servicos.valor,
+            preco: item.valor || item.servicos.valor,
+            profissional_servico_id: item.id
           }));
+          
+          // Ordenar por nome
+          servicosFormatados.sort((a, b) => a.nome.localeCompare(b.nome));
+          
+          return servicosFormatados;
+        } else {
+          console.error("❌ Erro ao buscar serviços do profissional:", error);
+          throw error;
         }
-        throw error;
       }
 
-      console.log("✅ Serviços do profissional carregados:", data);
-      
       // Mapear para formato compatível
       const servicosFormatados = (data || []).map(item => ({
         id: item.servicos.id,
@@ -446,14 +567,14 @@ class DataManager {
         duracao_min: item.duracao || item.servicos.duracao_min,
         valor: item.valor || item.servicos.valor,
         preco: item.valor || item.servicos.valor,
-        // Manter referência à tabela de relacionamento
         profissional_servico_id: item.id
       }));
       
-      // ✅ ORDENAR POR NOME NO JAVASCRIPT
+      // Ordenar por nome
       servicosFormatados.sort((a, b) => a.nome.localeCompare(b.nome));
       
       return servicosFormatados;
+      
     } catch (error) {
       console.error('Erro ao carregar serviços por profissional:', error);
       // Fallback: retornar todos os serviços
@@ -1035,7 +1156,20 @@ class DataManager {
           .single();
           
         if (profissionalError || !profissional) {
-          console.warn("⚠️ Profissional não encontrado para o profile:", user.id);
+          console.warn("⚠️ Profissional não encontrado, criando automaticamente...");
+          
+          // ✅ CRIAR PROFISSIONAL AUTOMATICAMENTE
+          const novoProfissional = await this.criarProfissionalParaProfile(
+            user.id, 
+            profile.nome, 
+            profile.telefone || ''
+          );
+          
+          if (novoProfissional) {
+            console.log("✅ Profissional criado automaticamente:", novoProfissional);
+            return novoProfissional;
+          }
+          
           return null;
         }
         
