@@ -23,14 +23,17 @@ serve(async (req: Request) => {
 
     const { nome, telefone, email } = await req.json()
 
-    if (!nome || !telefone || !email) {
+    if (!telefone || !email) {
       return new Response(
-        JSON.stringify({ error: 'Campos obrigatórios: nome, telefone, email' }),
+        JSON.stringify({ error: 'Campos obrigatórios: telefone, email' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    
+    // ✅ nome é opcional na requisição (será usado no profile)
+    const nomeProfissional = nome || email.split('@')[0]; // Fallback: usa parte do email
 
-    console.log('🔐 CRIANDO PROFISSIONAL:', { nome, telefone, email })
+    console.log('🔐 CRIANDO PROFISSIONAL:', { nome: nomeProfissional, telefone, email })
 
     // Criar cliente Supabase com Service Role Key
     const supabaseAdmin = createClient(
@@ -50,7 +53,7 @@ serve(async (req: Request) => {
       email,
       {
         data: {
-          nome: nome,
+          nome: nomeProfissional,
           telefone: telefone,
           role: 'profissional'
         },
@@ -141,9 +144,8 @@ serve(async (req: Request) => {
       .from('profissionais')
       .insert({
         profile_id: userId,
-        nome: nome,
-        telefone: telefone,
-        email: email
+        telefone: telefone
+        // ✅ REMOVIDO: nome e email (estão em profiles)
       })
       .select()
       .single()

@@ -20,8 +20,13 @@ const corsHeaders = {
 
 1. Recebe dados do profissional (nome, telefone, email, cor)
 2. Cria usuário no Supabase Auth usando `auth.admin.createUser()`
-3. Cria registro na tabela `profiles`
-4. Cria registro na tabela `profissionais`
+3. Cria registro na tabela `profiles` com nome, email, role = 'profissional'
+4. Cria registro na tabela `profissionais` com profile_id e telefone
+
+**⚠️ ATUALIZAÇÃO V1.4:**
+- `nome` e `email` ficam apenas na tabela `profiles`
+- `profissionais` contém apenas `profile_id`, `telefone` e `cor_calendario`
+- Relacionamento: profiles.id → profissionais.profile_id
 5. Envia email de convite automaticamente
 
 ## Variáveis de Ambiente
