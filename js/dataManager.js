@@ -273,10 +273,69 @@ class DataManager {
     }
   }
 
+  // NOVO MÉTODO: Carregar serviços por profissional
+  async loadServicosPorProfissional(profissionalId) {
+    try {
+      console.log(`🔍 Carregando serviços para profissional ${profissionalId}...`);
+      
+      if (!this.supabase) {
+        throw new Error('Supabase client não disponível');
+      }
+      
+      // QUERY COM JOIN CONFORME NOVA ARQUITETURA
+      const { data, error } = await this.supabase
+        .from("profissional_servicos")
+        .select(`
+          servico_id,
+          servicos (
+            id,
+            nome,
+            categoria,
+            duracao_min,
+            descricao,
+            valor,
+            cor,
+            ativo
+          )
+        `)
+        .eq("profissional_id", profissionalId)
+        .eq("ativo", true)
+        .eq("servicos.ativo", true);
+
+      if (error) {
+        console.error("❌ Erro ao carregar serviços do profissional:", error);
+        throw error;
+      }
+
+      // Mapear para formato compatível
+      const servicosFormatados = data?.map(item => ({
+        ...item.servicos,
+        profissional_servico_id: item.servico_id,
+        // Manter compatibilidade com código existente
+        duracao: item.servicos.duracao_min,
+        duracao_minutos: item.servicos.duracao_min,
+        preco: item.servicos.valor
+      })) || [];
+
+      console.log(`✅ ${servicosFormatados.length} serviços carregados para profissional ${profissionalId}`);
+      return servicosFormatados;
+      
+    } catch (error) {
+      console.error("❌ Erro geral em loadServicosPorProfissional:", error);
+      throw error;
+    }
+  }
+
   // Método getServicos() para compatibilidade
   async getServicos() {
     console.log("📋 getServicos() chamado - carregando serviços...");
     return await this.loadServicos();
+  }
+
+  // NOVO MÉTODO: Serviços por profissional (compatibilidade)
+  async getServicosPorProfissional(profissionalId) {
+    console.log(`📋 getServicosPorProfissional() chamado para profissional ${profissionalId}`);
+    return await this.loadServicosPorProfissional(profissionalId);
   }
 
   async addServico(servico) {
