@@ -163,8 +163,14 @@ class MenuManager {
   async handleLogout() {
     console.log('🚪 MENU_MANAGER: Iniciando logout...');
     
-    // Mostrar confirmação
-    const confirmed = confirm('Tem certeza que deseja sair do sistema?');
+    // Mostrar confirmação com ConfirmDialog padrão
+    const confirmed = await window.ConfirmDialog.confirmDelete({
+      title: 'Sair do Sistema',
+      message: 'Tem certeza que deseja sair do sistema?',
+      itemName: '',
+      confirmText: 'Sair',
+      cancelText: 'Cancelar'
+    });
     
     if (!confirmed) {
       console.log('⏹️ MENU_MANAGER: Logout cancelado pelo usuário');

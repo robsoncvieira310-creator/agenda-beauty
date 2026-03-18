@@ -85,10 +85,16 @@ class ServicosPage extends PageManager {
   }
 
   async renderPage() {
-    console.log("📋 renderPage() - Carregando serviços...");
+    console.log('📋 renderPage() - Carregando serviços...');
+    
     try {
-      // NOVA IMPLEMENTAÇÃO V1.2 - FORÇAR CARREGAMENTO DIRETO
-      console.log("🔍 Forçando carregamento direto do Supabase...");
+      // FORÇAR LIMPEZA DO CACHE ANTES DE CARREGAR
+      if (window.dataManager && window.dataManager.cache) {
+        window.dataManager.cache.servicos = null;
+        console.log('🗑️ Cache de serviços limpo antes do carregamento');
+      }
+      
+      console.log('🔍 Forçando carregamento direto do Supabase...');
       
       try {
         this.servicos = await window.dataManager.loadServicos();  // Força carregamento
@@ -161,7 +167,6 @@ class ServicosPage extends PageManager {
             ${servico.descricao ? `<br><small class="text-muted">${servico.descricao.substring(0, 50)}...</small>` : ''}
           </div>
         </td>
-        // Usar campos com compatibilidade para nova estrutura
         <td>
           <span class="badge badge-primary">${servico.duracao_min || servico.duracao_minutos || servico.duracao || 0} min</span>
         </td>
@@ -204,7 +209,6 @@ class ServicosPage extends PageManager {
         return;
       }
 
-      // Usar campos com compatibilidade para nova estrutura
       const duracoes = this.servicos.map(s => s.duracao_min || s.duracao_minutos || s.duracao || 0);
       const valores = this.servicos.map(s => s.valor || s.preco || 0);
       
@@ -249,7 +253,6 @@ class ServicosPage extends PageManager {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><strong>${servico.nome}</strong></td>
-        // Usar campos com compatibilidade para nova estrutura
         <td><span class="badge badge-primary">${servico.duracao_min || servico.duracao_minutos || servico.duracao || 0} min</span></td>
         <td><span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span></td>
         <td><span class="badge badge-info">${agendamentosCount}</span></td>
@@ -297,7 +300,6 @@ class ServicosPage extends PageManager {
     
     // Preencher formulário
     document.getElementById('nomeServico').value = servico.nome || '';
-    // Usar campos com compatibilidade para nova estrutura
     document.getElementById('duracaoServico').value = servico.duracao_min || servico.duracao_minutos || servico.duracao || '';
     document.getElementById('valorServico').value = servico.valor || servico.preco || '';
     document.getElementById('descricaoServico').value = servico.descricao || '';
@@ -322,6 +324,13 @@ class ServicosPage extends PageManager {
 
   async saveService() {
     console.log('🔘 Botão salvar clicado - Iniciando saveService()');
+    
+    // PREVENIR DUPLO CLIQUE
+    const saveButton = document.getElementById('btnSalvar');
+    if (saveButton && saveButton.disabled) {
+      console.log('⚠️ Botão já desabilitado, ignorando clique duplo');
+      return;
+    }
     
     const nome = document.getElementById('nomeServico').value.trim();
     const duracao = parseInt(document.getElementById('duracaoServico').value) || 0;
@@ -417,6 +426,14 @@ class ServicosPage extends PageManager {
       }
 
       console.log('🔄 Atualizando página...');
+      
+      // FORÇAR RECARGA COMPLETA DO BANCO
+      if (window.dataManager && window.dataManager.cache) {
+        window.dataManager.cache.servicos = null;
+        window.dataManager.servicos = []; // Limpar array local também
+        console.log('🗑️ Cache e array local limpos para recarga completa');
+      }
+      
       await this.renderPage();
       await this.updateStatistics();
       console.log('✅ Página atualizada');

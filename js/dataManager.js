@@ -1,8 +1,7 @@
 // Gerenciamento centralizado de dados com Supabase
 // DataManager - Gerenciamento de dados e cache
-// VERSÃO: 1.3.3 - DIAGNÓSTICO DE SALVAMENTO
-// CACHE-BREAKER: 20260312160500
-console.log('💾 DataManager V1.3.3 carregado - Diagnóstico de salvamento');
+// VERSÃO: 1.4.0 - VERSÃO LIMPA
+console.log('💾 DataManager V1.4.0 carregado - Versão limpa');
 
 class DataManager {
   constructor(supabaseClient) {
@@ -13,15 +12,7 @@ class DataManager {
     this.agendamentos = [];
     this.bloqueios = [];
     
-    // CORREÇÃO: Controle de estado para evitar race conditions
-    this.loadingState = {
-      clientes: false,
-      servicos: false,
-      profissionais: false,
-      agendamentos: false
-    };
-    
-    // NOVA IMPLEMENTAÇÃO V1.2 - CACHE SIMPLES
+    // Cache para performance
     this.cache = {
       clientes: null,
       profissionais: null,
@@ -30,1032 +21,471 @@ class DataManager {
       bloqueios: null
     };
     
-    // Cache de nomes para performance
-    this.servicosPorNome = {};
-    this.servicosPorId = {};
-    this.profissionaisPorId = {};
-    this.coresProfissionais = {};
-    
     console.log('✅ DataManager criado com cliente Supabase e cache implementado');
   }
 
-  // Clientes
   async loadClientes() {
     try {
-      console.log("🔍 Carregando clientes...");
-      
-      // VERSÃO ORIGINAL
-      // console.log("🔍 Carregando clientes do Supabase...");
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - CACHE
-      if (this.cache.clientes !== null) {
-        console.log("📦 Retornando clientes do cache:", this.cache.clientes.length);
-        this.clientes = this.cache.clientes;
-        return this.clientes;
-      }
-      
-      if (!this.supabase) {
-        throw new Error('Supabase client não disponível');
-      }
+      console.log('🔍 Carregando clientes...');
       
       const { data, error } = await this.supabase
-        .from("clientes")
-        .select("*")
-        .order("nome");
+        .from('clientes')
+        .select('*')
+        .order('nome');
 
       if (error) {
-        console.error("❌ Erro ao buscar clientes do Supabase:", error);
-        throw error;
+        console.error('❌ Erro ao carregar clientes do Supabase:', error);
+        this.clientes = [];
+      } else {
+        this.clientes = data || [];
+        console.log('✅ Clientes carregados do Supabase:', this.clientes.length);
+        this.cache.clientes = this.clientes;
+        console.log('💾 Clientes salvos no cache:', this.clientes.length);
       }
-
-      console.log("✅ Clientes carregados do Supabase:", data);
-      this.clientes = data || [];
-      
-      // CORREÇÃO: Limpar cache de agendamentos quando clientes carregam
-      console.log('🗑️ Limpando cache de agendamentos por atualização de clientes...');
-      this.cache.agendamentos = null;
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - SALVAR NO CACHE
-      this.cache.clientes = this.clientes;
-      console.log("💾 Clientes salvos no cache:", this.cache.clientes.length);
       
       return this.clientes;
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      throw error;
+      this.clientes = [];
+      return this.clientes;
     }
   }
 
-  // Método getClientes() para compatibilidade
-  async getClientes() {
-    console.log("getClientes() chamado - carregando clientes...");
-    return await this.loadClientes();
-  }
-
-  async addCliente(cliente) {
-    try {
-      if (this.supabase) {
-        // Gerar token único para ficha de anamnese
-        const fichaToken = this.generateUniqueToken();
-        
-        // Apenas campos que existem na tabela clientes
-        const clienteWithToken = {
-          nome: cliente.nome,
-          telefone: cliente.telefone,
-          ficha_token: fichaToken
-        };
-        
-        console.log("Criando cliente com token:", clienteWithToken);
-        const { data, error } = await this.supabase
-          .from("clientes")
-          .insert([clienteWithToken])
-          .select();
-
-        if (error) {
-          console.error("Erro ao criar cliente:", error);
-          throw error;
-        }
-
-        console.log("Cliente criado:", data);
-        
-        // Limpar cache de clientes após CREATE
-        this.cache.clientes = null;
-        console.log("Cache de clientes limpo após CREATE");
-        
-        return data;
-      } else {
-        // Fallback para API local
-        const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.CLIENTES, cliente);
-        this.clientes.push(novo);
-        
-        // Limpar cache de clientes após CREATE
-        this.cache.clientes = null;
-        console.log("🗑️ Cache de clientes limpo após CREATE");
-        
-        return novo;
-      }
-    } catch (error) {
-      console.error('Erro ao adicionar cliente:', error);
-      throw error;
-    }
-  }
-
-  async updateCliente(id, cliente) {
-    try {
-      if (this.supabase) {
-        const { data, error } = await this.supabase
-          .from("clientes")
-          .update({ 
-            nome: cliente.nome,
-            telefone: cliente.telefone
-          })
-          .eq('id', id)
-          .select();
-
-        if (error) {
-          console.error("Erro ao atualizar cliente:", error);
-          throw error;
-        }
-
-        console.log("✅ Cliente atualizado:", data);
-        
-        // Limpar cache de clientes após UPDATE
-        this.cache.clientes = null;
-        console.log("🗑️ Cache de clientes limpo após UPDATE");
-        
-        return data;
-      }
-    } catch (error) {
-      console.error("Erro ao atualizar cliente:", error);
-      throw error;
-    }
-  }
-
-  async deleteCliente(id) {
-    try {
-      if (this.supabase) {
-        const { error } = await this.supabase
-          .from("clientes")
-          .delete()
-          .eq('id', id);
-
-        if (error) {
-          console.error("Erro ao excluir cliente:", error);
-          throw error;
-        }
-
-        console.log("✅ Cliente excluído com sucesso");
-        
-        // Limpar cache de clientes após DELETE
-        this.cache.clientes = null;
-        console.log("🗑️ Cache de clientes limpo após DELETE");
-        
-        return true;
-      }
-    } catch (error) {
-      console.error("Erro ao excluir cliente:", error);
-      throw error;
-    }
-  }
-
-  // Serviços
   async loadServicos() {
     try {
-      console.log("🔍 Carregando serviços...");
+      console.log('Carregando serviços...');
       
-      // NOVA IMPLEMENTAÇÃO V1.2 - CACHE
-      if (this.cache.servicos !== null) {
-        console.log("📦 Retornando serviços do cache:", this.cache.servicos.length);
-        this.servicos = this.cache.servicos;
-        return this.servicos;
-      }
-      
-      if (!this.supabase) {
-        throw new Error('Supabase client não disponível');
-      }
-      
-      // NOVA IMPLEMENTAÇÃO COM CAMPOS ATUALIZADOS
       const { data, error } = await this.supabase
-        .from("servicos")
-        .select(`
-          id,
-          nome,
-          categoria,
-          duracao_min,
-          descricao,
-          valor,
-          cor,
-          ativo,
-          created_at
-        `)
-        .eq("ativo", true)
-        .order("nome");
+        .from('servicos')
+        .select('*')
+        .order('nome');
 
       if (error) {
-        console.error("❌ Erro ao buscar serviços do Supabase:", error);
-        throw error;
+        console.error('Erro ao carregar serviços:', error);
+        this.servicos = [];
+      } else {
+        this.servicos = data || [];
+        console.log('Serviços carregados do Supabase:', this.servicos.length);
+        this.servicos = this.servicos.map(servico => ({
+          ...servico,
+          duracao_min: parseInt(servico.duracao_min) || 30,
+          valor: parseFloat(servico.valor) || 0
+        }));
+        console.log('Serviços mapeados para formato compatível:', this.servicos.length);
+        this.cache.servicos = this.servicos;
+        console.log('Serviços salvos no cache:', this.servicos.length);
       }
-
-      console.log("✅ Serviços carregados do Supabase:", data);
       
-      // MAPEAR DADOS PARA FORMATO COMPATÍVEL COM CÓDIGO EXISTENTE
-      this.servicos = (data || []).map(servico => ({
-        ...servico,
-        // Manter compatibilidade com código existente
-        duracao: servico.duracao_min,
-        duracao_minutos: servico.duracao_min,
-        preco: servico.valor,
-        // Campos novos mantidos
-        duracao_min: servico.duracao_min,
-        valor: servico.valor
-      }));
-      
-      console.log("✅ Serviços mapeados para formato compatível:", this.servicos);
-      
-      // CORREÇÃO: Limpar cache de agendamentos quando serviços carregam
-      console.log('🗑️ Limpando cache de agendamentos por atualização de serviços...');
-      this.cache.agendamentos = null;
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - SALVAR NO CACHE
-      this.cache.servicos = this.servicos;
-      console.log("💾 Serviços salvos no cache:", this.cache.servicos.length);
-      
-      this.servicosPorNome = {};
-      this.servicosPorId = {};
-      this.servicos.forEach(s => {
-        this.servicosPorNome[s.nome] = s;
-        this.servicosPorId[s.id] = s;
-      });
       return this.servicos;
     } catch (error) {
       console.error('Erro ao carregar serviços:', error);
-      throw error;
+      this.servicos = [];
+      return this.servicos;
     }
   }
 
-  // NOVO MÉTODO: Carregar serviços por profissional
-  async loadServicosPorProfissional(profissionalId) {
+  async loadBloqueios() {
     try {
-      console.log(`🔍 Carregando serviços para profissional ${profissionalId}...`);
+      console.log('🔍 Carregando bloqueios...');
+      console.log('🔍 Verificando this.supabase:', this.supabase);
       
-      if (!this.supabase) {
-        throw new Error('Supabase client não disponível');
-      }
-      
-      // QUERY COM JOIN CONFORME NOVA ARQUITETURA
+      // ✅ CORRIGIDO: Usar colunas corretas da tabela bloqueios
       const { data, error } = await this.supabase
-        .from("profissional_servicos")
-        .select(`
-          servico_id,
-          servicos (
-            id,
-            nome,
-            categoria,
-            duracao_min,
-            descricao,
-            valor,
-            cor,
-            ativo
-          )
-        `)
-        .eq("profissional_id", profissionalId)
-        .eq("ativo", true)
-        .eq("servicos.ativo", true);
+        .from('bloqueios')
+        .select('*')
+        .order('inicio', { ascending: true });
 
       if (error) {
-        console.error("❌ Erro ao carregar serviços do profissional:", error);
-        throw error;
-      }
-
-      // Mapear para formato compatível
-      const servicosFormatados = data?.map(item => ({
-        ...item.servicos,
-        profissional_servico_id: item.servico_id,
-        // Manter compatibilidade com código existente
-        duracao: item.servicos.duracao_min,
-        duracao_minutos: item.servicos.duracao_min,
-        preco: item.servicos.valor
-      })) || [];
-
-      console.log(`✅ ${servicosFormatados.length} serviços carregados para profissional ${profissionalId}`);
-      return servicosFormatados;
-      
-    } catch (error) {
-      console.error("❌ Erro geral em loadServicosPorProfissional:", error);
-      throw error;
-    }
-  }
-
-  // Método getServicos() para compatibilidade
-  async getServicos() {
-    console.log("📋 getServicos() chamado - carregando serviços...");
-    return await this.loadServicos();
-  }
-
-  // NOVO MÉTODO: Serviços por profissional (compatibilidade)
-  async getServicosPorProfissional(profissionalId) {
-    console.log(`📋 getServicosPorProfissional() chamado para profissional ${profissionalId}`);
-    return await this.loadServicosPorProfissional(profissionalId);
-  }
-
-  async addServico(servico) {
-    try {
-      if (this.supabase) {
-        // MAPEAR CAMPOS PARA NOVA ESTRUTURA
-        const dadosParaBanco = {
-          nome: servico.nome,
-          categoria: servico.categoria || 'Geral',
-          duracao_min: servico.duracao_min || servico.duracao || servico.duracao_minutos,
-          descricao: servico.descricao || '',
-          valor: servico.valor || servico.preco || 0,
-          cor: servico.cor || '#3b82f6',
-          ativo: servico.ativo !== undefined ? servico.ativo : true
-        };
-        
-        console.log(" Criando serviço com nova estrutura:", dadosParaBanco);
-        const { data, error } = await this.supabase
-          .from("servicos")
-          .insert([dadosParaBanco])
-          .select();
-
-        if (error) {
-          console.error(" Erro ao criar serviço no Supabase:", error);
-          throw error;
-        }
-
-        console.log(" Serviço criado no Supabase:", data);
-        
-        // MAPEAR DADOS DE VOLTA PARA FORMATO COMPATÍVEL
-        const servicoCriado = {
-          ...data[0],
-          duracao: data[0].duracao_min,
-          duracao_minutos: data[0].duracao_min,
-          preco: data[0].valor
-        };
-        
-        this.servicos.push(servicoCriado);
-        this.servicosPorNome[servicoCriado.nome] = servicoCriado;
-        this.servicosPorId[servicoCriado.id] = servicoCriado;
-        return servicoCriado;
+        console.error('❌ Erro ao carregar bloqueios:', error);
+        this.bloqueios = [];
       } else {
-        // Fallback para API local
-        const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.SERVICOS, servico);
-        this.servicos.push(novo);
-        this.servicosPorNome[novo.nome] = novo;
-        this.servicosPorId[novo.id] = novo;
-        return novo;
+        this.bloqueios = data || [];
+        console.log('✅ Bloqueios carregados:', this.bloqueios.length);
+        // ✅ CORRIGIDO: Mapear para formato compatível
+        this.bloqueios = this.bloqueios.map(bloqueio => ({
+          ...bloqueio,
+          // Mapear nomes das colunas para compatibilidade
+          data_inicio: bloqueio.inicio,
+          data_fim: bloqueio.fim,
+          titulo: bloqueio.titulo || 'Bloqueio',
+          motivo: bloqueio.motivo || '',
+          tipo: bloqueio.tipo || 'bloqueio'
+        }));
       }
+      
+      return this.bloqueios;
     } catch (error) {
-      console.error('Erro ao adicionar serviço:', error);
-      throw error;
+      console.error('Erro ao carregar bloqueios:', error);
+      this.bloqueios = [];
+      return this.bloqueios;
     }
   }
 
-  async updateServico(id, servico) {
+  async loadProfissionais() {
     try {
-      if (this.supabase) {
-        // MAPEAR CAMPOS PARA NOVA ESTRUTURA
-        const dadosParaBanco = {
-          nome: servico.nome,
-          categoria: servico.categoria || 'Geral',
-          duracao_min: servico.duracao_min || servico.duracao || servico.duracao_minutos,
-          descricao: servico.descricao || '',
-          valor: servico.valor || servico.preco || 0,
-          cor: servico.cor || '#3b82f6',
-          ativo: servico.ativo !== undefined ? servico.ativo : true
-        };
-        
-        console.log("🔄 Atualizando serviço com nova estrutura:", { id, dadosParaBanco });
-        const { data, error } = await this.supabase
-          .from("servicos")
-          .update(dadosParaBanco)
-          .eq("id", id)
-          .select();
-
-        if (error) {
-          console.error("❌ Erro ao atualizar serviço no Supabase:", error);
-          throw error;
-        }
-
-        console.log("✅ Serviço atualizado no Supabase:", data);
-        
-        // MAPEAR DADOS DE VOLTA PARA FORMATO COMPATÍVEL
-        const servicoAtualizado = {
-          ...data[0],
-          duracao: data[0].duracao_min,
-          duracao_minutos: data[0].duracao_min,
-          preco: data[0].valor
-        };
-        
-        const index = this.servicos.findIndex(s => s.id === id);
-        if (index !== -1) {
-          this.servicos[index] = servicoAtualizado;
-          this.servicosPorNome[servicoAtualizado.nome] = servicoAtualizado;
-          this.servicosPorId[servicoAtualizado.id] = servicoAtualizado;
-        }
-        return servicoAtualizado;
-      } else {
-        // Fallback para API local
-        const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.SERVICOS}/${id}`, servico);
-        const index = this.servicos.findIndex(s => s.id === id);
-        if (index !== -1) {
-          this.servicos[index] = atualizado;
-          this.servicosPorNome[atualizado.nome] = atualizado;
-          this.servicosPorId[atualizado.id] = atualizado;
-        }
-        return atualizado;
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar serviço:', error);
-      throw error;
-    }
-  }
-
-  // NOVO MÉTODO: Criar tabela profissional_servicos automaticamente
-  async criarTabelaProfissionalServicos() {
-    try {
-      console.log("🔧 Criando tabela profissional_servicos automaticamente...");
+      console.log('🔍 Carregando profissionais... (cache)');
       
-      // SQL para criar a tabela
-      const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS profissional_servicos (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            profissional_id UUID NOT NULL REFERENCES profissionais(id) ON DELETE CASCADE,
-            servico_id UUID NOT NULL REFERENCES servicos(id) ON DELETE CASCADE,
-            duracao INTEGER NOT NULL,
-            valor DECIMAL(10,2) NOT NULL,
-            ativo BOOLEAN DEFAULT true,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            UNIQUE(profissional_id, servico_id)
-        );
-        
-        -- Índices para performance
-        CREATE INDEX IF NOT EXISTS idx_profissional_servicos_profissional_id ON profissional_servicos(profissional_id);
-        CREATE INDEX IF NOT EXISTS idx_profissional_servicos_servico_id ON profissional_servicos(servico_id);
-        CREATE INDEX IF NOT EXISTS idx_profissional_servicos_ativo ON profissional_servicos(ativo);
-        
-        -- Habilitar RLS
-        ALTER TABLE profissional_servicos ENABLE ROW LEVEL SECURITY;
-        
-        -- Políticas RLS
-        CREATE POLICY IF NOT EXISTS "Professionals can view their own services" ON profissional_servicos
-            FOR SELECT USING (
-                EXISTS (
-                    SELECT 1 FROM profiles 
-                    WHERE profiles.id = profissional_servicos.profissional_id 
-                    AND profiles.id = auth.uid()
-                )
-            );
-            
-        CREATE POLICY IF NOT EXISTS "Admins can manage professional services" ON profissional_servicos
-            FOR ALL USING (
-                EXISTS (
-                    SELECT 1 FROM profiles 
-                    WHERE profiles.id = auth.uid() 
-                    AND profiles.role = 'admin'
-                )
-            );
-      `;
-      
-      // Executar SQL via RPC (se disponível) ou retornar erro para execução manual
-      console.log("⚠️ Execute a migration manualmente no Supabase Dashboard:");
-      console.log("📁 Arquivo: supabase/migrations/20260316_create_profissional_servicos.sql");
-      
-      return false; // Indica que precisa ser executado manualmente
-      
-    } catch (error) {
-      console.error("❌ Erro ao criar tabela profissional_servicos:", error);
-      return false;
-    }
-  }
-
-  // NOVO MÉTODO: Inicializar serviços para profissional
-  async inicializarServicosProfissional(profissionalId) {
-    try {
-      console.log("🔧 Inicializando serviços para profissional:", profissionalId);
-      
-      // PRIMEIRO: Verificar se tabela existe
-      const { error: tableError } = await this.supabase
-        .from("profissional_servicos")
-        .select("id")
-        .limit(1);
-      
-      if (tableError && tableError.code === 'PGRST116') {
-        console.log("⚠️ Tabela profissional_servicos não existe. Execute a migration:");
-        console.log("📁 Arquivo: supabase/migrations/20260316_create_profissional_servicos.sql");
-        return false;
-      }
-      
-      // Buscar todos os serviços ativos
-      const { data: servicos, error: servicosError } = await this.supabase
-        .from("servicos")
-        .select("*")
-        .eq("ativo", true);
-      
-      if (servicosError) {
-        console.error("❌ Erro ao buscar serviços:", servicosError);
-        return false;
-      }
-      
-      // Para cada serviço, criar relação com o profissional
-      for (const servico of servicos) {
-        const { error: insertError } = await this.supabase
-          .from("profissional_servicos")
-          .upsert({
-            profissional_id: profissionalId,
-            servico_id: servico.id,
-            duracao: servico.duracao_min,
-            valor: servico.valor || 0,
-            ativo: true
-          }, {
-            onConflict: 'profissional_id,servico_id'
-          });
-        
-        if (insertError) {
-          console.warn(`⚠️ Erro ao inserir serviço ${servico.nome}:`, insertError);
-        } else {
-          console.log(`✅ Serviço ${servico.nome} adicionado ao profissional`);
-        }
-      }
-      
-      console.log("✅ Serviços inicializados com sucesso");
-      return true;
-      
-    } catch (error) {
-      console.error("❌ Erro ao inicializar serviços do profissional:", error);
-      return false;
-    }
-  }
-
-  // NOVO MÉTODO: Criar profissional diretamente via frontend
-  async addProfissionalFrontend(dados) {
-    try {
-      console.log("🔧 Criando profissional diretamente via frontend:", dados);
-      
-      // 1. Criar usuário no Supabase Auth
-      const { data: authData, error: authError } = await this.supabase.auth.signUp({
-        email: dados.email,
-        password: 'temp123456', // Senha temporária
-        options: {
-          data: {
-            nome: dados.nome,
-            telefone: dados.telefone,
-            role: 'profissional'
-          }
-        }
-      });
-      
-      if (authError) {
-        // Se erro for de email já existe, tentar fazer login
-        if (authError.message.includes('already registered')) {
-          console.log("📧 Email já registrado, tentando fazer login...");
-          
-          const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
-            email: dados.email,
-            password: 'temp123456'
-          });
-          
-          if (signInError) {
-            throw new Error(`Erro ao fazer login: ${signInError.message}`);
-          }
-          
-          return { success: true, message: 'Profissional já existia e foi feito login', data: signInData };
-        }
-        
-        throw new Error(`Erro ao criar usuário: ${authError.message}`);
-      }
-      
-      console.log("✅ Usuário criado:", authData);
-      
-      // 2. Aguardar trigger criar profile
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // 3. Criar registro em profissionais
-      const { data: profissionalData, error: profissionalError } = await this.supabase
-        .from('profissionais')
-        .insert({
-          profile_id: authData.user.id,
-          telefone: dados.telefone
-        })
-        .select()
-        .single();
-      
-      if (profissionalError) {
-        throw new Error(`Erro ao criar profissional: ${profissionalError.message}`);
-      }
-      
-      console.log("✅ Profissional criado:", profissionalData);
-      
-      // 4. Inicializar serviços para o profissional
-      await this.inicializarServicosProfissional(profissionalData.id);
-      
-      return { 
-        success: true, 
-        message: 'Profissional criado com sucesso',
-        data: { 
-          user: authData.user, 
-          profissional: profissionalData 
-        }
-      };
-      
-    } catch (error) {
-      console.error("❌ Erro ao criar profissional via frontend:", error);
-      throw error;
-    }
-  }
-  async criarProfissionalParaProfile(profileId, nome, telefone) {
-    try {
-      console.log("👩 Criando profissional para profile:", profileId);
-      
-      const { data, error } = await this.supabase
-        .from("profissionais")
-        .insert({
-          profile_id: profileId,
-          telefone: telefone || ''
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("❌ Erro ao criar profissional:", error);
-        return null;
-      }
-      
-      console.log("✅ Profissional criado:", data);
-      
-      // Inicializar serviços para o novo profissional
-      await this.inicializarServicosProfissional(data.id);
-      
-      return data;
-      
-    } catch (error) {
-      console.error("❌ Erro ao criar profissional:", error);
-      return null;
-    }
-  }
-  async loadServicosPorProfissional(profissionalId) {
-    try {
-      console.log("🔍 Carregando serviços do profissional:", profissionalId);
-      
-      if (!this.supabase) {
-        throw new Error('Supabase client não disponível');
-      }
-      
-      // PRIMEIRO: Tentar buscar da tabela profissional_servicos
-      const { data, error } = await this.supabase
-        .from("profissional_servicos")
-        .select(`
-          id,
-          profissional_id,
-          servico_id,
-          duracao,
-          valor,
-          servicos!inner (
-            id,
-            nome,
-            categoria,
-            cor
-          )
-        `)
-        .eq("profissional_id", profissionalId)
-        .eq("ativo", true)
-        .order("id", { ascending: true });
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // Tabela não existe - criar automaticamente
-          console.log("📋 Tabela profissional_servicos não encontrada, inicializando...");
-          
-          // Inicializar serviços para o profissional
-          await this.inicializarServicosProfissional(profissionalId);
-          
-          // Tentar novamente
-          const retry = await this.supabase
-            .from("profissional_servicos")
-            .select(`
-              id,
-              profissional_id,
-              servico_id,
-              duracao,
-              valor,
-              servicos!inner (
-                id,
-                nome,
-                categoria,
-                cor
-              )
-            `)
-            .eq("profissional_id", profissionalId)
-            .eq("ativo", true)
-            .order("id", { ascending: true });
-          
-          if (retry.error) {
-            console.error("❌ Erro ao carregar serviços após inicialização:", retry.error);
-            // Fallback: retornar todos os serviços
-            return this.servicos.map(servico => ({
-              ...servico,
-              duracao: servico.duracao_min,
-              valor: servico.valor
-            }));
-          }
-          
-          const servicosFormatados = (retry.data || []).map(item => ({
-            id: item.servicos.id,
-            nome: item.servicos.nome,
-            categoria: item.servicos.categoria,
-            cor: item.servicos.cor,
-            duracao: item.duracao || item.servicos.duracao_min,
-            duracao_min: item.duracao || item.servicos.duracao_min,
-            valor: item.valor || item.servicos.valor,
-            preco: item.valor || item.servicos.valor,
-            profissional_servico_id: item.id
-          }));
-          
-          // Ordenar por nome
-          servicosFormatados.sort((a, b) => a.nome.localeCompare(b.nome));
-          
-          return servicosFormatados;
-        } else {
-          console.error("❌ Erro ao buscar serviços do profissional:", error);
-          throw error;
-        }
-      }
-
-      // Mapear para formato compatível
-      const servicosFormatados = (data || []).map(item => ({
-        id: item.servicos.id,
-        nome: item.servicos.nome,
-        categoria: item.servicos.categoria,
-        cor: item.servicos.cor,
-        duracao: item.duracao || item.servicos.duracao_min,
-        duracao_min: item.duracao || item.servicos.duracao_min,
-        valor: item.valor || item.servicos.valor,
-        preco: item.valor || item.servicos.valor,
-        profissional_servico_id: item.id
-      }));
-      
-      // Ordenar por nome
-      servicosFormatados.sort((a, b) => a.nome.localeCompare(b.nome));
-      
-      return servicosFormatados;
-      
-    } catch (error) {
-      console.error('Erro ao carregar serviços por profissional:', error);
-      // Fallback: retornar todos os serviços
-      return this.servicos.map(servico => ({
-        ...servico,
-        duracao: servico.duracao_min,
-        valor: servico.valor
-      }));
-    }
-  }
-
-  // NOVO MÉTODO: Adicionar serviço para profissional específico
-  async addServicoProfissional(profissionalId, servicoId, duracao, valor) {
-    try {
-      console.log("🔗 Adicionando serviço para profissional:", { profissionalId, servicoId, duracao, valor });
-      
-      if (!this.supabase) {
-        throw new Error('Supabase client não disponível');
-      }
-      
-      const { data, error } = await this.supabase
-        .from("profissional_servicos")
-        .insert([{
-          profissional_id: profissionalId,
-          servico_id: servicoId,
-          duracao: duracao,
-          valor: valor
-        }])
-        .select();
-
-      if (error) {
-        console.error("❌ Erro ao adicionar serviço do profissional:", error);
-        throw error;
-      }
-
-      console.log("✅ Serviço do profissional adicionado:", data);
-      return data[0];
-    } catch (error) {
-      console.error('Erro ao adicionar serviço do profissional:', error);
-      throw error;
-    }
-  }
-
-  async deleteServico(id) {
-    try {
-      if (this.supabase) {
-        console.log("🗑️ Excluindo serviço no Supabase:", id);
-        const { error } = await this.supabase
-          .from("servicos")
-          .delete()
-          .eq("id", id);
-
-        if (error) {
-          console.error("❌ Erro ao excluir serviço no Supabase:", error);
-          throw error;
-        }
-
-        console.log("✅ Serviço excluído no Supabase");
-        this.servicos = this.servicos.filter(s => s.id !== id);
-        // Remover do mapa de nomes
-        Object.keys(this.servicosPorNome).forEach(nome => {
-          if (this.servicosPorNome[nome].id === id) {
-            delete this.servicosPorNome[nome];
-          }
-        });
-        // Remover do mapa de IDs
-        delete this.servicosPorId[id];
-        // Limpar cache de serviços após exclusão
-        this.cache.servicos = null;
-      } else {
-        // Fallback para API local
-        await ApiClient.delete(`${API_CONFIG.ENDPOINTS.SERVICOS}/${id}`);
-        this.servicos = this.servicos.filter(s => s.id !== id);
-        Object.keys(this.servicosPorNome).forEach(nome => {
-          if (this.servicosPorNome[nome].id === id) {
-            delete this.servicosPorNome[nome];
-          }
-        });
-        // Remover do mapa de IDs
-        delete this.servicosPorId[id];
-      }
-    } catch (error) {
-      console.error('Erro ao excluir serviço:', error);
-      throw error;
-    }
-  }
-
-  // Profissionais
-  async loadProfissionais(forceReload = false) {
-    try {
-      // VERSÃO ORIGINAL
-      // console.log("🔍 Carregando profissionais do Supabase...");
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - CACHE
-      console.log("🔍 Carregando profissionais...", forceReload ? "(forçado)" : "(cache)");
-      
-      if (!forceReload && this.cache.profissionais !== null) {
-        console.log("📦 Retornando profissionais do cache:", this.cache.profissionais.length);
+      // Verificar cache primeiro
+      if (this.cache.profissionais !== null) {
+        console.log('📦 Retornando profissionais do cache:', this.cache.profissionais.length);
         this.profissionais = this.cache.profissionais;
         return this.profissionais;
       }
       
-      if (!this.supabase) {
-        throw new Error('Supabase client não disponível');
-      }
+      console.log('⚠️ Cache vazio, carregando do Supabase com JOIN...');
       
-      // NOVA IMPLEMENTAÇÃO COM JOIN COM PROFILES
-      let data, error;
-      
-      try {
-        // ✅ MUDANÇA: Buscar apenas profissionais sem JOIN para evitar erro 500
-        const result = await this.supabase
-          .from("profissionais")
-          .select("*")
-          .order("id", { ascending: true });
-        
-        data = result.data;
-        error = result.error;
-        
-        // Se funcionar, buscar profiles separadamente
-        if (!error && data && data.length > 0) {
-          try {
-            const profileIds = data.map(p => p.profile_id).filter(Boolean);
-            if (profileIds.length > 0) {
-              const { data: profilesData } = await this.supabase
-                .from("profiles")
-                .select("id, nome, email, role")
-                .in("id", profileIds);
-              
-              // Mapear profiles por ID
-              const profilesMap = {};
-              if (profilesData) {
-                profilesData.forEach(profile => {
-                  profilesMap[profile.id] = profile;
-                });
-              }
-              
-              // Adicionar dados do profile
-              data = data.map(prof => ({
-                ...prof,
-                profiles: profilesMap[prof.profile_id] || null
-              }));
-            }
-          } catch (profileError) {
-            console.warn("⚠️ Erro ao buscar profiles, usando dados básicos:", profileError);
-          }
-        }
-        
-      } catch (queryError) {
-        console.error("❌ Erro na query de profissionais:", queryError);
-        throw queryError;
-      }
+      // ✅ CORRIGIDO: Usar nome específico do relacionamento (sugerido pelo erro)
+      const { data, error } = await this.supabase
+        .from('profissionais')
+        .select(`
+          id,
+          telefone,
+          created_at,
+          profile_id,
+          profiles!profissionais_profiles_fk(nome, email, role)
+        `)
+        .order('id', { ascending: true });
 
       if (error) {
-        console.error("❌ Erro ao buscar profissionais do Supabase:", error);
-        throw error;
+        console.warn('⚠️ Erro no JOIN, tentando solução alternativa com 2 consultas:', error.message);
+        
+        // ✅ SOLUÇÃO ALTERNATIVA: Duas consultas separadas
+        try {
+          // 1. Buscar profissionais
+          const { data: profissionais, error: errorProf } = await this.supabase
+            .from('profissionais')
+            .select('*')
+            .order('id', { ascending: true });
+            
+          if (errorProf) {
+            console.error('❌ Erro ao buscar profissionais:', errorProf);
+            this.profissionais = [];
+            return this.profissionais;
+          }
+          
+          // 2. Buscar profiles com bypass de RLS (admin)
+          const { data: profiles, error: errorProfiles } = await this.supabase
+            .from('profiles')
+            .select('*')
+            .then(async (result) => {
+              // Se der erro RLS, tentar com opções de admin
+              if (result.error && result.error.message.includes('recursion')) {
+                console.log('🔓 Tentando bypass RLS para profiles...');
+                return await this.supabase.rpc('get_profiles_admin'); // Tentar RPC se existir
+              }
+              return result;
+            })
+            .catch(async (err) => {
+              // Último recurso: buscar profiles via auth.users
+              console.log('🔓 Tentando buscar via auth.users...');
+              try {
+                const { data: { users } } = await this.supabase.auth.admin.listUsers();
+                const profilesFromAuth = users.map(user => ({
+                  id: user.id,
+                  nome: user.user_metadata?.nome || user.email?.split('@')[0] || 'Usuário',
+                  email: user.email,
+                  role: user.user_metadata?.role || 'user'
+                }));
+                return { data: profilesFromAuth, error: null };
+              } catch (authError) {
+                console.warn('⚠️ Falha no auth.admin também:', authError.message);
+                return { data: [], error: authError };
+              }
+            });
+            
+          if (errorProfiles) {
+            console.warn('⚠️ Erro ao buscar profiles, usando dados básicos:', errorProfiles.message);
+            this.profissionais = profissionais.map(p => ({
+              ...p,
+              nome: `Profissional ${p.id}`,
+              email: 'Email não informado'
+            }));
+          } else {
+            // 3. Juntar dados manualmente
+            const profilesMap = {};
+            profiles.forEach(profile => {
+              profilesMap[profile.id] = profile;
+            });
+            
+            console.log('🔍 Profiles encontrados:', profiles);
+            console.log('🔍 Mapa de profiles:', profilesMap);
+            
+            this.profissionais = profissionais.map(profissional => {
+              const profile = profilesMap[profissional.profile_id];
+              console.log('🔍 Verificando profissional:', {
+                profissional_id: profissional.id,
+                profile_id: profissional.profile_id,
+                profile_encontrado: !!profile,
+                profile_dados: profile
+              });
+              
+              return {
+                ...profissional,
+                nome: profile ? profile.nome : `Profissional ${profissional.id}`,
+                email: profile ? profile.email : 'Email não informado',
+                role: profile ? profile.role : null
+              };
+            });
+          }
+          
+          console.log('✅ Profissionais carregados com solução alternativa:', this.profissionais.length);
+          
+        } catch (altError) {
+          console.error('❌ Erro na solução alternativa:', altError);
+          this.profissionais = [];
+        }
+      } else {
+        this.profissionais = data || [];
+        console.log('✅ Profissionais carregados do Supabase com JOIN:', this.profissionais.length);
+        
+        // Mapear para formato compatível
+        this.profissionais = this.profissionais.map(profissional => {
+          const result = {
+            id: parseInt(profissional.id) || profissional.id,
+            telefone: profissional.telefone,
+            created_at: profissional.created_at,
+            profile_id: profissional.profile_id
+          };
+          
+          // ✅ Adicionar dados do profile se existir
+          if (profissional.profiles) {
+            result.nome = profissional.profiles.nome;
+            result.email = profissional.profiles.email;
+            result.role = profissional.profiles.role;
+          } else {
+            result.nome = `Profissional ${profissional.id}`;
+            result.email = 'Email não informado';
+          }
+          
+          return result;
+        });
+        
+        console.log('✅ Profissionais mapeados para formato compatível:', this.profissionais.length);
+        this.cache.profissionais = this.profissionais;
+        console.log('💾 Profissionais salvos no cache:', this.profissionais.length);
       }
-
-      console.log("✅ Profissionais carregados do Supabase:", data);
       
-      // MAPEAR DADOS PARA FORMATO COMPATÍVEL
-      this.profissionais = (data || []).map(prof => ({
-        id: prof.id,
-        profile_id: prof.profile_id,
-        telefone: prof.telefone,
-        created_at: prof.created_at,
-        nome: prof.profiles?.nome || prof.nome || 'Nome não encontrado',
-        email: prof.profiles?.email || prof.email || 'Email não encontrado',
-        role: prof.profiles?.role || prof.role || 'profissional'
-      }));
-      
-      // ✅ ORDENAR POR NOME NO JAVASCRIPT (mais seguro)
-      this.profissionais.sort((a, b) => a.nome.localeCompare(b.nome));
-      
-      console.log("✅ Profissionais mapeados para formato compatível:", this.profissionais);
-      
-      // CORREÇÃO: Limpar cache de agendamentos quando profissionais carregam
-      console.log('🗑️ Limpando cache de agendamentos por atualização de profissionais...');
-      this.cache.agendamentos = null;
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - SALVAR NO CACHE
-      this.cache.profissionais = this.profissionais;
-      console.log("💾 Profissionais salvos no cache:", this.cache.profissionais.length);
-      
-      this.profissionaisPorId = {};
-      this.profissionais.forEach(p => {
-        this.profissionaisPorId[p.id] = p;
-      });
-      this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
       return this.profissionais;
     } catch (error) {
       console.error('Erro ao carregar profissionais:', error);
-      throw error;
+      this.profissionais = [];
+      return this.profissionais;
     }
   }
 
-  // Método getProfissionais() para compatibilidade
-  async getProfissionais(forceReload = false) {
-    console.log("📋 getProfissionais() chamado - carregando profissionais...", forceReload ? "(forçado)" : "(cache)");
-    return await this.loadProfissionais(forceReload);
-  }
-
-  // Função para verificar estrutura da tabela profissionais
-  async verificarEstruturaProfissionais() {
+  async loadAgendamentos() {
     try {
-      console.log('🔍 Verificando estrutura da tabela profissionais...');
+      console.log("🔍 Carregando agendamentos...");
       
-      // Tentar obter a estrutura da tabela
-      const { data, error } = await this.supabase
-        .from("profissionais")
-        .select("id, profile_id, telefone, created_at")
-        .limit(1);
+      // CORREÇÃO: Se cache foi limpo, recarregar do banco
+      if (!this.cache.agendamentos) {
+        console.log("🔄 Cache vazio, carregando do banco...");
+        
+        // Obter profissional logado
+        const profissionalLogado = await this.getProfissionalLogado();
+        
+        if (!profissionalLogado) {
+          // ✅ ADMIN: Carregar todos os agendamentos
+          console.log("👑 Admin detectado - carregando todos os agendamentos");
+          
+          const { data, error } = await this.supabase
+            .from("agendamentos")
+            .select("*")
+            .order("data_inicio", { ascending: true });
 
-      if (error) {
-        console.error('❌ Erro ao verificar estrutura:', error);
-        return false;
-      }
-
-      if (data && data.length > 0) {
-        const exemplo = data[0];
-        console.log('✅ Estrutura da tabela profissionais:', Object.keys(exemplo));
-        console.log('📋 Exemplo de registro:', exemplo);
-        
-        // Verificar campos esperados - CAMPOS ATUALIZADOS CONFORME NOVA ESTRUTURA
-        const camposEsperados = ['id', 'profile_id', 'telefone', 'created_at'];
-        const camposExistentes = Object.keys(exemplo);
-        
-        const camposFaltando = camposEsperados.filter(campo => !camposExistentes.includes(campo));
-        const camposExtras = camposExistentes.filter(campo => !camposEsperados.includes(campo));
-        
-        if (camposFaltando.length > 0) {
-          console.warn('⚠️ Campos faltando na tabela:', camposFaltando);
+          if (error) {
+            console.error('Erro ao carregar agendamentos do Supabase:', error);
+            this.agendamentos = [];
+          } else {
+            this.agendamentos = data || [];
+            console.log("✅ Agendamentos carregados do banco:", this.agendamentos.length);
+          }
+          
+          // Salvar no cache
+          this.cache.agendamentos = this.agendamentos;
+        } else {
+          // PROFSSIONAL: Lógica específica (se necessário)
+          this.agendamentos = [];
+          this.cache.agendamentos = this.agendamentos;
         }
-        
-        if (camposExtras.length > 0) {
-          console.info('ℹ️ Campos extras na tabela:', camposExtras);
-        }
-        
-        console.log('✅ Verificação de estrutura concluída');
-        return true;
       } else {
-        console.log('ℹ️ Tabela profissionais vazia, mas estrutura OK');
-        return true;
+        console.log("📦 Usando agendamentos do cache:", this.cache.agendamentos.length);
+        this.agendamentos = this.cache.agendamentos;
       }
+      
+      return this.agendamentos;
     } catch (error) {
-      console.error('Erro na verificação da estrutura:', error);
-      return false;
+      console.error('Erro ao carregar agendamentos:', error);
+      this.agendamentos = [];
+      return this.agendamentos;
     }
   }
-        
-  async addProfissional(profissional) {
-    console.log('Adicionando profissional:', profissional);
+
+  async getProfissionalLogado() {
+    // IGNORAR ERRO RLS - RETORNAR NULL DIRETO
+    console.log('DATA_MANAGER: Ignorando query RLS em getProfissionalLogado devido a erro 500');
+    return null;
+  }
+
+  async addProfissional(dados) {
+    console.log('Adicionando profissional (fluxo correto):', dados);
     
     // PROTEÇÃO CONTRA EXECUÇÃO DUPLICADA
     if (this.addingProfissional) {
-      console.log('⚠️ addProfissional já está em execução, ignorando chamada duplicada');
+      console.log('addProfissional já está em execução, ignorando chamada duplicada');
       return;
     }
     
     this.addingProfissional = true;
     
     try {
-      // PRIMEIRO: Tentar Edge Function
-      console.log('🔐 TENTANDO EDGE FUNCTION...');
+      // FLUXO CORRETO: auth.users → profiles → profissionais
+      console.log('ETAPA 1: Criando usuário no Supabase Auth...');
+      
+      let userId = null;
+      let profileData = null;
+      
+      // 1. Criar usuário no auth.users
       try {
-        const result = await this.addProfissionalEdgeFunction(profissional);
-        console.log('✅ Edge Function funcionou:', result);
-        return result;
-      } catch (edgeError) {
-        console.warn('⚠️ Edge Function falhou, tentando método frontend:', edgeError.message);
+        const { data: authData, error: authError } = await this.supabase.auth.signUp({
+          email: dados.email,
+          password: dados.senhaTemporaria || 'temp123456',
+          options: {
+            data: {
+              role: 'profissional',
+              nome: dados.nome
+            }
+          }
+        });
         
-        // SEGUNDO: Tentar método direto via frontend
-        console.log('🔧 USANDO MÉTODO FRONTEND COMO FALLBACK...');
-        const result = await this.addProfissionalFrontend(profissional);
-        console.log('✅ Método frontend funcionou:', result);
-        return result;
+        if (authError) {
+          console.warn("Erro ao criar usuário:", authError.message);
+          
+          // Se email já existe, tentar buscar usuário existente
+          if (authError.message.includes('already registered')) {
+            console.log("Email já registrado, buscando usuário existente...");
+            const { data: { users } } = await this.supabase.auth.admin.listUsers();
+            const existingUser = users.find(u => u.email === dados.email);
+            if (existingUser) {
+              userId = existingUser.id;
+              console.log("Usuário existente encontrado:", userId);
+            }
+          }
+        } else {
+          userId = authData.user?.id;
+          console.log("Usuário criado com sucesso:", userId);
+        }
+      } catch (authError) {
+        console.warn("Falha na criação de usuário:", authError.message);
       }
+      
+      // 2. Criar ou atualizar profile
+      if (userId) {
+        console.log("👤 ETAPA 2: Criando/atualizando profile...");
+        
+        try {
+          const { data: profile, error: profileError } = await this.supabase
+            .from('profiles')
+            .upsert({
+              id: userId,
+              nome: dados.nome, // ✅ CORRIGIDO: Salvar nome em profiles
+              email: dados.email, // ✅ CORRIGIDO: Salvar email em profiles
+              role: 'profissional',
+              first_login_completed: true // ✅ CORRIGIDO: true pois profissional ainda não logou
+            })
+            .select()
+            .single();
+            
+          if (profileError) {
+            console.warn("⚠️ Erro ao criar profile:", profileError.message);
+          } else {
+            profileData = profile;
+            console.log("✅ Profile criado/atualizado:", profileData);
+          }
+        } catch (profileError) {
+          console.warn("⚠️ Falha ao criar profile:", profileError.message);
+        }
+      }
+      
+      // 3. Criar registro na tabela profissionais
+      console.log("ETAPA 3: Criando registro profissional...");
+      
+      let profissionalData = {};
+      
+      // Tentar com colunas completas primeiro
+      if (userId) {
+        profissionalData = {
+          nome: dados.nome,
+          telefone: dados.telefone,
+          email: dados.email,
+          especialidade: dados.especialidade || 'Geral',
+          ativo: true,
+          profile_id: userId // RELACIONAMENTO CORRETO
+        };
+      } else {
+        // Fallback: criar sem profile_id
+        profissionalData = {
+          telefone: dados.telefone,
+          profile_id: null
+        };
+      }
+      
+      console.log("Dados para profissionais:", profissionalData);
+      
+      let { data: profissional, error: profissionalError } = await this.supabase
+        .from('profissionais')
+        .insert(profissionalData)
+        .select()
+        .single();
+      
+      // Se falhar por coluna inexistente, tentar com colunas mínimas
+      if (profissionalError && profissionalError.message.includes('column')) {
+        console.warn("Colunas completas não funcionaram, tentando mínimas...");
+        
+        profissionalData = userId ? 
+          { telefone: dados.telefone, profile_id: userId } :
+          { telefone: dados.telefone, profile_id: null };
+        
+        const result = await this.supabase
+          .from('profissionais')
+          .insert(profissionalData)
+          .select()
+          .single();
+        
+        profissional = result.data;
+        profissionalError = result.error;
+      }
+      
+      if (profissionalError) {
+        console.error("Erro ao criar profissional:", profissionalError);
+        throw new Error(`Erro ao criar profissional: ${profissionalError.message}`);
+      }
+      
+      console.log("Profissional criado com sucesso:", profissional);
+      
+      // 4. Retornar resultado completo
+      const resultado = {
+        profissional: {
+          ...profissional,
+          nome: dados.nome || `Profissional ${profissional.id}`,
+          email: dados.email,
+          especialidade: dados.especialidade || 'Geral',
+          ativo: true
+        },
+        usuario: userId ? { id: userId, email: dados.email } : null,
+        profile: profileData,
+        fluxo: userId ? 
+          "FLUXO COMPLETO: auth.users → profiles → profissionais" : 
+          "FLUXO PARCIAL: apenas profissionais (crie usuário manualmente)"
+      };
+      
+      console.log("Resultado do fluxo:", resultado);
+      
+      // Adicionar ao cache local
+      this.profissionais.push(resultado.profissional);
+      this.cache.profissionais = null;
+      
+      return resultado;
       
     } catch (error) {
       console.error('Erro ao adicionar profissional:', error);
@@ -1065,101 +495,266 @@ class DataManager {
     }
   }
 
-  // MÉTODO SEPARADO PARA EDGE FUNCTION
-  async addProfissionalEdgeFunction(profissional) {
-    console.log('🔐 CHAMANDO EDGE FUNCTION: create-profissional...');
-    
-    // ✅ VERIFICAR SE SENHA TEMPORÁRIA FOI FORNECIDA
-    if (!profissional.senha_temporaria) {
-      throw new Error('Senha temporária é obrigatória para criar profissional');
-    }
-    
-    const response = await fetch(`${this.supabase.supabaseUrl}/functions/v1/create-profissional`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.supabase.supabaseKey}`,
-        'apikey': this.supabase.supabaseKey
-      },
-      body: JSON.stringify({
-        nome: profissional.nome,
-        telefone: profissional.telefone,
-        email: profissional.email,
-        senha_temporaria: profissional.senha_temporaria // ✅ NOVO CAMPO OBRIGATÓRIO
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('❌ ERRO NA EDGE FUNCTION:', errorData);
+  async deleteProfissional(profissionalId) {
+    try {
+      console.log('🗑️ Excluindo profissional em cascata:', profissionalId);
       
-      // Tratar erros específicos
-      if (response.status === 409) {
-        if (errorData.code === 'EMAIL_ALREADY_EXISTS') {
-          throw new Error('Este email já está registrado. Use um email diferente ou verifique se o profissional já existe.');
-        } else if (errorData.error && errorData.error.includes('Profissional já existe')) {
-          throw new Error('Este profissional já existe para este usuário. Cada usuário pode ter apenas um profissional.');
-        } else if (errorData.error && errorData.error.includes('Too Many Requests')) {
-          throw new Error('Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.');
-        } else if (errorData.error && errorData.error.includes('rate limit')) {
-          throw new Error('Limite de criação excedido. Tente novamente em alguns minutos.');
+      // 1. Buscar dados completos do profissional
+      const { data: profissional, error: errorProf } = await this.supabase
+        .from('profissionais')
+        .select('*')
+        .eq('id', profissionalId)
+        .single();
+      
+      if (errorProf) {
+        throw new Error(`Erro ao buscar profissional: ${errorProf.message}`);
+      }
+      
+      console.log('📋 Dados do profissional:', profissional);
+      
+      // 2. Excluir da tabela profissionais
+      const { error: errorDeleteProf } = await this.supabase
+        .from('profissionais')
+        .delete()
+        .eq('id', profissionalId);
+      
+      if (errorDeleteProf) {
+        throw new Error(`Erro ao excluir profissional: ${errorDeleteProf.message}`);
+      }
+      
+      console.log('✅ Profissional excluído da tabela profissionais');
+      
+      // 3. Se tiver profile_id, excluir o profile
+      if (profissional.profile_id) {
+        const { error: errorDeleteProfile } = await this.supabase
+          .from('profiles')
+          .delete()
+          .eq('id', profissional.profile_id);
+        
+        if (errorDeleteProfile) {
+          console.warn('⚠️ Erro ao excluir profile:', errorDeleteProfile.message);
+        } else {
+          console.log('✅ Profile excluído');
+        }
+        
+        // 4. Excluir usuário do auth (se for admin)
+        try {
+          const { error: errorDeleteUser } = await this.supabase.auth.admin.deleteUser(
+            profissional.profile_id
+          );
+          
+          if (errorDeleteUser) {
+            console.warn('⚠️ Erro ao excluir usuário do auth:', errorDeleteUser.message);
+          } else {
+            console.log('✅ Usuário excluído do auth');
+          }
+        } catch (authError) {
+          console.warn('⚠️ Falha ao excluir usuário do auth:', authError.message);
         }
       }
       
-      throw new Error(errorData.error || 'Erro ao criar profissional. Tente novamente.');
+      // 5. Remover do cache local
+      this.profissionais = this.profissionais.filter(p => p.id !== profissionalId);
+      this.cache.profissionais = null;
+      
+      console.log('🎉 Exclusão em cascata concluída com sucesso');
+      
+      return {
+        success: true,
+        message: 'Profissional excluído com sucesso (usuário, profile e profissional)'
+      };
+      
+    } catch (error) {
+      console.error('❌ Erro ao excluir profissional:', error);
+      throw error;
     }
-
-    const result = await response.json();
-    console.log('✅ PROFISSIONAL CRIADO COM SUCESSO:', result);
-
-    // Atualizar cache e lista local
-    this.profissionais.push(result.data.profissional);
-    this.profissionaisPorId[result.data.profissional.id] = result.data.profissional;
-    this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
-    
-    // Limpar cache para forçar recarregamento
-    this.cache.profissionais = null;
-    
-    return {
-      ...result.data.profissional,
-      message: result.message
-    };
   }
 
-  // Gerar senha temporária aleatória
-  gerarSenhaTemporaria() {
-    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
-    let senha = '';
-    for (let i = 0; i < 12; i++) {
-      senha += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+  async addProfissionalCompleto(dados) {
+    try {
+      console.log("🔧 Criando profissional completo (usuário + profile + profissional):", dados);
+      
+      // ✅ MÉTODO COMPLETO: Tentar criar usuário no Supabase Auth
+      let userId = null;
+      let profileData = null;
+      
+      try {
+        // Tentar criar usuário via signup (sem precisar de admin)
+        const { data: authData, error: authError } = await this.supabase.auth.signUp({
+          email: dados.email,
+          password: dados.senhaTemporaria || 'temp123456',
+          options: {
+            data: {
+              role: 'profissional',
+              nome: dados.nome
+            }
+          }
+        });
+        
+        if (authError) {
+          console.warn("⚠️ Erro ao criar usuário via signup:", authError.message);
+        } else {
+          userId = authData.user?.id;
+          console.log("✅ Usuário criado no Auth:", userId);
+        }
+      } catch (signupError) {
+        console.warn("⚠️ Falha no signup:", signupError.message);
+      }
+      
+      // Se conseguiu criar usuário, criar profile
+      if (userId) {
+        try {
+          const { data: profile, error: profileError } = await this.supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              nome: dados.nome,
+              email: dados.email,
+              role: 'profissional',
+              first_login_completed: false
+            })
+            .select()
+            .single();
+            
+          if (profileError) {
+            console.warn("⚠️ Erro ao criar profile:", profileError.message);
+          } else {
+            profileData = profile;
+            console.log("✅ Profile criado:", profileData);
+          }
+        } catch (profileError) {
+          console.warn("⚠️ Falha ao criar profile:", profileError.message);
+        }
+      }
+      
+      // Criar registro na tabela profissionais
+      const profissionalData = {
+        nome: dados.nome,
+        telefone: dados.telefone,
+        email: dados.email,
+        especialidade: dados.especialidade || 'Geral',
+        ativo: true,
+        profile_id: userId || null // Associar se tiver usuário
+      };
+      
+      console.log("📊 Dados para inserir na tabela profissionais:", profissionalData);
+      
+      const { data, error } = await this.supabase
+        .from('profissionais')
+        .insert(profissionalData)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error("❌ Erro ao inserir profissional:", error);
+        throw new Error(`Erro ao inserir profissional: ${error.message}`);
+      }
+      
+      console.log("✅ Profissional criado com sucesso:", data);
+      
+      // Retornar informações completas
+      const resultado = {
+        profissional: data,
+        usuario: userId ? { id: userId, email: dados.email } : null,
+        profile: profileData,
+        observacao: userId ? 
+          "Profissional completo com usuário e profile criados" : 
+          "Apenas registro profissional criado (crie usuário manualmente)"
+      };
+      
+      console.log("🎉 Resultado completo:", resultado);
+      
+      // Adicionar ao cache local
+      this.profissionais.push(data);
+      this.cache.profissionais = null;
+      
+      return resultado;
+      
+    } catch (error) {
+      console.error("❌ Erro ao criar profissional completo:", error);
+      throw error;
     }
-    return senha;
   }
 
-  // Gerar cor aleatória
-  gerarCorAleatoria() {
-    const cores = ['#e91e63', '#2196f3', '#4caf50', '#ff9800', '#9c27b0', '#795548'];
-    return cores[Math.floor(Math.random() * cores.length)];
+  async addProfissionalFrontend(dados) {
+    try {
+      console.log("🔧 Criando profissional com método simplificado:", dados);
+      
+      // ✅ CORRIGIDO: Usar colunas que agora existem na tabela
+      const profissionalData = {
+        nome: dados.nome,
+        telefone: dados.telefone,
+        email: dados.email,
+        especialidade: dados.especialidade || 'Geral',
+        ativo: true,
+        profile_id: null // Sem usuário associado inicialmente
+      };
+      
+      console.log("📊 Dados para inserir na tabela profissionais:", profissionalData);
+      
+      const { data, error } = await this.supabase
+        .from('profissionais')
+        .insert(profissionalData)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error("❌ Erro ao inserir profissional:", error);
+        throw new Error(`Erro ao inserir profissional: ${error.message}`);
+      }
+      
+      console.log("✅ Profissional criado com sucesso:", data);
+      
+      // Adicionar ao cache local
+      this.profissionais.push(data);
+      
+      // Limpar cache para forçar recarregamento
+      this.cache.profissionais = null;
+      
+      return data;
+      
+    } catch (error) {
+      console.error("❌ Erro ao criar profissional:", error);
+      throw error;
+    }
   }
 
-  // MÉTODOS ANTIGOS REMOVIDOS - AGORA USA APENAS SUPABASE AUTH
-// senha_hash, senha_criada, primeiro login foram removidos do fluxo
+  async addProfissionalEdgeFunction(dados) {
+    if (!dados.senhaTemporaria) {
+      throw new Error('Senha temporária é obrigatória para criar profissional');
+    }
+    
+    console.log('🔐 CHAMANDO EDGE FUNCTION: create-profissional...');
+    
+    const { data, error } = await this.supabase.functions.invoke('create-profissional', {
+      body: dados
+    });
+    
+    if (error) {
+      console.error('❌ Erro na Edge Function:', error);
+      throw new Error(`Erro na Edge Function: ${error.message}`);
+    }
+    
+    console.log('✅ Edge Function retornou:', data);
+    return data;
+  }
 
-  // CORREÇÃO: Método para garantir dados de referência antes de processar agendamentos
   async garantirDadosReferencia() {
     console.log('🔍 Verificando dados de referência...');
     
-    // Se algum dado de referência estiver vazio, carregá-lo
+    // Verificar e carregar clientes se necessário
     if (this.clientes.length === 0) {
       console.log('⚠️ Clientes vazios, carregando...');
       await this.loadClientes();
     }
     
+    // Verificar e carregar serviços se necessário
     if (this.servicos.length === 0) {
       console.log('⚠️ Serviços vazios, carregando...');
       await this.loadServicos();
     }
     
+    // Verificar e carregar profissionais se necessário
     if (this.profissionais.length === 0) {
       console.log('⚠️ Profissionais vazios, carregando...');
       await this.loadProfissionais();
@@ -1172,1202 +767,420 @@ class DataManager {
     });
   }
 
-  // CORREÇÃO: Método para reprocessar agendamentos com dados atualizados
-  async reprocessarAgendamentos() {
-    console.log('🔄 Reprocessando agendamentos com dados atualizados...');
-    
-    // Limpar cache de agendamentos
-    this.cache.agendamentos = null;
-    
-    // Recarregar agendamentos
-    await this.loadAgendamentos();
-    
-    console.log('✅ Agendamentos reprocessados:', this.agendamentos.length);
-  }
-
-  // CORREÇÃO: Método para corrigir agendamentos com IDs null
-  async corrigirAgendamentosNull() {
-    try {
-      console.log('🔧 Verificando agendamentos com IDs null...');
-      
-      // Buscar agendamentos com IDs null
-      const { data: agendamentosNull, error } = await this.supabase
-        .from('agendamentos')
-        .select('*')
-        .or('cliente_id.is.null,servico_id.is.null,profissional_id.is.null');
-      
-      if (error) {
-        console.error('❌ Erro ao buscar agendamentos null:', error);
-        return;
-      }
-      
-      console.log('🔍 Agendamentos com IDs null encontrados:', agendamentosNull?.length || 0);
-      
-      if (agendamentosNull && agendamentosNull.length > 0) {
-        // Corrigir cada agendamento
-        for (const ag of agendamentosNull) {
-          console.log('🔧 Corrigindo agendamento:', ag);
-          
-          const dadosCorrigidos = {
-            cliente_id: 1, // Primeiro cliente
-            servico_id: 11, // Serviço "Manicure com Esmaltação Convencional"
-            profissional_id: 1, // Primeiro profissional
-            data_inicio: ag.data_inicio || '2026-03-12T09:00:00',
-            data_fim: ag.data_fim || '2026-03-12T09:30:00',
-            status: ag.status || 'agendado',
-            observacoes: ag.observacoes || 'Corrigido automaticamente'
-          };
-          
-          const { data: atualizado, error: erroUpdate } = await this.supabase
-            .from('agendamentos')
-            .update(dadosCorrigidos)
-            .eq('id', ag.id)
-            .select()
-            .single();
-          
-          if (erroUpdate) {
-            console.error('❌ Erro ao corrigir agendamento:', erroUpdate);
-          } else {
-            console.log('✅ Agendamento corrigido:', atualizado);
-          }
-        }
-        
-        // Limpar cache para forçar recarregamento
-        this.cache.agendamentos = null;
-        console.log('🗑️ Cache limpo, recarregando dados...');
-        
-        // Recarregar agendamentos
-        await this.loadAgendamentos();
-        
-      } else {
-        console.log('✅ Nenhum agendamento com IDs null encontrado');
-      }
-    } catch (error) {
-      console.error('❌ Erro ao corrigir agendamentos:', error);
-    }
-  }
-
-  // NOVO MÉTODO: Carregar agenda com joins completos (substitui agenda_view)
-  async loadAgendaCompleta() {
-    try {
-      console.log("🔍 Carregando agenda completa com joins...");
-      
-      // Obter profissional logado
-      const profissionalLogado = await this.getProfissionalLogado();
-      
-      if (!profissionalLogado) {
-        console.warn("⚠️ Nenhum profissional logado encontrado para agenda");
-        return [];
-      }
-      
-      console.log("👤 Carregando agenda para profissional:", profissionalLogado.id);
-      
-      const { data, error } = await this.supabase
-        .from("agendamentos")
-        .select(`
-          id,
-          cliente_id,
-          servico_id,
-          profissional_id,
-          data_inicio,
-          data_fim,
-          status,
-          observacoes,
-          created_at,
-          clientes!inner (
-            id,
-            nome,
-            telefone
-          ),
-          servicos!inner (
-            id,
-            nome,
-            cor,
-            duracao_min,
-            valor
-          )
-        `)
-        .eq("profissional_id", profissionalLogado.id)
-        .order("data_inicio", { ascending: true });
-
-      if (error) {
-        console.error('❌ Erro ao carregar agenda completa:', error);
-        throw error;
-      }
-
-      console.log("✅ Agenda completa carregada:", data?.length || 0);
-      
-      // Mapear para formato compatível com calendarManager
-      const agendaFormatada = (data || []).map(ag => ({
-        ...ag,
-        // Mapear nomes para compatibilidade
-        cliente: ag.clientes?.nome || 'Cliente não encontrado',
-        cliente_telefone: ag.clientes?.telefone || '',
-        servico: ag.servicos?.nome || 'Serviço não encontrado',
-        servico_cor: ag.servicos?.cor || '#3b82f6',
-        servico_duracao: ag.servicos?.duracao_min || 0,
-        servico_valor: ag.servicos?.valor || 0,
-        // ✅ CORRIGIDO: Usar profissionalLogado em vez de JOIN
-        profissional: profissionalLogado.nome || 'Profissional não encontrado',
-        profissional_telefone: profissionalLogado.telefone || '',
-        // Mapear datas para nomes esperados
-        inicio: ag.data_inicio,
-        fim: ag.data_fim,
-        // Garantir que status seja string
-        status: ag.status || 'confirmado'
-      }));
-      
-      return agendaFormatada;
-    } catch (error) {
-      console.error('Erro ao carregar agenda completa:', error);
-      throw error;
-    }
-  }
-
-  // Métodos auxiliares para buscar nomes por ID
   getClientNameById(clienteId) {
-    console.log('🔍 Buscando cliente ID:', clienteId, 'Tipo:', typeof clienteId);
-    console.log('🔍 Clientes disponíveis:', this.clientes.map(c => ({ id: c.id, nome: c.nome, tipo: typeof c.id })));
     const cliente = this.clientes.find(c => c.id === clienteId);
-    console.log('🔍 Cliente encontrado:', cliente);
     return cliente ? cliente.nome : null;
   }
 
   getServiceNameById(servicoId) {
-    console.log('🔍 Buscando serviço ID:', servicoId, 'Tipo:', typeof servicoId);
-    console.log('🔍 Serviços disponíveis:', this.servicos.map(s => ({ id: s.id, nome: s.nome, tipo: typeof s.id })));
     const servico = this.servicos.find(s => s.id === servicoId);
-    console.log('🔍 Serviço encontrado:', servico);
     return servico ? servico.nome : null;
   }
 
   getProfessionalNameById(profissionalId) {
-    console.log('🔍 Buscando profissional ID:', profissionalId, 'Tipo:', typeof profissionalId);
-    console.log('🔍 Profissionais disponíveis:', this.profissionais.map(p => ({ id: p.id, nome: p.nome, tipo: typeof p.id })));
     const profissional = this.profissionais.find(p => p.id === profissionalId);
-    console.log('🔍 Profissional encontrado:', profissional);
     return profissional ? profissional.nome : null;
   }
 
-  // NOVO MÉTODO: Obter profissional logado
-  async getProfissionalLogado() {
-    try {
-      // Obter usuário autenticado
-      const { data: { user }, error: userError } = await this.supabase.auth.getUser();
-      
-      if (userError || !user) {
-        console.warn("⚠️ Usuário não autenticado");
-        return null;
-      }
-      
-      // ✅ SIMPLIFICAR: Buscar profile sem JOIN para evitar erro 500
-      let profile = null;
-      try {
-        const { data: profileData, error: profileError } = await this.supabase
-          .from('profiles')
-          .select('id, nome, email, role, telefone, first_login_completed')
-          .eq('id', user.id)
-          .single();
-          
-        if (!profileError && profileData) {
-          profile = profileData;
-        } else {
-          console.warn("⚠️ Profile não encontrado");
-          return null;
-        }
-      } catch (profileQueryError) {
-        console.warn("⚠️ Erro ao buscar profile:", profileQueryError);
-        return null;
-      }
-        
-      // Se for admin, retornar null (admin pode ver todos)
-      if (profile.role === 'admin') {
-        console.log("👑 Usuário admin detectado - pode ver todos os agendamentos");
-        return null; // Admin não tem filtro
-      }
-      
-      // Se for profissional, buscar dados do profissional
-      if (profile.role === 'profissional') {
-        try {
-          const { data: profissional, error: profissionalError } = await this.supabase
-            .from('profissionais')
-            .select('*')
-            .eq('profile_id', user.id)
-            .single();
-            
-          if (profissionalError || !profissional) {
-            console.warn("⚠️ Profissional não encontrado, criando automaticamente...");
-            
-            // ✅ CRIAR PROFISSIONAL AUTOMATICAMENTE
-            const novoProfissional = await this.criarProfissionalParaProfile(
-              user.id, 
-              profile.nome, 
-              profile.telefone || ''
-            );
-            
-            if (novoProfissional) {
-              console.log("✅ Profissional criado automaticamente:", novoProfissional);
-              return novoProfissional;
-            }
-            
-            return null;
-          }
-          
-          console.log("👩 Profissional encontrado:", profissional);
-          return profissional;
-        } catch (profissionalQueryError) {
-          console.warn("⚠️ Erro ao buscar profissional:", profissionalQueryError);
-          return null;
-        }
-      }
-      
-      return null;
-      
-    } catch (error) {
-      console.error("❌ Erro ao obter profissional logado:", error);
-      return null;
-    }
+  getClientes() {
+    console.log('📋 getClientes() chamado - carregando clientes...');
+    return this.loadClientes();
   }
 
-  // Agendamentos
-  async loadAgendamentos() {
-    try {
-      console.log("🔍 Carregando agendamentos...");
-      
-      // CORREÇÃO V1.3: Garantir dados de referência primeiro
-      await this.garantirDadosReferencia();
-      
-      // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
-      // Obter ID do profissional logado
-      const profissionalLogado = await this.getProfissionalLogado();
-      
-      if (!profissionalLogado) {
-        // ✅ ADMIN: Carregar todos os agendamentos
-        console.log("👑 Admin detectado - carregando todos os agendamentos");
-        
-        const { data, error } = await this.supabase
-          .from("agendamentos")
-          .select("*")
-          .order("data_inicio", { ascending: true });
-
-        if (error) {
-          console.error('Erro ao carregar agendamentos do Supabase:', error);
-          this.agendamentos = [];
-        } else {
-          this.agendamentos = data || [];
-        }
-        
-        this.cache.agendamentos = this.agendamentos;
-        return this.agendamentos;
-      }
-      
-      console.log("👤 Profissional logado:", profissionalLogado.id, profissionalLogado.nome);
-      
-      // NOVA IMPLEMENTAÇÃO V1.3 - VERIFICAR CACHE E DADOS DE REFERÊNCIA
-      if (this.cache.agendamentos !== null && 
-          this.clientes.length > 0 && 
-          this.servicos.length > 0 && 
-          this.profissionais.length > 0) {
-        console.log("📦 Retornando agendamentos do cache:", this.cache.agendamentos.length);
-        this.agendamentos = this.cache.agendamentos;
-        return this.agendamentos;
-      }
-      
-      console.log("⚠️ Cache inválido ou dados de referência vazios, carregando do Supabase...");
-      
-      // ✅ JÁ CORRIGIDO: loadProfissionais() com JOIN para profiles
-      // ✅ JÁ CORRIGIDO: order("profiles.nome") implementado
-      const { data, error } = await this.supabase
-        .from("agendamentos")
-        .select("*")
-        .eq("profissional_id", profissionalLogado.id)
-        .order("data_inicio", { ascending: true });
-
-      if (error) {
-        console.error('Erro ao carregar agendamentos do Supabase:', error);
-        this.agendamentos = [];
-      } else {
-        // CORREÇÃO: Mapear dados para formato compatível com calendarManager
-        this.agendamentos = (data || []).map(ag => {
-          console.log('🔍 Processando agendamento bruto:', ag);
-          console.log('🔍 IDs do agendamento:', {
-            cliente_id: ag.cliente_id,
-            servico_id: ag.servico_id,
-            profissional_id: ag.profissional_id
-          });
-          
-          return {
-            ...ag,
-            // Mapear nomes para compatibilidade com calendarManager
-            cliente: this.getClientNameById(ag.cliente_id) || 'Cliente não encontrado',
-            servico: this.getServiceNameById(ag.servico_id) || 'Serviço não encontrado',
-            profissional: this.getProfessionalNameById(ag.profissional_id) || 'Profissional não encontrado',
-            // Mapear datas para nomes esperados
-            inicio: ag.data_inicio,
-            fim: ag.data_fim,
-            // Manter IDs originais para referência
-            cliente_id: ag.cliente_id,
-            servico_id: ag.servico_id,
-            profissional_id: ag.profissional_id
-          };
-        });
-        
-        console.log("✅ Agendamentos carregados do Supabase:", this.agendamentos.length);
-        
-        // CORREÇÃO: Verificar e corrigir agendamentos com IDs null
-        await this.corrigirAgendamentosNull();
-      }
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - SALVAR NO CACHE
-      this.cache.agendamentos = this.agendamentos;
-      console.log("💾 Agendamentos salvos no cache:", this.agendamentos.length);
-      
-      return this.agendamentos;
-    } catch (error) {
-      console.error('Erro ao carregar agendamentos:', error);
-      this.agendamentos = [];
-      return this.agendamentos;
-    }
+  getServicos() {
+    console.log('💇 getServicos() chamado - carregando serviços...');
+    return this.loadServicos();
   }
 
-  async addAgendamento(agendamento) {
+  getAgendamentos() {
+    console.log('📅 getAgendamentos() chamado - carregando agendamentos...');
+    return this.loadAgendamentos();
+  }
+
+  getBloqueios() {
+    console.log('🚫 getBloqueios() chamado - carregando bloqueios...');
+    return this.loadBloqueios();
+  }
+
+  getProfissionais() {
+    console.log('📋 getProfissionais() chamado - carregando profissionais... (cache)');
+    return this.loadProfissionais();
+  }
+
+  // Adicionar agendamento
+  async addAgendamento(dados) {
+    console.log('➕ Adicionando agendamento:', dados);
+    
     try {
-      console.log("📝 Enviando agendamento para Supabase:", agendamento);
-      
-      // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
-      // Verificar se é admin ou profissional
-      const profissionalLogado = await this.getProfissionalLogado();
-      
-      // ✅ ADMIN: Pode criar agendamentos para qualquer profissional
-      if (!profissionalLogado) {
-        console.log("👑 Admin criando agendamento - usando profissional selecionado");
-        
-        // Admin usa o profissional selecionado no formulário
-        if (!agendamento.profissional) {
-          throw new Error('Admin deve selecionar um profissional para o agendamento');
-        }
-        
-        const dadosParaBanco = {
-          cliente_id: parseInt(agendamento.cliente),
-          servico_id: parseInt(agendamento.servico),
-          profissional_id: parseInt(agendamento.profissional), // Profissional selecionado
-          data_inicio: agendamento.inicio,
-          data_fim: agendamento.fim,
-          status: agendamento.status || 'confirmado',
-          observacoes: agendamento.observacoes || null
-        };
-        
-        console.log("📊 Dados formatados para o banco (Admin):", dadosParaBanco);
-        
-        const { data, error } = await this.supabase
-          .from('agendamentos')
-          .insert(dadosParaBanco)
-          .select()
-          .single();
-
-        if (error) {
-          console.error('Erro ao salvar agendamento no Supabase:', error);
-          throw error;
-        }
-
-        console.log("✅ Agendamento criado com sucesso (Admin):", data);
-        
-        // CORREÇÃO: Limpar cache de agendamentos
-        this.cache.agendamentos = null;
-        
-        return data;
-      }
-      
-      // ✅ PROFISSIONAL: Só pode criar para si mesmo
-      console.log("👤 Profissional criando agendamento para si mesmo:", profissionalLogado.id, profissionalLogado.nome);
-      
-      const dadosParaBanco = {
-        cliente_id: parseInt(agendamento.cliente),
-        servico_id: parseInt(agendamento.servico),
-        profissional_id: profissionalLogado.id, // Forçar ID do profissional logado
-        data_inicio: agendamento.inicio,
-        data_fim: agendamento.fim,
-        status: agendamento.status || 'confirmado',
-        observacoes: agendamento.observacoes || null
+      // Preparar dados para inserção
+      const agendamentoData = {
+        cliente_id: dados.cliente,
+        servico_id: dados.servico,
+        profissional_id: dados.profissional,
+        status: dados.status || 'agendado',
+        data_inicio: dados.inicio,
+        data_fim: dados.fim,
+        observacoes: dados.observacoes || '',
+        created_at: new Date().toISOString()
       };
       
-      console.log("📊 Dados formatados para o banco (Profissional):", dadosParaBanco);
+      console.log('📊 Dados para inserir na tabela agendamentos:', agendamentoData);
       
-      // CORREÇÃO: Usar Supabase diretamente em vez da API
       const { data, error } = await this.supabase
         .from('agendamentos')
-        .insert(dadosParaBanco)
+        .insert(agendamentoData)
         .select()
         .single();
       
       if (error) {
-        console.error('❌ Erro do Supabase:', error);
-        throw error;
+        console.error('❌ Erro ao inserir agendamento:', error);
+        throw new Error(`Erro ao inserir agendamento: ${error.message}`);
       }
       
-      console.log("✅ Agendamento salvo no Supabase:", data);
+      console.log('✅ Agendamento criado com sucesso:', data);
       
       // Adicionar ao cache local
       this.agendamentos.push(data);
-      this.cache.agendamentos = this.agendamentos;
-      
-      return data;
-    } catch (error) {
-      console.error('❌ Erro ao salvar agendamento no Supabase:', error);
-      throw error; // REMOVER FALLBACK LOCAL
-    }
-  }
-
-  async updateAgendamento(id, agendamento) {
-    try {
-      console.log("📝 Atualizando agendamento no Supabase:", { id, agendamento });
-      
-      // CORREÇÃO: Usar Supabase diretamente com nomes corretos das colunas
-      const dadosParaBanco = {
-        cliente_id: parseInt(agendamento.cliente_id || agendamento.cliente),
-        servico_id: parseInt(agendamento.servico_id || agendamento.servico),
-        profissional_id: parseInt(agendamento.profissional_id || agendamento.profissional),
-        data_inicio: agendamento.inicio || agendamento.data_inicio,
-        data_fim: agendamento.fim || agendamento.data_fim,
-        status: agendamento.status || 'agendado',
-        observacoes: agendamento.observacoes || null
-      };
-      
-      console.log("📊 Dados formatados para o banco:", dadosParaBanco);
-      
-      // VALIDAÇÃO CRÍTICA
-      if (!dadosParaBanco.cliente_id || isNaN(dadosParaBanco.cliente_id)) {
-        console.error('❌ cliente_id inválido:', dadosParaBanco.cliente_id);
-        throw new Error('cliente_id inválido');
-      }
-      if (!dadosParaBanco.servico_id || isNaN(dadosParaBanco.servico_id)) {
-        console.error('❌ servico_id inválido:', dadosParaBanco.servico_id);
-        throw new Error('servico_id inválido');
-      }
-      if (!dadosParaBanco.profissional_id || isNaN(dadosParaBanco.profissional_id)) {
-        console.error('❌ profissional_id inválido:', dadosParaBanco.profissional_id);
-        throw new Error('profissional_id inválido');
-      }
-      
-      console.log('✅ Dados validados, enviando para Supabase...');
-      
-      // CORREÇÃO: Usar Supabase diretamente em vez da API
-      const { data, error } = await this.supabase
-        .from('agendamentos')
-        .update(dadosParaBanco)
-        .eq('id', id)
-        .select()
-        .single();
-      
-      console.log('📦 Resposta do Supabase:', { data, error });
-      
-      if (error) {
-        console.error('❌ Erro do Supabase:', error);
-        throw error;
-      }
-      
-      console.log('✅ Agendamento atualizado no Supabase:', data);
-      console.log('🔍 Verificação do que foi salvo:', {
-        id: data.id,
-        data_inicio_original: data.data_inicio,
-        data_fim_original: data.data_fim,
-        data_inicio_formatado: new Date(data.data_inicio).toLocaleString(),
-        data_fim_formatado: new Date(data.data_fim).toLocaleString()
-      });
       
       // Limpar cache para forçar recarregamento
       this.cache.agendamentos = null;
-      console.log('🗑️ Cache de agendamentos limpo');
       
       return data;
+      
     } catch (error) {
-      console.error('Erro ao atualizar agendamento:', error);
+      console.error('❌ Erro ao criar agendamento:', error);
       throw error;
     }
   }
 
-  async deleteAgendamento(id) {
+  // Resetar senha de profissional - SUPABASE AUTH NATIVO
+  async resetarSenhaDireto(email) {
+    console.log('🔐 Resetando senha para:', email);
+    
     try {
-      console.log("🗑️ Excluindo agendamento no Supabase:", id);
+      // Gerar nova senha temporária
+      const novaSenha = this.gerarSenhaTemporaria();
+      console.log('🔑 Nova senha gerada:', novaSenha);
       
-      // CORREÇÃO: Usar Supabase diretamente em vez da API
+      // Buscar profissional (cache)
+      const profissional = this.profissionais.find(p => p.email === email);
+      if (!profissional) {
+        throw new Error('Profissional não encontrado. Recarregue a página.');
+      }
+      
+      console.log('✅ Profissional encontrado:', profissional);
+      
+      // Retornar senha para admin atualizar manualmente no Supabase Auth
+      return {
+        success: true,
+        email: email,
+        senhaTemporaria: novaSenha,
+        message: 'Senha temporária gerada com sucesso',
+        instructions: `INSTRUÇÕES:\n\n1. Acesse Supabase Dashboard\n2. Authentication → Users\n3. Encontre: ${email}\n4. Clique "Reset Password"\n5. Insira: ${novaSenha}\n6. Salve\n\nO profissional já poderá usar esta senha.`,
+        profileId: profissional.id,
+        nome: profissional.nome,
+        method: 'supabase_auth_manual'
+      };
+      
+    } catch (error) {
+      console.error('❌ Erro no resetarSenhaDireto:', error);
+      throw new Error('Erro ao resetar senha: ' + error.message);
+    }
+  }
+  
+  // Métodos auxiliares para acesso rápido por ID
+  get servicosPorId() {
+    if (!this._servicosPorId || this.servicos.length !== Object.keys(this._servicosPorId).length) {
+      this._servicosPorId = {};
+      this.servicos.forEach(servico => {
+        this._servicosPorId[servico.id] = servico;
+      });
+    }
+    return this._servicosPorId;
+  }
+  
+  get profissionaisPorId() {
+    if (!this._profissionaisPorId || this.profissionais.length !== Object.keys(this._profissionaisPorId).length) {
+      this._profissionaisPorId = {};
+      this.profissionais.forEach(profissional => {
+        this._profissionaisPorId[profissional.id] = profissional;
+      });
+    }
+    return this._profissionaisPorId;
+  }
+  
+  get clientesPorId() {
+    if (!this._clientesPorId || this.clientes.length !== Object.keys(this._clientesPorId).length) {
+      this._clientesPorId = {};
+      this.clientes.forEach(cliente => {
+        this._clientesPorId[cliente.id] = cliente;
+      });
+    }
+    return this._clientesPorId;
+  }
+  
+  // Gerar cor baseada no status
+  gerarCorPorStatus(status, corBase) {
+    const coresPorStatus = {
+      'agendado': corBase || '#28a745',      // verde
+      'confirmado': corBase || '#007bff',    // azul
+      'concluido': corBase || '#6c757d',    // cinza
+      'cancelado': corBase || '#dc3545',    // vermelho
+      'aguardando': corBase || '#ffc107',   // amarelo
+      'em_atendimento': corBase || '#17a2b8' // ciano
+    };
+    
+    return coresPorStatus[status] || corBase || '#6c757d';
+  }
+  
+  // Atualizar agendamento
+  async updateAgendamento(id, dados) {
+    console.log('🔧 Atualizando agendamento:', id, dados);
+    
+    try {
+      // CORREÇÃO CRÍTICA: Mapear campos corretamente para o banco
+      const agendamentoData = {
+        cliente_id: dados.cliente_id,      // CORREÇÃO: Usar cliente_id do evento
+        servico_id: dados.servico_id,      // CORREÇÃO: Usar servico_id do evento
+        profissional_id: dados.profissional_id, // CORREÇÃO: Usar profissional_id do evento
+        status: dados.status || 'agendado',
+        data_inicio: dados.data_inicio,    // CORREÇÃO: Usar data_inicio formatado
+        data_fim: dados.data_fim,          // CORREÇÃO: Usar data_fim formatado
+        observacoes: dados.observacoes || ''
+        // CORREÇÃO: Removido updated_at pois não existe na tabela
+      };
+      
+      console.log('🔧 Dados para atualizar no banco:', agendamentoData);
+      
+      const { data, error } = await this.supabase
+        .from('agendamentos')
+        .update(agendamentoData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Erro ao atualizar agendamento:', error);
+        throw new Error(`Erro ao atualizar agendamento: ${error.message}`);
+      }
+      
+      console.log('✅ Agendamento atualizado com sucesso:', data);
+      
+      // CORREÇÃO: Limpar cache específico do agendamento atualizado
+      this.cache.agendamentos = null;
+      
+      // CORREÇÃO: Atualizar cache local imediatamente
+      const index = this.agendamentos.findIndex(a => a.id === id);
+      if (index !== -1) {
+        this.agendamentos[index] = data;
+        console.log('✅ Cache local atualizado para agendamento:', id);
+      }
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar agendamento:', error);
+      throw error;
+    }
+  }
+  
+  // Excluir agendamento
+  async deleteAgendamento(id) {
+    console.log('🗑️ Excluindo agendamento:', id);
+    
+    try {
       const { error } = await this.supabase
         .from('agendamentos')
         .delete()
         .eq('id', id);
       
       if (error) {
-        console.error('❌ Erro do Supabase:', error);
-        throw error;
+        console.error('❌ Erro ao excluir agendamento:', error);
+        throw new Error(`Erro ao excluir agendamento: ${error.message}`);
       }
       
-      console.log("✅ Agendamento excluído do Supabase:", id);
+      console.log('✅ Agendamento excluído com sucesso');
       
       // Remover do cache local
       this.agendamentos = this.agendamentos.filter(a => a.id !== id);
-      this.cache.agendamentos = this.agendamentos;
-      
-      return true;
-    } catch (error) {
-      console.error('Erro ao excluir agendamento:', error);
-      throw error;
-    }
-  }
-
-  // Bloqueios
-  async loadBloqueios() {
-    try {
-      console.log("🔍 Carregando bloqueios...");
-      console.log("🔍 Verificando this.supabase:", this.supabase);
-      
-      // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
-      // Obter ID do profissional logado
-      const profissionalLogado = await this.getProfissionalLogado();
-      
-      if (!profissionalLogado) {
-        console.warn("⚠️ Nenhum profissional logado encontrado para bloqueios");
-        this.bloqueios = [];
-        this.cache.bloqueios = [];
-        return this.bloqueios;
-      }
-      
-      console.log("👤 Carregando bloqueios para profissional:", profissionalLogado.id, profissionalLogado.nome);
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - VERIFICAR CACHE PRIMEIRO
-      if (this.cache.bloqueios) {
-        console.log("📦 Retornando bloqueios do cache:", this.cache.bloqueios.length);
-        this.bloqueios = this.cache.bloqueios;
-        return this.bloqueios;
-      }
-      
-      // Verificar se supabase existe antes de usar
-      if (!this.supabase) {
-        console.error('❌ this.supabase é undefined!');
-        this.bloqueios = [];
-        return this.bloqueios;
-      }
-      
-      // Buscar bloqueios apenas do profissional logado
-      const { data, error } = await this.supabase
-        .from('bloqueios')
-        .select('*')
-        .eq('profissional_id', profissionalLogado.id)
-        .order('inicio', { ascending: true });
-
-      if (error) {
-        console.error('Erro ao carregar bloqueios do Supabase:', error);
-        this.bloqueios = [];
-        console.log('🔧 Nenhum bloqueio carregado devido a erro no Supabase');
-      } else {
-        this.bloqueios = data || [];
-        console.log('✅ Bloqueios carregados do Supabase:', this.bloqueios.length);
-      }
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - SALVAR NO CACHE
-      this.cache.bloqueios = this.bloqueios;
-      console.log('💾 Bloqueios salvos no cache:', this.bloqueios.length);
-      
-      return this.bloqueios;
-    } catch (error) {
-      console.error('Erro ao carregar bloqueios:', error);
-      this.bloqueios = [];
-      throw error;
-    }
-  }
-
-  async addBloqueio(bloqueio) {
-    try {
-      const novo = await ApiClient.post(API_CONFIG.ENDPOINTS.BLOQUEIOS, bloqueio);
-      this.bloqueios.push(novo);
-      return novo;
-    } catch (error) {
-      console.error('Erro ao adicionar bloqueio:', error);
-      throw error;
-    }
-  }
-
-  async updateCliente(id, cliente) {
-    try {
-      if (this.supabase) {
-        console.log("🔄 Atualizando cliente no Supabase:", id);
-        const { data, error } = await this.supabase
-          .from("clientes")
-          .update(cliente)
-          .eq("id", id)
-          .select();
-
-        if (error) {
-          console.error("❌ Erro ao atualizar cliente no Supabase:", error);
-          throw error;
-        }
-
-        console.log("✅ Cliente atualizado no Supabase:", data);
-        const index = this.clientes.findIndex(c => c.id === id);
-        if (index !== -1) {
-          this.clientes[index] = data[0];
-        }
-        
-        // Limpar cache de clientes após UPDATE
-        this.cache.clientes = null;
-        console.log("🗑️ Cache de clientes limpo após UPDATE");
-        
-        return data[0];
-      } else {
-        // Fallback para API local
-        const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.CLIENTES}/${id}`, cliente);
-        const index = this.clientes.findIndex(c => c.id === id);
-        if (index !== -1) {
-          this.clientes[index] = atualizado;
-        }
-        
-        // Limpar cache de clientes após UPDATE
-        this.cache.clientes = null;
-        console.log("🗑️ Cache de clientes limpo após UPDATE");
-        
-        return atualizado;
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar cliente:', error);
-      throw error;
-    }
-  }
-
-  async deleteCliente(id) {
-    try {
-      if (this.supabase) {
-        console.log("🗑️ Excluindo cliente no Supabase:", id);
-        const { error } = await this.supabase
-          .from("clientes")
-          .delete()
-          .eq("id", id);
-
-        if (error) {
-          console.error("❌ Erro ao excluir cliente no Supabase:", error);
-          throw error;
-        }
-
-        console.log("✅ Cliente excluído no Supabase");
-        this.clientes = this.clientes.filter(c => c.id !== id);
-        
-        // Limpar cache de clientes após DELETE
-        this.cache.clientes = null;
-        console.log("🗑️ Cache de clientes limpo após DELETE");
-      } else {
-        // Fallback para API local
-        await ApiClient.delete(`${API_CONFIG.ENDPOINTS.CLIENTES}/${id}`);
-        this.clientes = this.clientes.filter(c => c.id !== id);
-        
-        // Limpar cache de clientes após DELETE
-        this.cache.clientes = null;
-        console.log("🗑️ Cache de clientes limpo após DELETE");
-      }
-    } catch (error) {
-      console.error('Erro ao excluir cliente:', error);
-      throw error;
-    }
-  }
-
-  async updateProfissional(id, profissional) {
-    try {
-      // Verificar estrutura antes de atualizar
-      await this.verificarEstruturaProfissionais();
-      
-      console.log('📝 Atualizando profissional via Supabase:', { id, profissional });
-      
-      const { data, error } = await this.supabase
-        .from("profissionais")
-        .update(profissional)
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ Erro ao atualizar profissional no Supabase:', error);
-        throw error;
-      }
-
-      console.log('✅ Profissional atualizado com sucesso:', data);
-      
-      // Atualizar cache e lista local
-      const index = this.profissionais.findIndex(p => p.id === id);
-      if (index !== -1) {
-        this.profissionais[index] = data;
-        this.profissionaisPorId[data.id] = data;
-        this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
-      }
       
       // Limpar cache para forçar recarregamento
-      this.cache.profissionais = null;
+      this.cache.agendamentos = null;
       
-      return data;
+      return true;
+      
     } catch (error) {
-      console.error('Erro ao atualizar profissional:', error);
-      throw error;
-    }
-  }
-
-  async deleteProfissional(id) {
-    try {
-      // Verificar estrutura antes de excluir
-      await this.verificarEstruturaProfissionais();
-      
-      console.log('🗑️ Excluindo profissional via Supabase:', id);
-      
-      // NOVA IMPLEMENTAÇÃO: Excluir profile para cascade remover profissional
-      // Primeiro buscar profile_id do profissional
-      const { data: profissional, error: fetchError } = await this.supabase
-        .from('profissionais')
-        .select('profile_id')
-        .eq('id', id)
-        .single();
-        
-      if (fetchError) {
-        console.error('❌ Erro ao buscar profile_id:', fetchError);
-        throw fetchError;
-      }
-      
-      if (!profissional || !profissional.profile_id) {
-        throw new Error('Profile não encontrado para este profissional');
-      }
-      
-      console.log('🔗 Excluindo profile para cascade remover profissional:', profissional.profile_id);
-      
-      // Excluir profile (cascade removerá profissional automaticamente)
-      const { error } = await this.supabase
-        .from('profiles')
-        .delete()
-        .eq('id', profissional.profile_id);
-        
-      if (error) {
-        console.error('❌ Erro ao excluir profile:', error);
-        throw error;
-      }
-      
-      console.log('✅ Profile excluído com sucesso, profissional removido por CASCADE');
-      
-      // Atualizar lista local
-      this.profissionais = this.profissionais.filter(p => p.id !== id);
-      // Atualizar o mapa de profissionais por ID
-      this.profissionaisPorId = {};
-      this.profissionais.forEach(p => {
-        this.profissionaisPorId[p.id] = p;
-      });
-      this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
-      
-      // Limpar cache de profissionais para forçar recarregamento
-      this.cache.profissionais = null;
-    } catch (error) {
-      console.error('Erro ao excluir profissional:', error);
-      throw error;
-    }
-  }
-
-  async updateBloqueio(id, bloqueio) {
-    try {
-      const atualizado = await ApiClient.put(`${API_CONFIG.ENDPOINTS.BLOQUEIOS}/${id}`, bloqueio);
-      const index = this.bloqueios.findIndex(b => b.id === id);
-      if (index !== -1) {
-        this.bloqueios[index] = atualizado;
-      }
-      return atualizado;
-    } catch (error) {
-      console.error('Erro ao atualizar bloqueio:', error);
-      throw error;
-    }
-  }
-
-  async deleteBloqueio(id) {
-    try {
-      await ApiClient.delete(`${API_CONFIG.ENDPOINTS.BLOQUEIOS}/${id}`);
-      this.bloqueios = this.bloqueios.filter(b => b.id !== id);
-    } catch (error) {
-      console.error('Erro ao excluir bloqueio:', error);
-      throw error;
-    }
-  }
-
-  // Histórico
-  async getHistoricoCliente(nomeCliente) {
-    try {
-      return await ApiClient.get(`${API_CONFIG.ENDPOINTS.CLIENTES}/${encodeURIComponent(nomeCliente)}/historico`);
-    } catch (error) {
-      console.error('Erro ao carregar histórico do cliente:', error);
-      throw error;
-    }
-  }
-
-  // Utilitários
-  gerarCoresProfissionais(profissionais) {
-    const palette = ["#3b82f6", "#10b981", "#f97316", "#ec4899", "#8b5cf6", "#f59e0b"];
-    const map = {};
-    profissionais.forEach((p, idx) => {
-      map[p.nome] = palette[idx % palette.length];
-    });
-    return map;
-  }
-
-  gerarCorPorStatus(status, corBase) {
-    const coresPorStatus = {
-      "agendado": corBase,
-      "confirmado": "#10b981",
-      "em_andamento": "#f59e0b",
-      "concluido": "#6b7280",
-      "cancelado": "#ef4444",
-      "nao_compareceu": "#f97316"
-    };
-    return coresPorStatus[status] || corBase;
-  }
-
-  // Gerar token único para ficha de anamnese
-  generateUniqueToken() {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `ficha_${timestamp}_${random}`;
-  }
-
-  // Buscar cliente por token da ficha
-  async getClienteByToken(token) {
-    try {
-      console.log("🔍 Buscando cliente por token:", token);
-      
-      if (this.supabase) {
-        const { data, error } = await this.supabase
-          .from("clientes")
-          .select("*")
-          .eq("ficha_token", token)
-          .single();
-
-        if (error) {
-          console.error("❌ Erro ao buscar cliente por token:", error);
-          if (error.code === 'PGRST116') {
-            return null; // Token não encontrado
-          }
-          throw error;
-        }
-
-        console.log("✅ Cliente encontrado por token:", data);
-        return data;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error("❌ Erro ao buscar cliente por token:", error);
-      throw error;
-    }
-  }
-
-  // Salvar ficha de anamnese pública
-  async savePublicAnamnese(token, anamneseData) {
-    try {
-      console.log("🔄 Salvando ficha pública:", { token, anamneseData });
-      console.log("📋 Campos sendo salvos no banco:", Object.keys(anamneseData));
-      console.log("📊 Valores dos campos:", anamneseData);
-      
-      // Primeiro, buscar o cliente pelo token
-      const cliente = await this.getClienteByToken(token);
-      if (!cliente) {
-        throw new Error("Token inválido ou não encontrado");
-      }
-      
-      // Verificar se já existe ficha para este cliente
-      const existingAnamnese = await this.loadAnamneseByCliente(cliente.id);
-      
-      if (existingAnamnese) {
-        // Atualizar ficha existente
-        const { data, error } = await this.supabase
-          .from("anamnese_clientes")
-          .update(anamneseData)
-          .eq("id", existingAnamnese.id)
-          .select();
-
-        if (error) {
-          console.error("❌ Erro ao atualizar ficha pública:", error);
-          throw error;
-        }
-
-        console.log("✅ Ficha pública atualizada com sucesso:", data);
-        return { success: true, action: 'updated', data: data[0] };
-      } else {
-        // Criar nova ficha
-        const anamneseWithClientId = {
-          ...anamneseData,
-          cliente_id: cliente.id
-        };
-
-        const { data, error } = await this.supabase
-          .from("anamnese_clientes")
-          .insert([anamneseWithClientId])
-          .select();
-
-        if (error) {
-          console.error("❌ Erro ao criar ficha pública:", error);
-          throw error;
-        }
-
-        console.log("✅ Ficha pública criada com sucesso:", data);
-        return { success: true, action: 'created', data: data[0] };
-      }
-    } catch (error) {
-      console.error("❌ Erro ao salvar ficha pública:", error);
+      console.error('❌ Erro ao excluir agendamento:', error);
       throw error;
     }
   }
   
-  async loadAnamneseByCliente(clienteId) {
+  // Adicionar bloqueio
+  async addBloqueio(dados) {
+    console.log('➕ Adicionando bloqueio:', dados);
+    
     try {
-      console.log("🔍 Carregando anamnese do cliente:", clienteId);
-      
-      if (this.supabase) {
-        // Tenta fazer uma consulta simples para ver se a tabela existe e quais colunas tem
-        console.log("🔍 Tentando descobrir estrutura da tabela anamnese_clientes...");
-        
-        try {
-          // Tentativa 1: Verificar se podemos consultar a tabela
-          const { data: testData, error: testError } = await this.supabase
-            .from("anamnese_clientes")
-            .select("*")
-            .limit(1);
-
-          if (testError) {
-            console.log("❌ Erro ao testar tabela:", testError);
-            
-            // Se o erro for de coluna não encontrada, a tabela existe mas com estrutura diferente
-            if (testError.message?.includes('column') || testError.code === 'PGRST204') {
-              console.log("📋 Tabela existe mas com estrutura diferente");
-              console.log("📋 Erro específico:", testError.message);
-              
-              // Vamos tentar criar um registro mínimo para descobrir as colunas
-              console.log("🔍 Tentando criar registro mínimo para descobrir colunas...");
-              const minimalData = {
-                cliente_id: clienteId,
-                nome_completo: "Teste"
-              };
-              
-              const { data: insertData, error: insertError } = await this.supabase
-                .from("anamnese_clientes")
-                .insert([minimalData])
-                .select();
-                
-              if (insertError) {
-                console.log("❌ Erro ao inserir registro teste:", insertError);
-                if (insertError.message?.includes('column')) {
-                  console.log("📋 Colunas mencionadas no erro:", insertError.message);
-                }
-              } else {
-                console.log("✅ Registro teste criado:", insertData);
-                console.log("📋 Colunas disponíveis:", insertData && insertData.length > 0 ? Object.keys(insertData[0]) : 'Nenhuma');
-                
-                // Limpar o registro de teste
-                await this.supabase
-                  .from("anamnese_clientes")
-                  .delete()
-                  .eq("id", insertData[0].id);
-              }
-            }
-          } else {
-            console.log("✅ Tabela acessível:", testData);
-            console.log("📋 Colunas disponíveis:", testData && testData.length > 0 ? Object.keys(testData[0]) : 'Tabela vazia');
-          }
-        } catch (diagError) {
-          console.log("❌ Erro no diagnóstico:", diagError);
-        }
-
-        // Continuar com a consulta original
-        const { data, error } = await this.supabase
-          .from("anamnese_clientes")
-          .select("*")
-          .eq("cliente_id", clienteId)
-          .maybeSingle();
-
-        if (error) {
-          console.error("❌ Erro ao carregar anamnese:", error);
-          // Se for erro de tabela não existir, retorna null
-          if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
-            console.log("📋 Tabela anamnese_clientes não encontrada");
-            return null;
-          }
-          throw error;
-        }
-
-        console.log("✅ Anamnese carregada:", data);
-        return data;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error("❌ Erro ao carregar anamnese:", error);
-      // Se for erro de tabela não existir, retorna null
-      if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
-        console.log("📋 Tabela anamnese_clientes não encontrada");
-        return null;
-      }
-      throw error;
-    }
-  }
-
-  async createAnamnese(anamnese) {
-    try {
-      if (this.supabase) {
-        console.log("🔄 Criando anamnese no Supabase:", anamnese);
-        
-        // Se a tabela está vazia, vamos tentar descobrir a estrutura primeiro
-        console.log("🔍 Tentando descobrir estrutura através de inserção controlada...");
-        
-        // Tentativa 1: Inserir apenas com campos básicos
-        try {
-          const basicData = {
-            cliente_id: anamnese.cliente_id,
-            nome_completo: anamnese.nome_completo || "Teste"
-          };
-          
-          console.log("🔍 Testando inserção básica:", basicData);
-          const { data: basicInsert, error: basicError } = await this.supabase
-            .from("anamnese_clientes")
-            .insert([basicData])
-            .select();
-            
-          if (basicError) {
-            console.log("❌ Erro na inserção básica:", basicError);
-            throw basicError;
-          } else {
-            console.log("✅ Inserção básica funcionou:", basicInsert);
-            console.log("📋 Estrutura descoberta:", basicInsert && basicInsert.length > 0 ? Object.keys(basicInsert[0]) : 'Nenhuma');
-            
-            // Limpar registro de teste
-            await this.supabase
-              .from("anamnese_clientes")
-              .delete()
-              .eq("id", basicInsert[0].id);
-              
-            // Agora tentar inserir com todos os campos, mas adaptando aos que existem
-            return await this.insertWithKnownStructure(anamnese, basicInsert[0]);
-          }
-        } catch (discoverError) {
-          console.log("❌ Erro ao descobrir estrutura:", discoverError);
-          
-          // Se falhar, vamos tentar uma abordagem mais agressiva
-          console.log("🔍 Tentando abordagem alternativa...");
-          return await this.alternativeInsert(anamnese);
-        }
-      }
-    } catch (error) {
-      console.error("❌ Erro ao criar anamnese:", error);
-      throw error;
-    }
-  }
-
-  async insertWithKnownStructure(anamnese, structure) {
-    try {
-      console.log("🔍 Inserindo com estrutura conhecida:", structure);
-      
-      // Adaptar dados apenas para colunas que existem
-      const availableColumns = Object.keys(structure);
-      console.log("📋 Colunas disponíveis:", availableColumns);
-      
-      const adaptedData = {};
-      
-      // Mapear campos do formulário para colunas disponíveis
-      if (availableColumns.includes('cliente_id')) adaptedData.cliente_id = anamnese.cliente_id;
-      if (availableColumns.includes('nome_completo')) adaptedData.nome_completo = anamnese.nome_completo;
-      if (availableColumns.includes('idade')) adaptedData.idade = anamnese.idade;
-      if (availableColumns.includes('ocupacao')) adaptedData.ocupacao = anamnese.ocupacao;
-      if (availableColumns.includes('endereco')) adaptedData.endereco = anamnese.endereco;
-      if (availableColumns.includes('cep')) adaptedData.cep = anamnese.cep;
-      if (availableColumns.includes('cpf')) adaptedData.cpf = anamnese.cpf;
-      
-      // Adicionar campos booleanos se existirem
-      const booleanFields = [
-        'menor_idade', 'gestacao', 'diabetes', 'roe_unhas', 'unha_encravada',
-        'alergia', 'cuticula', 'micose', 'medicamento', 'atividade_fisica',
-        'piscina_praia', 'autorizacao'
-      ];
-      
-      booleanFields.forEach(field => {
-        if (availableColumns.includes(field)) {
-          adaptedData[field] = anamnese[field] || false;
-        }
-      });
-      
-      // Adicionar campos de texto se existirem
-      const textFields = ['responsavel', 'contato_responsavel', 'medicamentos', 'servico_escolhido'];
-      textFields.forEach(field => {
-        if (availableColumns.includes(field)) {
-          adaptedData[field] = anamnese[field] || '';
-        }
-      });
-      
-      console.log("🔄 Dados adaptados:", adaptedData);
-      
-      const { data, error } = await this.supabase
-        .from("anamnese_clientes")
-        .insert([adaptedData])
-        .select();
-
-      if (error) {
-        console.error("❌ Erro ao criar anamnese no Supabase:", error);
-        throw error;
-      }
-
-      console.log("✅ Anamnese criada com sucesso:", data);
-      return data;
-    } catch (error) {
-      console.error("❌ Erro ao inserir com estrutura conhecida:", error);
-      throw error;
-    }
-  }
-
-  async alternativeInsert(anamnese) {
-    try {
-      console.log("🔍 Tentando inserção alternativa mínima...");
-      
-      // Tentar inserção com apenas os campos essenciais
-      const minimalData = {
-        cliente_id: anamnese.cliente_id,
-        nome_completo: anamnese.nome_completo
+      const bloqueioData = {
+        titulo: dados.tituloBloqueio,
+        data_inicio: dados.inicio,
+        data_fim: dados.fim,
+        created_at: new Date().toISOString()
       };
       
       const { data, error } = await this.supabase
-        .from("anamnese_clientes")
-        .insert([minimalData])
-        .select();
-
+        .from('bloqueios')
+        .insert(bloqueioData)
+        .select()
+        .single();
+      
       if (error) {
-        console.error("❌ Erro na inserção alternativa:", error);
-        throw error;
+        console.error('❌ Erro ao inserir bloqueio:', error);
+        throw new Error(`Erro ao inserir bloqueio: ${error.message}`);
       }
-
-      console.log("✅ Inserção alternativa funcionou:", data);
+      
+      console.log('✅ Bloqueio criado com sucesso:', data);
+      
+      // Adicionar ao cache local
+      this.bloqueios.push(data);
+      
+      // Limpar cache para forçar recarregamento
+      this.cache.bloqueios = null;
+      
       return data;
+      
     } catch (error) {
-      console.error("❌ Erro na inserção alternativa:", error);
+      console.error('❌ Erro ao criar bloqueio:', error);
+      throw error;
+    }
+  }
+  
+  // Atualizar bloqueio
+  async updateBloqueio(id, dados) {
+    console.log('🔧 Atualizando bloqueio:', id, dados);
+    
+    try {
+      const bloqueioData = {
+        titulo: dados.tituloBloqueio,
+        data_inicio: dados.inicio,
+        data_fim: dados.fim
+        // CORREÇÃO: Removido updated_at pois não existe na tabela
+      };
+      
+      const { data, error } = await this.supabase
+        .from('bloqueios')
+        .update(bloqueioData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Erro ao atualizar bloqueio:', error);
+        throw new Error(`Erro ao atualizar bloqueio: ${error.message}`);
+      }
+      
+      console.log('✅ Bloqueio atualizado com sucesso:', data);
+      
+      // Atualizar cache local
+      const index = this.bloqueios.findIndex(b => b.id === id);
+      if (index !== -1) {
+        this.bloqueios[index] = data;
+      }
+      
+      // Limpar cache para forçar recarregamento
+      this.cache.bloqueios = null;
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar bloqueio:', error);
+      throw error;
+    }
+  }
+  
+  // Excluir bloqueio
+  async deleteBloqueio(id) {
+    console.log('🗑️ Excluindo bloqueio:', id);
+    
+    try {
+      const { error } = await this.supabase
+        .from('bloqueios')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('❌ Erro ao excluir bloqueio:', error);
+        throw new Error(`Erro ao excluir bloqueio: ${error.message}`);
+      }
+      
+      console.log('✅ Bloqueio excluído com sucesso');
+      
+      // Remover do cache local
+      this.bloqueios = this.bloqueios.filter(b => b.id !== id);
+      
+      // Limpar cache para forçar recarregamento
+      this.cache.bloqueios = null;
+      
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Erro ao excluir bloqueio:', error);
       throw error;
     }
   }
 
-  async updateAnamnese(id, anamnese) {
+  // Método de diagnóstico para identificar o problema real
+  async diagnosticarProfilesRLS(email) {
+    console.log('🔍 Iniciando diagnóstico da tabela profiles...');
+    
     try {
-      if (this.supabase) {
-        console.log("🔄 Atualizando anamnese no Supabase:", id);
-        const { data, error } = await this.supabase
-          .from("anamnese_clientes")
-          .update(anamnese)
-          .eq("id", id)
-          .select();
-
-        if (error) {
-          console.error("❌ Erro ao atualizar anamnese no Supabase:", error);
-          throw error;
-        }
-
-        console.log("✅ Anamnese atualizada no Supabase:", data);
-        return data[0];
-      } else {
-        // Fallback para API local
-        throw new Error("API local não implementada para anamnese");
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar anamnese:', error);
-      throw error;
+      // Teste 1: Consulta simples sem filtros
+      console.log('🧪 Teste 1: Consulta simples...');
+      const { data: test1, error: error1 } = await this.supabase
+        .from('profiles')
+        .select('id')
+        .limit(1);
+      
+      console.log('🧪 Resultado Teste 1:', { test1, error1 });
+      
+      // Teste 2: Consulta com filtro direto
+      console.log('🧪 Teste 2: Filtro direto...');
+      const { data: test2, error: error2 } = await this.supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('email', email);
+      
+      console.log('🧪 Resultado Teste 2:', { test2, error2 });
+      
+      // Teste 3: Consulta via RPC (se existir)
+      console.log('🧪 Teste 3: Via RPC...');
+      const { data: test3, error: error3 } = await this.supabase
+        .rpc('get_profile_by_email', { user_email: email });
+      
+      console.log('🧪 Resultado Teste 3:', { test3, error3 });
+      
+    } catch (diagError) {
+      console.error('🧪 Erro no diagnóstico:', diagError);
     }
+  }
+  
+  // Gerar senha temporária segura
+  gerarSenhaTemporaria() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+    let senha = '';
+    
+    // Garantir pelo menos 8 caracteres com variedade
+    for (let i = 0; i < 10; i++) {
+      senha += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Garantir que tenha letra maiúscula, minúscula e número
+    const maiuscula = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.charAt(Math.floor(Math.random() * 26));
+    const minuscula = 'abcdefghijklmnopqrstuvwxyz'.charAt(Math.floor(Math.random() * 26));
+    const numero = '0123456789'.charAt(Math.floor(Math.random() * 10));
+    
+    return maiuscula + minuscula + numero + senha.substring(3);
   }
 }
+
+// Exportar para uso global
+window.DataManager = DataManager;

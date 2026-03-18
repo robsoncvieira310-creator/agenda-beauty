@@ -5,6 +5,7 @@ class ProfissionaisPage {
     this.profissionalEditando = null;
     this.profissionaisPorId = {};
     this.coresProfissionais = {};
+    this.saving = false;
   }
 
   async initializeSpecificPage() {
@@ -28,29 +29,23 @@ class ProfissionaisPage {
     // Botão novo profissional
     const btnNovo = document.getElementById('btnNovoProfissional');
     if (btnNovo) {
-      btnNovo.addEventListener('click', () => this.openNewProfessionalModal());
+      btnNovo.addEventListener('click', () => this.openModal());
       console.log('✅ Botão Novo Profissional configurado');
     } else {
       console.error('❌ Botão Novo Profissional não encontrado!');
     }
 
-    // Botão salvar profissional
-    const btnSalvar = document.getElementById('btnSalvar');
-    if (btnSalvar) {
-      btnSalvar.addEventListener('click', () => this.saveProfessional());
-      console.log('✅ Botão Salvar configurado');
+    // Botão atualizar
+    const btnAtualizar = document.getElementById('btnAtualizar');
+    if (btnAtualizar) {
+      btnAtualizar.addEventListener('click', () => this.refreshProfissionais());
+      console.log('✅ Botão Atualizar configurado');
     } else {
-      console.error('❌ Botão Salvar não encontrado!');
+      console.error('❌ Botão Atualizar não encontrado!');
     }
 
-    // Botão excluir profissional
-    const btnExcluir = document.getElementById('btnExcluir');
-    if (btnExcluir) {
-      btnExcluir.addEventListener('click', () => this.confirmDelete());
-      console.log('✅ Botão Excluir configurado');
-    } else {
-      console.error('❌ Botão Excluir não encontrado!');
-    }
+    // Botão excluir removido temporariamente
+    console.log('✅ Botão Excluir removido para limpeza');
 
     // Botão fechar modal
     const btnFecharModal = document.getElementById('btnFecharModal');
@@ -61,8 +56,122 @@ class ProfissionaisPage {
       console.error('❌ Botão Fechar Modal não encontrado!');
     }
 
+    // CONFIGURAÇÃO DOS BOTÕES DO MODAL
+    this.setupModalButtons();
+    
     // Configurar formatação automática do telefone
     this.setupPhoneFormatting();
+  }
+
+  setupModalButtons() {
+    const btnSalvar = document.getElementById('btnSalvar');
+    const btnFechar = document.getElementById('btnFecharModal');
+    const btnResetSenha = document.getElementById('btnResetSenha');
+    
+    if (btnSalvar) {
+      btnSalvar.addEventListener('click', () => this.saveProfessional());
+    }
+    
+    // ✅ btnExcluir já configurado em setupProfessionalButtons()
+    
+    if (btnFechar) {
+      btnFechar.addEventListener('click', () => this.closeModal());
+    }
+    
+    if (btnResetSenha) {
+      btnResetSenha.addEventListener('click', () => this.handleResetSenhaDireto());
+    }
+    
+    console.log('✅ Botões do modal configurados');
+  }
+  
+  // MÉTODO DE RESET DE SENHA DIRETO - USANDO PADRÃO DO SISTEMA
+  async handleResetSenhaDireto() {
+    if (!this.profissionalEditando) {
+      this.showError('Nenhum profissional selecionado para reset de senha');
+      return;
+    }
+    
+    const btnReset = document.getElementById('btnResetSenha');
+    
+    // PROTEÇÃO CONTRA MÚLTIPLOS CLIQUES
+    if (btnReset.disabled) {
+      console.log('⚠️ Reset de senha já em andamento...');
+      return;
+    }
+    
+    try {
+      // CONFIRMAÇÃO COM CONFIRMDIALOG PADRÃO
+      const confirmacao = await window.ConfirmDialog.confirmDelete({
+        title: 'Redefinir Senha',
+        message: `Deseja redefinir a senha do profissional "${this.profissionalEditando.nome}"?`,
+        itemName: this.profissionalEditando.email,
+        confirmText: 'Redefinir Senha'
+      });
+      
+      if (!confirmacao) {
+        return;
+      }
+      
+      // PROTEGER BOTÃO
+      btnReset.disabled = true;
+      btnReset.innerHTML = '<span class="btn-icon">⏳</span> Gerando senha...';
+      
+      console.log('🔐 Iniciando reset de senha direto para:', this.profissionalEditando.email);
+      
+      const resultado = await window.dataManager.resetarSenhaDireto(
+        this.profissionalEditando.email
+      );
+      
+      console.log('✅ Reset de senha concluído:', resultado);
+      
+      // EXIBIR SENHA COM PADRÃO DO SISTEMA
+      const mensagemCompleta = 
+        `Senha redefinida com sucesso!\n\n` +
+        `📧 Email: ${resultado.email}\n` +
+        `🔑 Nova Senha: ${resultado.senhaTemporaria}\n\n` +
+        `📋 Copie esta senha e envie ao profissional.\n` +
+        `Ele deverá usá-la para fazer login e depois alterá-la.`;
+      
+      await this.showSuccessWithCopy(mensagemCompleta, resultado.senhaTemporaria);
+      
+      setTimeout(() => {
+        this.closeModal();
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ Erro ao resetar senha:', error);
+      this.showError(`Erro ao resetar senha: ${error.message}`);
+    } finally {
+      btnReset.disabled = false;
+      btnReset.innerHTML = '<span class="btn-icon">🔑</span> Resetar Senha';
+    }
+  }
+  
+  // MÉTODO AUXILIAR PARA EXIBIR SENHA COM PADRÃO DO SISTEMA
+  async showSuccessWithCopy(mensagem, senhaParaCopiar) {
+    try {
+      console.log('🔐 Exibindo modal de sucesso com senha...');
+      
+      // Usar ConfirmDialog padrão do sistema
+      const confirmed = await window.ConfirmDialog.confirmDelete({
+        title: 'Senha Redefinida',
+        message: mensagem,  // A mensagem já contém a senha
+        itemName: '',  // Removido para não duplicar
+        confirmText: '📋 Copiar Senha',
+        cancelText: 'Fechar'
+      });
+
+      if (confirmed) {
+        // Copiar senha para o clipboard
+        await navigator.clipboard.writeText(senhaParaCopiar);
+        console.log('✅ Senha copiada para o clipboard');
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao exibir modal de sucesso:', error);
+      this.showError('Erro ao processar senha: ' + error.message);
+    }
   }
 
   setupPhoneFormatting() {
@@ -80,33 +189,13 @@ class ProfissionaisPage {
           e.target.value = `(${digits}`;
         } else if (digits.length <= 6) {
           e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-        } else if (digits.length === 7) {
-          // Início do hífen no formato fixo
-          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
         } else if (digits.length <= 10) {
-          // Formato fixo: (DD) XXXX-XXXX
-          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
-        } else if (digits.length === 11) {
-          // Formato celular: (DD) XXXXX-XXXX
-          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+          e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
         } else {
-          // Limitar a 11 dígitos
           e.target.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
         }
       });
-      console.log('✅ Formatação automática de telefone configurada');
     }
-  }
-
-  async renderPage() {
-    console.log('Renderizando página de profissionais...');
-    await this.loadProfissionais();
-    this.renderProfessionalTable();
-  }
-
-  async updateStatistics() {
-    console.log('Atualizando estatísticas de profissionais...');
-    // Implementar se necessário
   }
 
   async loadProfissionais() {
@@ -116,125 +205,144 @@ class ProfissionaisPage {
       
       // Criar mapa de profissionais por ID
       this.profissionaisPorId = {};
-      this.profissionais.forEach(p => {
-        this.profissionaisPorId[p.id] = p;
+      this.profissionais.forEach(profissional => {
+        this.profissionaisPorId[profissional.id] = profissional; // ✅ CORRIGIDO: nome correto da variável
       });
       
-      // Gerar cores para profissionais
-      this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
-      
       console.log('Profissionais carregados:', this.profissionais.length);
+      console.log('🔍 Dados dos profissionais para renderização:', this.profissionais);
     } catch (error) {
       console.error('Erro ao carregar profissionais:', error);
-      UIUtils.showAlert('Erro ao carregar profissionais', 'error');
+      this.showError('Erro ao carregar profissionais');
     }
   }
 
-  gerarCoresProfissionais(profissionais) {
-    const cores = {};
-    profissionais.forEach(profissional => {
-      cores[profissional.id] = profissional.cor_calendario || '#8b5cf6';
-    });
-    return cores;
+  async refreshProfissionais() {
+    await this.loadProfissionais();
+    this.renderProfessionalTable();
+    this.showSuccess('Profissionais atualizados com sucesso');
   }
 
   renderProfessionalTable() {
-    console.log('🎨 Iniciando renderProfessionalTable...');
-    console.log('📊 Profissionais disponíveis:', this.profissionais);
-    
     const tbody = document.getElementById('tabelaProfissionais');
     if (!tbody) {
-      console.error('❌ Elemento tabelaProfissionais não encontrado!');
+      console.error('❌ Elemento tabelaProfissionais não encontrado');
       return;
     }
 
-    console.log('✅ Elemento tbody encontrado:', tbody);
+    console.log('🔍 Renderizando tabela com', this.profissionais.length, 'profissionais');
     tbody.innerHTML = '';
 
-    if (this.profissionais.length === 0) {
-      console.log('⚠️ Nenhum profissional encontrado');
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="3" class="text-center">Nenhum profissional encontrado</td>
-        </tr>
-      `;
-      return;
-    }
-
-    console.log(`📊 Renderizando ${this.profissionais.length} profissionais...`);
-    this.profissionais.forEach((profissional, index) => {
-      console.log(`👤 Renderizando profissional ${index + 1}:`, profissional);
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${profissional.nome}</td>
-        <td>${profissional.telefone || '-'}</td>
-        <td>
-          <button class="btn btn-sm btn-primary" onclick="window.profissionaisPage.editProfessional(${profissional.id})">
-            <i class="fas fa-edit"></i> Editar
-          </button>
-          <button class="btn btn-sm btn-danger" onclick="window.profissionaisPage.deleteProfessional(${profissional.id})">
-            <i class="fas fa-trash"></i> Excluir
-          </button>
-        </td>
-      `;
-      tbody.appendChild(tr);
+    this.profissionais.forEach(profissional => {
+      const row = this.createProfessionalRow(profissional);
+      tbody.appendChild(row);
     });
     
-    console.log('✅ Renderização concluída!');
+    console.log('✅ Tabela renderizada com sucesso');
   }
 
-  openNewProfessionalModal() {
-    this.profissionalEditando = null;
-    this.clearForm();
-    document.getElementById('modalTitulo').textContent = 'Novo Profissional';
-    document.getElementById('btnExcluir').style.display = 'none';
-    this.showModal('modalProfissional');
+  createProfessionalRow(profissional) {
+    const row = document.createElement('tr');
+    
+    // ✅ CORRIGIDO: Usar dados completos que o DataManager retorna
+    const nome = profissional.nome || `Profissional ${profissional.id}`;
+    const email = profissional.email || 'Email não informado';
+    const telefone = profissional.telefone || 'Não informado';
+    
+    console.log('🔍 Renderizando profissional:', {
+      id: profissional.id,
+      nome: nome,
+      email: email,
+      telefone: telefone
+    });
+    
+    row.innerHTML = `
+      <td>${nome}</td>
+      <td>${email}</td>
+      <td>${telefone}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="window.profissionaisPage.editProfessional('${profissional.id}')">
+          Editar
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="window.profissionaisPage.confirmarExclusao('${profissional.id}')">
+          Excluir
+        </button>
+      </td>
+    `;
+    
+    return row;
   }
 
   editProfessional(id) {
     const profissional = this.profissionaisPorId[id];
-    if (!profissional) return;
+    if (!profissional) {
+      this.showError('Profissional não encontrado');
+      return;
+    }
 
     this.profissionalEditando = profissional;
-    this.fillForm(profissional);
-    document.getElementById('modalTitulo').textContent = 'Editar Profissional';
-    document.getElementById('btnExcluir').style.display = 'inline-block';
-    this.showModal('modalProfissional');
+    this.populateModal(profissional);
+    this.openModal();
   }
 
-  fillForm(profissional) {
+  populateModal(profissional) {
     document.getElementById('nomeProfissional').value = profissional.nome || '';
-    document.getElementById('telefoneProfissional').value = profissional.telefone || '';
     document.getElementById('emailProfissional').value = profissional.email || '';
+    document.getElementById('telefoneProfissional').value = profissional.telefone || '';
     
-    // Verificar se usuário é admin para permitir edição do nome
-    const userProfile = window.authManager?.currentUserProfile;
-    const isAdmin = userProfile?.role === 'admin';
+    // Mostrar apenas botão de resetar senha
+    document.getElementById('btnResetSenha').style.display = 'inline-block';
+  }
+
+  async confirmarExclusao(profissionalId) {
+    console.log('🗑️ confirmarExclusao() chamado para ID:', profissionalId);
     
-    if (!isAdmin) {
-      // Desabilitar edição do nome apenas para não-admins
-      document.getElementById('nomeProfissional').disabled = true;
-    } else {
-      // Permitir edição do nome para admin
-      document.getElementById('nomeProfissional').disabled = false;
-      console.log('👑 Admin detectado - edição de nome permitida');
+    // Buscar profissional
+    const profissional = this.profissionaisPorId[profissionalId];
+    if (!profissional) {
+      this.showError('Profissional não encontrado');
+      return;
+    }
+    
+    console.log('📋 Profissional encontrado:', profissional);
+    
+    try {
+      console.log('🔄 Abrindo modal de confirmação...');
+      
+      // Usar ConfirmDialog padrão do sistema (igual ao clientes)
+      const confirmed = await window.ConfirmDialog.confirmDelete({
+        title: 'Excluir Profissional',
+        message: `Tem certeza que deseja excluir este profissional?`,
+        itemName: profissional.nome,
+        confirmText: 'Excluir Profissional'
+      });
+
+      console.log('📝 Resultado da confirmação:', confirmed);
+      
+      if (!confirmed) {
+        console.log('❌ Usuário cancelou a exclusão');
+        return;
+      }
+      
+      console.log('🔄 Iniciando processo de exclusão...');
+      this.showLoading('Excluindo profissional...');
+      
+      // Excluir em cascata: profissionais → profiles → auth.users
+      const resultado = await window.dataManager.deleteProfissional(profissional.id);
+      console.log('✅ Resultado da exclusão:', resultado);
+      
+      this.showSuccess(resultado.message || 'Profissional excluído com sucesso');
+      await this.refreshProfissionais();
+      
+    } catch (error) {
+      console.error('❌ Erro ao excluir profissional:', error);
+      this.showError('Erro ao excluir profissional: ' + error.message);
+    } finally {
+      this.hideLoading();
     }
   }
 
-  clearForm() {
-    // Limpar campos individualmente
-    document.getElementById('nomeProfissional').value = '';
-    document.getElementById('telefoneProfissional').value = '';
-    document.getElementById('emailProfissional').value = '';
-    document.getElementById('senhaTemporaria').value = ''; // ✅ LIMPAR SENHA TEMPORÁRIA
-    document.getElementById('nomeProfissional').disabled = false;
-    console.log('✅ Formulário limpo');
-  }
-
   async saveProfessional() {
-    console.log('saveProfessional chamado');
-    
-    // PROTEÇÃO CONTRA EXECUÇÃO DUPLICADA
     if (this.saving) {
       console.log('⚠️ saveProfessional já está em execução, ignorando chamada duplicada');
       return;
@@ -243,122 +351,71 @@ class ProfissionaisPage {
     this.saving = true;
     
     try {
-        // Coletar dados
-        const nome = document.getElementById('nomeProfissional').value.trim();
-        const telefone = document.getElementById('telefoneProfissional').value.trim();
-        const email = document.getElementById('emailProfissional').value.trim();
-        const senha_temporaria = document.getElementById('senhaTemporaria').value.trim();
+      // Coletar dados do formulário
+      const nome = document.getElementById('nomeProfissional').value.trim();
+      const telefone = document.getElementById('telefoneProfissional').value.trim();
+      const email = document.getElementById('emailProfissional').value.trim();
+      
+      // Validações
+      if (!nome) {
+        this.showError('Nome é obrigatório');
+        return;
+      }
+      
+      if (!email) {
+        this.showError('Email é obrigatório');
+        return;
+      }
+      
+      if (!this.isValidEmail(email)) {
+        this.showError('Email inválido');
+        return;
+      }
+      
+      const dadosParaSalvar = {
+        nome: nome,
+        telefone: telefone,
+        email: email
+      };
 
-        console.log('Dados coletados:', { nome, telefone, email, senha_temporaria });
-
-        // Validacao
-        const errors = [];
-        
-        if (!nome) {
-            errors.push('O nome do profissional e obrigatorio');
-        } else if (nome.length < 3) {
-            errors.push('O nome deve ter pelo menos 3 caracteres');
+      if (this.profissionalEditando) {
+        // Editar profissional existente
+        await window.dataManager.updateProfissional(this.profissionalEditando.id, dadosParaSalvar);
+        this.showSuccess('Profissional atualizado com sucesso');
+      } else {
+        // Criar novo profissional
+        if (this.profissionais.some(p => p.nome === nome)) {
+          this.showError('Já existe um profissional com este nome');
+          return;
         }
         
-        if (!telefone) {
-            errors.push('WhatsApp do profissional e obrigatorio');
+        if (this.profissionais.some(p => p.email === email)) {
+          this.showError('Este email já está cadastrado para outro profissional');
+          return;
         }
         
-        if (telefone && !this.isValidPhone(telefone)) {
-            errors.push('WhatsApp invalido. Use o formato (DDD) 00000-0000');
-        }
-        
-        if (!email) {
-            errors.push('Email do profissional e obrigatorio');
-        } else if (!this.isValidEmail(email)) {
-            errors.push('Email invalido');
-        }
-        
-        if (!senha_temporaria) {
-            errors.push('Senha temporaria e obrigatoria');
-        } else if (senha_temporaria.length < 6) {
-            errors.push('A senha deve ter pelo menos 6 caracteres');
-        }
-        
-        if (errors.length > 0) {
-            this.showError(errors[0]);
-            return;
-        }
-
-        const btnSalvar = document.getElementById('btnSalvar');
-        UIUtils.showLoading(btnSalvar);
-
-        // ✅ DADOS COM SENHA TEMPORARIA
-        const dadosParaSalvar = {
-            nome: nome,
-            telefone: telefone,
-            email: email,
-            senha_temporaria: senha_temporaria
-        };
-
-        console.log('Salvando profissional:', dadosParaSalvar);
-
-        if (this.profissionalEditando) {
-            await window.dataManager.updateProfissional(this.profissionalEditando.id, dadosParaSalvar);
-            this.showSuccess('Profissional atualizado com sucesso');
-        } else {
-            if (this.profissionais.some(p => p.nome === nome)) {
-                this.showError('Ja existe um profissional com este nome');
-                return;
-            }
-            
-            if (this.profissionais.some(p => p.email === email)) {
-                this.showError('Este email já está cadastrado para outro profissional');
-                return;
-            }
-            
-            await window.dataManager.addProfissional(dadosParaSalvar);
-            this.showSuccess('Profissional criado com sucesso');
-        }
-        
-        await this.renderPage();
-        this.closeModal();
-        console.log('saveProfessional concluido com sucesso');
-        
+        await window.dataManager.addProfissional(dadosParaSalvar);
+        this.showSuccess('Profissional criado com sucesso');
+      }
+      
+      await this.refreshProfissionais();
+      this.closeModal();
+      
     } catch (error) {
-        console.error('Erro no saveProfessional():', error);
-        this.showError('Erro ao salvar profissional: ' + error.message);
+      console.error('Erro ao salvar profissional:', error);
+      this.showError('Erro ao salvar profissional: ' + error.message);
     } finally {
-        this.saving = false; // Resetar flag de proteção
-        const btnSalvar = document.getElementById('btnSalvar');
-        UIUtils.hideLoading(btnSalvar);
+      this.saving = false;
     }
   }
 
-  isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  isValidPhone(phone) {
-    // Aceita ambos os formatos: (DD) XXXX-XXXX (14 chars) ou (DDD) XXXXX-XXXX (15 chars)
-    const phoneRegex = /^\(\d{2}\) \d{4,5}-\d{4}$/;
-    const isValid = phoneRegex.test(phone);
-    
-    // Verificar se tem exatamente 14 ou 15 caracteres (incluindo espaço)
-    const hasCorrectLength = phone.length === 14 || phone.length === 15;
-    
-    return isValid && hasCorrectLength;
-  }
-
-  showError(message) {
-    UIUtils.showAlert(message, 'error');
-  }
-
-  showSuccess(message) {
-    UIUtils.showAlert(message, 'success');
-  }
-
-  showModal(modalId) {
-    const modal = document.getElementById(modalId);
+  openModal() {
+    const modal = document.getElementById('modalProfissional');
     if (modal) {
-      modal.style.display = 'flex';
-      document.body.style.overflow = 'hidden';
+      modal.style.display = 'block';
+      console.log('✅ Modal aberto');
+    } else {
+      console.error('❌ Modal não encontrado');
     }
   }
 
@@ -366,57 +423,66 @@ class ProfissionaisPage {
     const modal = document.getElementById('modalProfissional');
     if (modal) {
       modal.style.display = 'none';
-      document.body.style.overflow = 'auto';
+      console.log('✅ Modal fechado');
+    }
+    
+    // Limpar formulário
+    document.getElementById('nomeProfissional').value = '';
+    document.getElementById('emailProfissional').value = '';
+    document.getElementById('telefoneProfissional').value = '';
+    
+    // Esconder botão de resetar senha
+    document.getElementById('btnResetSenha').style.display = 'none';
+    
+    // Limpar profissional editando
+    this.profissionalEditando = null;
+  }
+
+  isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  showError(message) {
+    alert(message); // Substituir por seu sistema de alertas
+  }
+
+  showSuccess(message) {
+    alert(message); // Substituir por seu sistema de alertas
+  }
+
+  showLoading(message = 'Carregando...') {
+    // Criar ou mostrar loading overlay
+    let loading = document.getElementById('loadingOverlay');
+    if (!loading) {
+      loading = document.createElement('div');
+      loading.id = 'loadingOverlay';
+      loading.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        color: white;
+        font-size: 18px;
+      `;
+      loading.innerHTML = `<div>${message}</div>`;
+      document.body.appendChild(loading);
+    } else {
+      loading.querySelector('div').textContent = message;
+      loading.style.display = 'flex';
     }
   }
 
-  async deleteProfessional(id) {
-    const profissional = this.profissionaisPorId[id];
-    if (!profissional) return;
-
-    const confirmed = await window.ConfirmDialog.confirmDelete({
-      title: 'Excluir Profissional',
-      message: 'Tem certeza que deseja excluir este profissional?',
-      itemName: profissional.nome,
-      confirmText: 'Excluir Profissional'
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await window.dataManager.deleteProfissional(id);
-      this.showSuccess('Profissional excluído com sucesso');
-      
-      // Forçar recarregamento dos dados do banco e renderizar novamente
-      await this.loadProfissionais();
-      await this.renderProfessionalTable();
-    } catch (error) {
-      console.error('Erro ao excluir profissional:', error);
-      this.showError('Erro ao excluir profissional');
-    }
-  }
-
-  async loadProfissionais() {
-    try {
-      console.log('Carregando profissionais...');
-      // Forçar recarregamento para obter dados atualizados
-      this.profissionais = await window.dataManager.getProfissionais(true);
-      
-      // Criar mapa de profissionais por ID
-      this.profissionaisPorId = {};
-      this.profissionais.forEach(p => {
-        this.profissionaisPorId[p.id] = p;
-      });
-      
-      // Gerar cores para profissionais
-      this.coresProfissionais = this.gerarCoresProfissionais(this.profissionais);
-      
-      console.log('Profissionais carregados:', this.profissionais.length);
-    } catch (error) {
-      console.error('Erro ao carregar profissionais:', error);
-      UIUtils.showAlert('Erro ao carregar profissionais', 'error');
+  hideLoading() {
+    const loading = document.getElementById('loadingOverlay');
+    if (loading) {
+      loading.style.display = 'none';
     }
   }
 }

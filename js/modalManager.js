@@ -311,7 +311,6 @@ class ModalManager {
     if (tipoRegistro !== 'agendamento') return;
 
     const servicoSelect = document.getElementById('servico');
-    // Usar campos com compatibilidade para nova estrutura
     const duracao = parseInt(servicoSelect.selectedOptions[0]?.dataset.duracao_min || servicoSelect.selectedOptions[0]?.dataset.duracao_minutos || "0", 10);
     
     if (!duracao) return;
@@ -621,7 +620,14 @@ class ModalManager {
   async excluirRegistro() {
     if (!this.registroAtual) return;
     
-    if (!confirm('Deseja realmente excluir este registro?')) {
+    const confirmacao = await window.ConfirmDialog.confirmDelete({
+      title: 'Excluir Registro',
+      message: 'Deseja realmente excluir este registro?',
+      itemName: this.registroAtual.titulo || 'Registro selecionado',
+      confirmText: 'Excluir'
+    });
+
+    if (!confirmacao) {
       return;
     }
 

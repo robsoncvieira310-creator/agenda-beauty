@@ -61,25 +61,47 @@ class CalendarManager {
       }
     }
     
-    // Se não tiver cor personalizada, usar o mapa de cores padrão
-    if (!nomeServico) return '#78909c'; // Cinza padrão
+    // Cores padrão por categoria de serviço
+    const coresPadrao = {
+      'corte': '#4a90e2',
+      'manicure': '#e24a90',
+      'pedicure': '#90e24a',
+      'depilacao': '#e2904a',
+      'tratamento': '#4ae290',
+      'default': '#78909c'
+    };
     
-    const servicoLower = nomeServico.toLowerCase();
-    
-    // Buscar correspondência exata
-    if (this.coresServicos[servicoLower]) {
-      return this.coresServicos[servicoLower];
-    }
-    
-    // Buscar por palavras-chave
-    for (const [chave, cor] of Object.entries(this.coresServicos)) {
-      if (servicoLower.includes(chave)) {
+    // Verificar se o nome contém alguma categoria
+    const nomeLower = (nomeServico || '').toLowerCase();
+    for (const [categoria, cor] of Object.entries(coresPadrao)) {
+      if (nomeLower.includes(categoria) && categoria !== 'default') {
         return cor;
       }
     }
     
-    // Se não encontrar, retorna cor padrão
-    return '#78909c';
+    return coresPadrao.default;
+  }
+  
+  // Métodos auxiliares para obter nomes por ID
+  getNomeCliente(clienteId) {
+    if (!clienteId) return 'Cliente não informado';
+    
+    const cliente = dataManager.clientesPorId[clienteId];
+    return cliente ? cliente.nome : `Cliente ${clienteId}`;
+  }
+  
+  getNomeServico(servicoId) {
+    if (!servicoId) return 'Serviço não informado';
+    
+    const servico = dataManager.servicosPorId[servicoId];
+    return servico ? servico.nome : `Serviço ${servicoId}`;
+  }
+  
+  getNomeProfissional(profissionalId) {
+    if (!profissionalId) return 'Profissional não informado';
+    
+    const profissional = dataManager.profissionaisPorId[profissionalId];
+    return profissional ? profissional.nome : `Profissional ${profissionalId}`;
   }
 
   async initialize() {
@@ -87,6 +109,11 @@ class CalendarManager {
       await this.loadInitialData();
       this.createCalendar();
       this.setupEventHandlers();
+      
+      // CORREÇÃO CRÍTICA: Adicionar eventos após criar o calendário
+      console.log("🔍 DEBUG - Calendário criado, adicionando eventos...");
+      this.adicionarEventosAoCalendario();
+      
     } catch (error) {
       console.error('Erro ao inicializar calendário:', error);
       UIUtils.showAlert('Erro ao carregar calendário', 'error');
@@ -112,7 +139,58 @@ class CalendarManager {
     ]);
 
     console.log("✅ Todos os dados carregados:", { clientes, servicos, profissionais, agendamentos, bloqueios });
+    
+    // DEBUG: Verificar estrutura dos agendamentos
+    console.log("🔍 DEBUG - Estrutura dos agendamentos:", agendamentos);
+    if (agendamentos && agendamentos.length > 0) {
+      console.log("🔍 DEBUG - Primeiro agendamento:", agendamentos[0]);
+      console.log("🔍 DEBUG - Campos do agendamento:", Object.keys(agendamentos[0]));
+    }
+    
     this.eventos = this.processarEventos(agendamentos, bloqueios);
+    
+    // DEBUG: Verificar eventos processados
+    console.log("🔍 DEBUG - Eventos processados:", this.eventos);
+    console.log("🔍 DEBUG - Quantidade de eventos:", this.eventos.length);
+    
+    // CORREÇÃO: Adicionar eventos ao calendário após processar
+    // NÃO chamar aqui - será chamado no initialize() após createCalendar()
+  }
+  
+  // CORREÇÃO: Método separado para adicionar eventos
+  adicionarEventosAoCalendario() {
+    try {
+      console.log("🔍 DEBUG - Adicionando eventos ao calendário...");
+      
+      // Remover eventos existentes
+      this.calendar.removeAllEvents();
+      
+      // Adicionar novos eventos
+      let eventosAdicionados = 0;
+      this.eventos.forEach(evento => {
+        console.log("🔍 DEBUG - Adicionando evento:", evento);
+        
+        const eventoCompleto = {
+          ...evento,
+          editable: true,
+          startEditable: true,
+          durationEditable: true,
+          extendedProps: evento.extendedProps || {}
+        };
+        
+        this.calendar.addEvent(eventoCompleto);
+        eventosAdicionados++;
+      });
+      
+      console.log("🔍 DEBUG - Eventos adicionados:", eventosAdicionados);
+      console.log("🔍 DEBUG - Eventos no calendário:", this.calendar.getEvents());
+      
+      // Forçar renderização
+      this.calendar.render();
+      
+    } catch (error) {
+      console.error('❌ Erro ao adicionar eventos:', error);
+    }
   }
 
   createCalendar() {
@@ -164,9 +242,7 @@ class CalendarManager {
       noEventsText: 'Nenhum evento para mostrar',
       
       // Configurações de tooltip e mensagens
-      eventLimitText: function(num) {
-        return '+' + num + ' mais'
-      },
+      // eventLimitText removido - obsoleto no FullCalendar v6
       
       // Títulos das views
       views: {
@@ -195,7 +271,8 @@ class CalendarManager {
       selectable: true,
       droppable: true,
 
-      events: this.eventos,
+      // CORREÇÃO: Não definir eventos aqui - serão adicionados via addEvent()
+      events: [],
 
       selectAllow: (selectInfo) => {
         return this.verificarDisponibilidade(selectInfo);
@@ -234,6 +311,15 @@ class CalendarManager {
 
     this.calendar.render();
     
+    // CORREÇÃO: Verificar e habilitar drag & drop
+    console.log("🔍 DEBUG - Verificando suporte a drag & drop");
+    console.log("🔍 DEBUG - Configurações do calendário:", {
+      editable: this.calendar.getOption('editable'),
+      eventStartEditable: this.calendar.getOption('eventStartEditable'),
+      eventDurationEditable: this.calendar.getOption('eventDurationEditable'),
+      droppable: this.calendar.getOption('droppable')
+    });
+    
     // Inicializar melhorias após renderizar
     if (window.CalendarEnhancements) {
       this.enhancements = new window.CalendarEnhancements(this);
@@ -241,26 +327,44 @@ class CalendarManager {
   }
 
   processarEventos(agendamentos, bloqueios) {
+    console.log("🔍 DEBUG - processarEventos iniciado");
+    console.log("🔍 DEBUG - agendamentos recebidos:", agendamentos);
+    console.log("🔍 DEBUG - bloqueios recebidos:", bloqueios);
+    
     const eventosAg = agendamentos.map(a => {
+      console.log("🔍 DEBUG - Processando agendamento:", a);
+      
+      // CORREÇÃO: Mapear campos corretos do banco
+      const cliente = this.getNomeCliente(a.cliente_id);
+      const servico = this.getNomeServico(a.servico_id);
+      const profissional = this.getNomeProfissional(a.profissional_id);
+      
+      console.log("🔍 DEBUG - Nomes resolvidos:", { cliente, servico, profissional });
+      
       // NOVA LÓGICA: Cor baseada no serviço (personalizada ou padrão)
-      const corServico = this.getCorPorServico(a.servico, a.servico_id);
+      const corServico = this.getCorPorServico(servico, a.servico_id);
       const corStatus = dataManager.gerarCorPorStatus(a.status, corServico);
       
-      return {
+      console.log("🔍 DEBUG - Cores geradas:", { corServico, corStatus });
+      
+      const evento = {
         id: String(a.id),
-        title: `${a.cliente} - ${a.servico}`,
-        start: a.inicio,
-        end: a.fim,
+        title: `${cliente} - ${servico}`,
+        start: a.data_inicio,  // CORREÇÃO: usar data_inicio
+        end: a.data_fim,       // CORREÇÃO: usar data_fim
+        // CORREÇÃO: Propriedades explícitas para drag & drop
         editable: true,
+        startEditable: true,
+        durationEditable: true,
         extendedProps: {
           tipo: "agendamento",
           realId: a.id,
           cliente_id: a.cliente_id,
           servico_id: a.servico_id,
           profissional_id: a.profissional_id,
-          cliente: a.cliente,
-          servico: a.servico,
-          profissional: a.profissional,
+          cliente: cliente,
+          servico: servico,
+          profissional: profissional,
           status: a.status || "agendado",
           observacoes: a.observacoes || ""
         },
@@ -272,7 +376,12 @@ class CalendarManager {
         // Formatação do título
         display: 'block'
       };
+      
+      console.log("🔍 DEBUG - Evento criado:", evento);
+      return evento;
     });
+
+    console.log("🔍 DEBUG - Eventos de agendamento criados:", eventosAg);
 
     const eventosBlq = [];
     
@@ -461,7 +570,7 @@ class CalendarManager {
         observacoes: eventoData.observacoes || null
       };
 
-      console.log('📝 Atualizando agendamento:', dadosAtualizacao);
+      console.log('📝 Dados formatados para atualização:', dadosAtualizacao);
       console.log('🔍 Horários do evento:', {
         start: ev.start,
         end: ev.end,
@@ -581,15 +690,12 @@ class CalendarManager {
 
   async refreshEvents() {
     try {
+      console.log("🔍 DEBUG - refreshEvents iniciado");
       await this.loadInitialData();
       
-      // Remover eventos existentes
-      this.calendar.removeAllEvents();
+      // CORREÇÃO: Usar o novo método para adicionar eventos
+      this.adicionarEventosAoCalendario();
       
-      // Adicionar novos eventos
-      this.eventos.forEach(evento => {
-        this.calendar.addEvent(evento);
-      });
     } catch (error) {
       console.error('Erro ao atualizar eventos:', error);
       UIUtils.showAlert('Erro ao atualizar calendário', 'error');

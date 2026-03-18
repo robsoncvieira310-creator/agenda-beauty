@@ -816,7 +816,27 @@ HISTÓRICO DO CLIENTE
 }
 
 /* =====================================================
-NOVA INTERFACE MODAL
+MODAL ESPECÍFICO PARA PROFISSIONAIS - EVITAR CONFLITOS
+===================================================== */
+
+#modalProfissional .modal-content {
+  background: white !important;
+  border-radius: 20px !important;
+  padding: 30px !important;
+  width: 420px !important;
+  max-width: 90vw !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+  z-index: 10000 !important;
+  border: 1px solid rgba(212, 175, 55, 0.3) !important;
+  position: relative !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+}
+
+/* =====================================================
+MODAL GERAL - MANTER PARA OUTRAS PÁGINAS
 ===================================================== */
 
 .modal-header{
