@@ -922,10 +922,65 @@ class DataManager {
       // Atualizar senha no Supabase Auth via Edge Function segura
       console.log('🔐 Atualizando senha via Edge Function...');
       
-      const { data: resetData, error: resetError } = await this.supabase.functions.invoke('reset-password', {
-        body: { userId, novaSenha }
-      });
+      // � 1. OBTER SESSÃO ATUALIZADA ANTES DO FETCH
+      console.log('🔐 Obtendo sessão atualizada para reset de senha...');
+      const { data: sessionData, error: sessionError } = await this.supabase.auth.getSession();
       
+      if (sessionError || !sessionData.session) {
+        console.error('❌ Sessão inválida ou expirada:', sessionError);
+        throw new Error('Sessão inválida ou expirada. Por favor, faça login novamente.');
+      }
+      
+      const session = sessionData.session;
+      const accessToken = session.access_token;
+      
+      console.log('🔍 Session disponível:', !!session);
+      console.log('🔍 Session user:', session.user.id);
+      console.log('🔍 UserId para reset:', userId);
+      console.log('🔍 Nova senha gerada:', novaSenha ? '***' : 'NÃO GERADA');
+      console.log('🔑 Token (início):', accessToken.substring(0, 20) + '...');
+      
+      // 🔍 DEBUG: Tentativa com fetch direto para melhor diagnóstico
+      try {
+        const edgeFunctionUrl = `${this.supabase.supabaseUrl}/functions/v1/reset-password`;
+        console.log('🔍 Edge Function URL:', edgeFunctionUrl);
+        
+        const response = await fetch(edgeFunctionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId,
+            novaSenha
+          })
+        });
+
+        console.log('🔍 RESPONSE STATUS:', response.status);
+        console.log('🔍 RESPONSE HEADERS:', Object.fromEntries(response.headers.entries()));
+        
+        const data = await response.json();
+        console.log('🔍 RESPONSE DATA:', data);
+
+        if (!response.ok) {
+          console.error('❌ ERRO NA EDGE FUNCTION:', {
+            status: response.status,
+            statusText: response.statusText,
+            data
+          });
+          throw new Error(data.error || `Erro ${response.status}: ${response.statusText}`);
+        }
+
+        console.log('✅ Edge Function executada com sucesso');
+        const resetData = data;
+        const resetError = null;
+        
+      } catch (fetchError) {
+        console.error('❌ ERRO NO FETCH:', fetchError);
+        throw new Error('Erro ao comunicar com Edge Function: ' + fetchError.message);
+      }
+      
+      // Mantendo compatibilidade com código existente
       if (resetError) {
         throw new Error('Erro ao atualizar senha: ' + resetError.message);
       }
