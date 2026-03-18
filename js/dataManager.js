@@ -922,22 +922,8 @@ class DataManager {
       // Atualizar senha no Supabase Auth via Edge Function segura
       console.log('🔐 Atualizando senha via Edge Function...');
       
-      // 🔧 1. OBTER TOKEN VÁLIDO COM refreshSession
-      console.log('🔐 Obtendo token válido com refreshSession...');
-      const { data: { session }, error } = await this.supabase.auth.refreshSession()
-      
-      if (error || !session) {
-        console.error('❌ Erro ao atualizar sessão:', error);
-        throw new Error('Erro ao atualizar sessão. Por favor, faça login novamente.');
-      }
-      
-      const accessToken = session.access_token;
-      
-      console.log('🔍 Session disponível:', !!session);
-      console.log('🔍 Session user:', session.user.id);
-      console.log('🔍 UserId para reset:', userId);
-      console.log('🔍 Nova senha gerada:', novaSenha ? '***' : 'NÃO GERADA');
-      console.log('🔑 Token (início):', accessToken.substring(0, 20) + '...');
+      // 🔧 1. CHAMADA ADMIN SEM DEPENDÊNCIA DE JWT
+      console.log('🔐 Chamando Edge Function com API Key...');
       
       // 🔍 DEBUG: Tentativa com fetch direto para melhor diagnóstico
       try {
@@ -948,11 +934,11 @@ class DataManager {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
+            'x-api-key': 'agenda-beauty-internal-key-2024'  // 🔒 API Key interna
           },
           body: JSON.stringify({
-            userId,
-            novaSenha
+            user_id: userId,
+            email: profissional.email  // 📧 Enviar email para validação
           })
         });
 

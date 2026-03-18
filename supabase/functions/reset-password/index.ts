@@ -6,14 +6,31 @@ export const config = {
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// 🔒 SEGURANÇA POR API KEY INTERNA
+const API_KEY = Deno.env.get('INTERNAL_API_KEY') || 'agenda-beauty-internal-key-2024'
+
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
 serve(async (req) => {
   console.log('🔥 EDGE FUNCTION EXECUTANDO')
+
+  // 🔒 VALIDAR API KEY INTERNA (ANTES DE QUALQUER LÓGICA)
+  const requestApiKey = req.headers.get('x-api-key')
+  
+  if (!requestApiKey || requestApiKey !== API_KEY) {
+    console.log('❌ API Key inválida ou ausente:', requestApiKey)
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+  
+  console.log('✅ API Key validada com sucesso')
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
