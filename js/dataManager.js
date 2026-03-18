@@ -26,22 +26,20 @@ class DataManager {
 
   async loadClientes() {
     try {
-      console.log('🔍 Carregando clientes...');
-      
       const { data, error } = await this.supabase
-        .from('clientes')
-        .select('*')
-        .order('nome');
+        .from("clientes")
+        .select("*")
+        .order("created_at", { ascending: true });
 
       if (error) {
-        console.error('❌ Erro ao carregar clientes do Supabase:', error);
+        console.error('Erro ao carregar clientes do Supabase:', error);
         this.clientes = [];
       } else {
         this.clientes = data || [];
-        console.log('✅ Clientes carregados do Supabase:', this.clientes.length);
-        this.cache.clientes = this.clientes;
-        console.log('💾 Clientes salvos no cache:', this.clientes.length);
       }
+      
+      // Salvar no cache
+      this.cache.clientes = this.clientes;
       
       return this.clientes;
     } catch (error) {
@@ -53,8 +51,6 @@ class DataManager {
 
   async loadServicos() {
     try {
-      console.log('Carregando serviços...');
-      
       const { data, error } = await this.supabase
         .from('servicos')
         .select('*')
@@ -65,16 +61,10 @@ class DataManager {
         this.servicos = [];
       } else {
         this.servicos = data || [];
-        console.log('Serviços carregados do Supabase:', this.servicos.length);
-        this.servicos = this.servicos.map(servico => ({
-          ...servico,
-          duracao_min: parseInt(servico.duracao_min) || 30,
-          valor: parseFloat(servico.valor) || 0
-        }));
-        console.log('Serviços mapeados para formato compatível:', this.servicos.length);
-        this.cache.servicos = this.servicos;
-        console.log('Serviços salvos no cache:', this.servicos.length);
       }
+      
+      // Salvar no cache
+      this.cache.servicos = this.servicos;
       
       return this.servicos;
     } catch (error) {
@@ -86,25 +76,19 @@ class DataManager {
 
   async loadBloqueios() {
     try {
-      console.log('🔍 Carregando bloqueios...');
-      console.log('🔍 Verificando this.supabase:', this.supabase);
-      
-      // ✅ CORRIGIDO: Usar colunas corretas da tabela bloqueios
       const { data, error } = await this.supabase
         .from('bloqueios')
         .select('*')
         .order('inicio', { ascending: true });
 
       if (error) {
-        console.error('❌ Erro ao carregar bloqueios:', error);
+        console.error('Erro ao carregar bloqueios:', error);
         this.bloqueios = [];
       } else {
         this.bloqueios = data || [];
-        console.log('✅ Bloqueios carregados:', this.bloqueios.length);
-        // ✅ CORRIGIDO: Mapear para formato compatível
+        // Mapear para formato compatível
         this.bloqueios = this.bloqueios.map(bloqueio => ({
           ...bloqueio,
-          // Mapear nomes das colunas para compatibilidade
           data_inicio: bloqueio.inicio,
           data_fim: bloqueio.fim,
           titulo: bloqueio.titulo || 'Bloqueio',
@@ -123,33 +107,26 @@ class DataManager {
 
   async loadProfissionais() {
     try {
-      console.log('🔍 Carregando profissionais... (cache)');
-      
-      // Verificar cache primeiro
-      if (this.cache.profissionais !== null) {
-        console.log('📦 Retornando profissionais do cache:', this.cache.profissionais.length);
+      if (this.cache.profissionais && this.cache.profissionais.length > 0) {
         this.profissionais = this.cache.profissionais;
         return this.profissionais;
       }
-      
-      console.log('⚠️ Cache vazio, carregando do Supabase com JOIN...');
-      
-      // ✅ CORRIGIDO: Usar nome específico do relacionamento (sugerido pelo erro)
+
       const { data, error } = await this.supabase
         .from('profissionais')
         .select(`
-          id,
-          telefone,
-          created_at,
-          profile_id,
+          id, 
+          telefone, 
+          created_at, 
+          profile_id, 
           profiles!profissionais_profiles_fk(nome, email, role)
         `)
         .order('id', { ascending: true });
 
       if (error) {
-        console.warn('⚠️ Erro no JOIN, tentando solução alternativa com 2 consultas:', error.message);
+        console.warn('Erro no JOIN, tentando solução alternativa:', error.message);
         
-        // ✅ SOLUÇÃO ALTERNATIVA: Duas consultas separadas
+        // SOLUÇÃO ALTERNATIVA: Duas consultas separadas
         try {
           // 1. Buscar profissionais
           const { data: profissionais, error: errorProf } = await this.supabase
@@ -207,62 +184,50 @@ class DataManager {
               profilesMap[profile.id] = profile;
             });
             
-            console.log('🔍 Profiles encontrados:', profiles);
-            console.log('🔍 Mapa de profiles:', profilesMap);
-            
             this.profissionais = profissionais.map(profissional => {
               const profile = profilesMap[profissional.profile_id];
-              console.log('🔍 Verificando profissional:', {
-                profissional_id: profissional.id,
-                profile_id: profissional.profile_id,
-                profile_encontrado: !!profile,
-                profile_dados: profile
-              });
-              
-              return {
-                ...profissional,
-                nome: profile ? profile.nome : `Profissional ${profissional.id}`,
-                email: profile ? profile.email : 'Email não informado',
-                role: profile ? profile.role : null
-              };
+              if (profile) {
+                return {
+                  ...profissional,
+                  nome: profile.nome,
+                  email: profile.email,
+                  role: profile.role
+                };
+              } else {
+                return {
+                  ...profissional,
+                  nome: `Profissional ${profissional.id}`,
+                  email: 'Email não informado',
+                  role: 'user'
+                };
+              }
             });
           }
           
-          console.log('✅ Profissionais carregados com solução alternativa:', this.profissionais.length);
-          
         } catch (altError) {
-          console.error('❌ Erro na solução alternativa:', altError);
+          console.error('Erro na solução alternativa:', altError);
           this.profissionais = [];
         }
       } else {
         this.profissionais = data || [];
-        console.log('✅ Profissionais carregados do Supabase com JOIN:', this.profissionais.length);
         
         // Mapear para formato compatível
         this.profissionais = this.profissionais.map(profissional => {
           const result = {
             id: parseInt(profissional.id) || profissional.id,
+            nome: profissional.profiles?.nome || `Profissional ${profissional.id}`,
+            email: profissional.profiles?.email || 'Email não informado',
             telefone: profissional.telefone,
+            role: profissional.profiles?.role || 'user',
+            profile_id: profissional.profile_id,
             created_at: profissional.created_at,
-            profile_id: profissional.profile_id
+            // Manter compatibilidade com código antigo
+            servicos: profissional.servicos || []
           };
-          
-          // ✅ Adicionar dados do profile se existir
-          if (profissional.profiles) {
-            result.nome = profissional.profiles.nome;
-            result.email = profissional.profiles.email;
-            result.role = profissional.profiles.role;
-          } else {
-            result.nome = `Profissional ${profissional.id}`;
-            result.email = 'Email não informado';
-          }
-          
           return result;
         });
         
-        console.log('✅ Profissionais mapeados para formato compatível:', this.profissionais.length);
         this.cache.profissionais = this.profissionais;
-        console.log('💾 Profissionais salvos no cache:', this.profissionais.length);
       }
       
       return this.profissionais;
@@ -275,18 +240,14 @@ class DataManager {
 
   async loadAgendamentos() {
     try {
-      console.log("🔍 Carregando agendamentos...");
-      
       // CORREÇÃO: Se cache foi limpo, recarregar do banco
       if (!this.cache.agendamentos) {
-        console.log("🔄 Cache vazio, carregando do banco...");
         
         // Obter profissional logado
         const profissionalLogado = await this.getProfissionalLogado();
         
         if (!profissionalLogado) {
-          // ✅ ADMIN: Carregar todos os agendamentos
-          console.log("👑 Admin detectado - carregando todos os agendamentos");
+          // ADMIN: Carregar todos os agendamentos
           
           const { data, error } = await this.supabase
             .from("agendamentos")
@@ -298,7 +259,6 @@ class DataManager {
             this.agendamentos = [];
           } else {
             this.agendamentos = data || [];
-            console.log("✅ Agendamentos carregados do banco:", this.agendamentos.length);
           }
           
           // Salvar no cache
@@ -309,7 +269,6 @@ class DataManager {
           this.cache.agendamentos = this.agendamentos;
         }
       } else {
-        console.log("📦 Usando agendamentos do cache:", this.cache.agendamentos.length);
         this.agendamentos = this.cache.agendamentos;
       }
       
@@ -783,28 +742,114 @@ class DataManager {
   }
 
   getClientes() {
-    console.log('📋 getClientes() chamado - carregando clientes...');
     return this.loadClientes();
   }
 
   getServicos() {
-    console.log('💇 getServicos() chamado - carregando serviços...');
     return this.loadServicos();
   }
 
   getAgendamentos() {
-    console.log('📅 getAgendamentos() chamado - carregando agendamentos...');
     return this.loadAgendamentos();
   }
 
   getBloqueios() {
-    console.log('🚫 getBloqueios() chamado - carregando bloqueios...');
     return this.loadBloqueios();
   }
 
   getProfissionais() {
-    console.log('📋 getProfissionais() chamado - carregando profissionais... (cache)');
     return this.loadProfissionais();
+  }
+
+  // Atualizar cliente - VERSÃO CORRIGIDA COM CAMPOS REAIS
+  async updateCliente(id, dados) {
+    try {
+      // CORREÇÃO: Campos que REALMENTE existem na tabela clientes
+      const clienteData = {
+        nome: dados.nome.trim(),
+        telefone: dados.telefone?.trim() || null,
+        observacoes: dados.observacoes?.trim() || null, // ✅ EXISTE NA TABELA
+        updated_at: new Date().toISOString() // ✅ EXISTE NA TABELA
+      };
+      
+      const { data, error } = await this.supabase
+        .from('clientes')
+        .update(clienteData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Erro ao atualizar cliente:', error);
+        throw new Error(`Erro ao atualizar cliente: ${error.message}`);
+      }
+      
+      // Atualizar cache local
+      const index = this.clientes.findIndex(c => c.id === id);
+      if (index !== -1) {
+        this.clientes[index] = data;
+      }
+      
+      // Limpar cache para forçar recarregamento
+      this.cache.clientes = null;
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar cliente:', error);
+      throw error;
+    }
+  }
+
+  // Adicionar cliente - VERSÃO CORRIGIDA COM CAMPOS REAIS
+  async addCliente(cliente) {
+    try {
+      if (this.supabase) {
+        // Gerar token único para ficha de anamnese - VERSÃO v1.4
+        const fichaToken = this.generateUniqueToken();
+
+        // CORREÇÃO: Campos que REALMENTE existem na tabela clientes
+        const clienteWithToken = {
+          nome: cliente.nome,
+          telefone: cliente.telephone || cliente.telefone, // Compatibilidade
+          observacoes: cliente.observacoes || null, // ✅ EXISTE NA TABELA
+          created_at: new Date().toISOString(), // ✅ EXISTE NA TABELA
+          ficha_token: fichaToken
+        };
+
+        const { data, error } = await this.supabase
+          .from("clientes")
+          .insert([clienteWithToken])
+          .select();
+
+        if (error) {
+          console.error("❌ Erro ao criar cliente:", error);
+          throw error;
+        }
+
+        // CORREÇÃO: Limpar cache de clientes após CREATE
+        this.cache.clientes = null;
+
+        return data;
+      }
+    } catch (error) {
+      console.error('❌ Erro ao criar cliente:', error);
+      throw error;
+    }
+  }
+
+  // Gerar token único para ficha de anamnese - VERSÃO RESTAURADA v1.4
+  generateUniqueToken() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 8);
+    return `ficha_${timestamp}_${random}`;
+  }
+
+  // Gerar token único para ficha de anamnese
+  gerarTokenFicha() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substr(2, 9);
+    return `${timestamp}${random}`.toUpperCase();
   }
 
   // Adicionar agendamento
