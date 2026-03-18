@@ -922,16 +922,15 @@ class DataManager {
       // Atualizar senha no Supabase Auth via Edge Function segura
       console.log('🔐 Atualizando senha via Edge Function...');
       
-      // � 1. OBTER SESSÃO ATUALIZADA ANTES DO FETCH
-      console.log('🔐 Obtendo sessão atualizada para reset de senha...');
-      const { data: sessionData, error: sessionError } = await this.supabase.auth.getSession();
+      // 🔧 1. OBTER TOKEN VÁLIDO COM refreshSession
+      console.log('🔐 Obtendo token válido com refreshSession...');
+      const { data: { session }, error } = await this.supabase.auth.refreshSession()
       
-      if (sessionError || !sessionData.session) {
-        console.error('❌ Sessão inválida ou expirada:', sessionError);
-        throw new Error('Sessão inválida ou expirada. Por favor, faça login novamente.');
+      if (error || !session) {
+        console.error('❌ Erro ao atualizar sessão:', error);
+        throw new Error('Erro ao atualizar sessão. Por favor, faça login novamente.');
       }
       
-      const session = sessionData.session;
       const accessToken = session.access_token;
       
       console.log('🔍 Session disponível:', !!session);
@@ -948,7 +947,8 @@ class DataManager {
         const response = await fetch(edgeFunctionUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
           },
           body: JSON.stringify({
             userId,
