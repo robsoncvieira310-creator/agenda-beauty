@@ -281,9 +281,32 @@ class DataManager {
   }
 
   async getProfissionalLogado() {
-    // IGNORAR ERRO RLS - RETORNAR NULL DIRETO
-    console.log('DATA_MANAGER: Ignorando query RLS em getProfissionalLogado devido a erro 500');
-    return null;
+    try {
+      const { data: { user } } = await this.supabase.auth.getUser();
+      
+      if (!user) {
+        console.log('DATA_MANAGER: Usuário não autenticado');
+        return null;
+      }
+
+      const { data, error } = await this.supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('DATA_MANAGER: Erro ao buscar profile:', error);
+        return null;
+      }
+
+      console.log('DATA_MANAGER: Profissional encontrado:', data);
+      return data;
+
+    } catch (error) {
+      console.error('DATA_MANAGER: Erro em getProfissionalLogado:', error);
+      return null;
+    }
   }
 
   async addProfissional(dados) {
@@ -922,22 +945,25 @@ class DataManager {
       // Atualizar senha no Supabase Auth via Edge Function segura
       console.log('🔐 Atualizando senha via Edge Function...');
       
-      // 🔧 1. CHAMADA ADMIN DIRETA (SEM JWT)
-      console.log('🔐 Chamando Edge Function (operação administrativa)...');
+      // 🔧 1. CHAMADA COM TOKEN VÁLIDO
+      console.log('🔐 Obtendo sessão para reset de senha...');
       
-      // 🔍 DEBUG: Tentativa com fetch direto para melhor diagnóstico
+      const session = await this.supabase.auth.getSession();
+      const token = session.data.session.access_token;
+
+      console.log('🔍 Token obtido:', !!token);
+      
+      // 🔍 DEBUG: Chamada direta para Edge Function
       try {
-        const edgeFunctionUrl = `${this.supabase.supabaseUrl}/functions/v1/reset-password`;
-        console.log('🔍 Edge Function URL:', edgeFunctionUrl);
-        
-        const response = await fetch(edgeFunctionUrl, {
-          method: 'POST',
+        const response = await fetch("https://kckbcjjgbipcqzkynwpy.supabase.co/functions/v1/reset-password", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json'
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` 
           },
           body: JSON.stringify({
-            userId: userId,
-            newPassword: novaSenha  // � Enviar senha diretamente
+            userId,
+            newPassword: novaSenha
           })
         });
 
