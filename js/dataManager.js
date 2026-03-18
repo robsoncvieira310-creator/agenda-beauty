@@ -915,16 +915,48 @@ class DataManager {
       
       console.log('✅ Profissional encontrado:', profissional);
       
-      // Retornar senha para admin atualizar manualmente no Supabase Auth
+      // Usar profile_id do profissional como userId do Supabase Auth
+      const userId = profissional.profile_id;
+      console.log('🔐 Usando profile_id como userId:', userId);
+      
+      // Atualizar senha no Supabase Auth via Edge Function segura
+      console.log('🔐 Atualizando senha via Edge Function...');
+      
+      const { data: resetData, error: resetError } = await this.supabase.functions.invoke('reset-password', {
+        body: { userId, novaSenha }
+      });
+      
+      if (resetError) {
+        throw new Error('Erro ao atualizar senha: ' + resetError.message);
+      }
+      
+      if (!resetData || !resetData.success) {
+        throw new Error('Falha ao atualizar senha no servidor');
+      }
+      
+      console.log('✅ Senha atualizada com sucesso via Edge Function');
+      
+      // Resetar first_login_completed para forçar troca no próximo login
+      try {
+        await this.supabase
+          .from('profiles')
+          .update({ first_login_completed: false })
+          .eq('id', userId);
+        console.log('✅ first_login_completed resetado');
+      } catch (profileError) {
+        console.warn('⚠️ Erro ao resetar first_login_completed:', profileError);
+      }
+      
+      // Retornar sucesso com senha atualizada automaticamente
       return {
         success: true,
         email: email,
         senhaTemporaria: novaSenha,
-        message: 'Senha temporária gerada com sucesso',
-        instructions: `INSTRUÇÕES:\n\n1. Acesse Supabase Dashboard\n2. Authentication → Users\n3. Encontre: ${email}\n4. Clique "Reset Password"\n5. Insira: ${novaSenha}\n6. Salve\n\nO profissional já poderá usar esta senha.`,
+        message: 'Senha atualizada automaticamente no Supabase Auth',
+        instructions: `Senha atualizada com sucesso!\n\n📧 Email: ${email}\n🔑 Nova Senha: ${novaSenha}\n\nO profissional já pode usar esta senha para fazer login.`,
         profileId: profissional.id,
         nome: profissional.nome,
-        method: 'supabase_auth_manual'
+        method: 'supabase_auth_automatic'
       };
       
     } catch (error) {

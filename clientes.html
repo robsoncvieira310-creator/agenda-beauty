@@ -10,6 +10,8 @@
 </head>
 <body>
   <div class="layout">
+    <!-- Botão será inserido dinamicamente via JavaScript -->
+    
     <aside class="sidebar" id="sidebar">
       <h2>💇 Agenda Beauty</h2>
       <nav>
@@ -34,6 +36,11 @@
           <span class="nav-text">Profissionais</span>
         </a>
       </nav>
+      
+      <button class="logout-btn" id="logoutButton">
+        <span>🚪</span>
+        <span>Sair</span>
+      </button>
     </aside>
 
     <main class="content">
@@ -122,11 +129,6 @@
       </div>
     </main>
   </div>
-
-  <!-- Botão de Logout -->
-  <button id="logoutButton" class="btn btn-danger logout-btn">
-    🚪 Sair
-  </button>
 
   <!-- Modal de Cliente -->
   <div id="modalCliente" class="modal">
@@ -368,6 +370,7 @@
   <script src="js/authManager.js"></script>
   <script src="js/firstLoginManager.js"></script>
   <script src="js/dataManager.js"></script>
+  <script src="js/sidebarManager.js"></script>
   <script src="js/pageManager.js"></script>
   <script src="js/menuManager.js"></script>
   <script src="js/clientesPage.js"></script>

@@ -13,6 +13,8 @@
 </head>
 <body>
   <div class="layout">
+    <!-- Botão será inserido dinamicamente via JavaScript -->
+    
     <aside class="sidebar" id="sidebar">
       <h2>💇 Agenda Beauty</h2>
       <nav>
@@ -37,6 +39,11 @@
           <span class="nav-text">Profissionais</span>
         </a>
       </nav>
+      
+      <button class="logout-btn" id="logoutButton">
+        <span>🚪</span>
+        <span>Sair</span>
+      </button>
     </aside>
 
     <main class="content">
@@ -149,30 +156,6 @@
     </main>
   </div>
 
-  <!-- Botão de Logout Fixo -->
-  <div id="logoutButton" style="
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    background: #dc2626;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-    z-index: 1000;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  " onmouseover="this.style.background='#b91c1c'; this.style.transform='translateY(-2px)'" onmouseout="this.style.background='#dc2626'; this.style.transform='translateY(0)'">
-    <span></span>
-    <span>Sair</span>
-  </div>
-
   <!-- Scripts -->
   <script src="js/utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -180,8 +163,9 @@
   <script src="js/authManager.js"></script>
   <script src="js/firstLoginManager.js"></script>
   <script src="js/dataManager.js"></script>
-  <script src="js/pageManager.js"></script>
+  <script src="js/sidebarManager.js"></script>
   <script src="js/menuManager.js"></script>
+  <script src="js/pageManager.js"></script>
   <script src="js/appInit.js"></script>
   
   <script>

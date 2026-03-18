@@ -132,22 +132,13 @@ class MenuManager {
   }
 
   addLogoutButton() {
-    const sidebar = document.querySelector('.sidebar');
-    if (!sidebar) return;
-
-    // Verificar se já existe botão de logout
-    if (document.querySelector('.logout-btn')) return;
-
-    // Criar botão de logout
-    const logoutBtn = document.createElement('button');
-    logoutBtn.className = 'logout-btn';
-    logoutBtn.innerHTML = '🚪 Sair';
-    logoutBtn.onclick = () => this.logout();
-
-    // Adicionar ao final do sidebar
-    sidebar.appendChild(logoutBtn);
-
-    console.log('🔐 MENU_MANAGER: Botão de logout adicionado');
+    // O botão de logout agora está no HTML dentro da sidebar-footer
+    // Apenas adicionar o evento de clique
+    const logoutBtn = document.querySelector('.logout-btn');
+    if (logoutBtn) {
+      logoutBtn.onclick = () => this.logout();
+      console.log('🔐 MENU_MANAGER: Botão de logout configurado na sidebar');
+    }
   }
 
   async logout() {
