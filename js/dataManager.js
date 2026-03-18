@@ -922,8 +922,8 @@ class DataManager {
       // Atualizar senha no Supabase Auth via Edge Function segura
       console.log('🔐 Atualizando senha via Edge Function...');
       
-      // 🔧 1. CHAMADA ADMIN SEM DEPENDÊNCIA DE JWT
-      console.log('🔐 Chamando Edge Function com API Key...');
+      // 🔧 1. CHAMADA ADMIN DIRETA (SEM JWT)
+      console.log('🔐 Chamando Edge Function (operação administrativa)...');
       
       // 🔍 DEBUG: Tentativa com fetch direto para melhor diagnóstico
       try {
@@ -933,12 +933,11 @@ class DataManager {
         const response = await fetch(edgeFunctionUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': 'agenda-beauty-internal-key-2024'  // 🔒 API Key interna
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            user_id: userId,
-            email: profissional.email  // 📧 Enviar email para validação
+            userId: userId,
+            newPassword: novaSenha  // � Enviar senha diretamente
           })
         });
 
