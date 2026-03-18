@@ -6,11 +6,12 @@ function getCorsHeaders(origin: string | null) {
   const allowedOrigins = [
     'http://localhost:8000',  // Ambiente atual
     'http://localhost:3000',  // Fallback
-    'https://seusite.com'     // Produção
+    'https://robsoncvieira310-creator.github.io/agenda-beauty/',    // Produção
   ]
   
-  // 🔒 MAIS SEGURO: Sem fallback automático
-  const allowedOrigin = allowedOrigins.includes(origin || '') ? origin : null
+  // 🔒 MAIS SEGURO: Verificar wildcard para GitHub Pages
+  const isGitHubPages = origin && origin.includes('.github.io')
+  const allowedOrigin = allowedOrigins.includes(origin || '') || isGitHubPages ? origin : null
   
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
