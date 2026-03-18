@@ -56,37 +56,21 @@ class MenuManager {
 
   async getCurrentUser() {
     try {
-      // Aguardar o profile estar disponível
-      await this.waitForUserProfile();
+      // Usar novo contrato do AuthManager
+      const profile = await window.authManager.getProfile();
       
-      if (window.currentUserProfile) {
-        this.currentUser = window.currentUserProfile;
-        console.log('🔐 MENU_MANAGER: Usuário carregado:', this.currentUser.role);
+      if (profile) {
+        this.currentUser = profile;
+        console.log('🔐 MENU_MANAGER: Usuário carregado:', profile.role);
       } else {
         console.warn('🔐 MENU_MANAGER: Nenhum usuário encontrado');
       }
-    } catch (error) {
-      console.error('🔐 MENU_MANAGER: Erro ao obter usuário:', error);
-    }
-  }
-
-  /**
-   * Aguarda o profile do usuário estar disponível
-   */
-  waitForUserProfile() {
-    return new Promise((resolve) => {
-      const checkProfile = () => {
-        if (window.currentUserProfile) {
-          console.log('✅ MENU_MANAGER: Profile encontrado:', window.currentUserProfile);
-          resolve();
-        } else {
-          console.log('⏳ MENU_MANAGER: Aguardando profile...');
-          setTimeout(checkProfile, 100);
-        }
-      };
       
-      checkProfile();
-    });
+      return this.currentUser;
+    } catch (error) {
+      console.error('❌ MENU_MANAGER: Erro ao carregar usuário:', error);
+      return null;
+    }
   }
 
   setupMenu() {

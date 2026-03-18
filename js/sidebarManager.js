@@ -40,11 +40,6 @@ class SidebarManager {
     // Restaurar estado salvo
     this.restoreState();
 
-    // Adicionar listener para resize da janela
-    window.addEventListener('resize', () => {
-      this.handleResize();
-    });
-
     console.log('✅ SidebarManager inicializado com sucesso');
   }
 
@@ -54,6 +49,19 @@ class SidebarManager {
     this.menuToggle.className = 'menu-toggle';
     this.menuToggle.setAttribute('aria-expanded', 'true');
     this.menuToggle.setAttribute('title', 'Fechar Menu');
+    
+    this.menuToggle.innerHTML = '☰';
+    
+    // Adicionar evento de clique
+    this.menuToggle.addEventListener('click', () => {
+      this.toggle();
+    });
+  }
+
+  handleResize() {
+    // Método vazio para evitar erro
+    // Lógica de resize pode ser implementada futuramente
+  }
 
     // Adicionar linhas do hambúrguer
     for (let i = 0; i < 3; i++) {

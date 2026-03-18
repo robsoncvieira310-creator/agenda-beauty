@@ -189,7 +189,7 @@
       }
       
       // ✅ Verificar sessão atual
-      const session = await window.authManager.getCurrentSession();
+      const { data: { session } } = await window.authManager.getSession();
       if (!session) {
         console.error('❌ PROFISSIONAIS: SEM SESSÃO - usuário não autenticado');
         window.location.href = 'login.html';

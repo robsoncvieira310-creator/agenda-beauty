@@ -5,6 +5,10 @@ console.log('💾 DataManager V1.4.0 carregado - Versão limpa');
 
 class DataManager {
   constructor(supabaseClient) {
+    if (!supabaseClient) {
+      throw new Error("Supabase client não fornecido ao DataManager");
+    }
+    
     this.supabase = supabaseClient;
     this.clientes = [];
     this.servicos = [];
@@ -25,6 +29,10 @@ class DataManager {
   }
 
   async loadClientes() {
+    if (!this.supabase) {
+      throw new Error("Supabase não inicializado no DataManager");
+    }
+    
     try {
       const { data, error } = await this.supabase
         .from("clientes")
@@ -281,6 +289,10 @@ class DataManager {
   }
 
   async getProfissionalLogado() {
+    if (!this.supabase) {
+      throw new Error("Supabase não inicializado no DataManager");
+    }
+    
     try {
       const { data: { user } } = await this.supabase.auth.getUser();
       
@@ -1317,11 +1329,11 @@ class DataManager {
     }
     
     // Garantir que tenha letra maiúscula, minúscula e número
-    const maiuscula = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.charAt(Math.floor(Math.random() * 26));
-    const minuscula = 'abcdefghijklmnopqrstuvwxyz'.charAt(Math.floor(Math.random() * 26));
-    const numero = '0123456789'.charAt(Math.floor(Math.random() * 10));
-    
-    return maiuscula + minuscula + numero + senha.substring(3);
+    if (!/\d/.test(senha)) {
+      senha += Math.floor(Math.random() * 10);
+    }
+
+    return senha;
   }
 }
 

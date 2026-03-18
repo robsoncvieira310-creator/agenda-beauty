@@ -8,6 +8,12 @@ async function initApp() {
     return;
   }
   
+  // PROTEÇÃO CONTRA EXECUÇÃO PREMATURA
+  if (!window.authManager) {
+    console.error("❌ AuthManager não carregado");
+    return;
+  }
+  
   appInitialized = true;
   
   try {
@@ -18,6 +24,7 @@ async function initApp() {
     console.log('  - window.supabase:', !!window.supabase);
     console.log('  - window.supabaseClient:', !!window.supabaseClient);
     console.log('  - window.authManager:', !!window.authManager);
+    console.log('  - window.dataManager:', !!window.dataManager);
     console.log('  - window.dataManager:', !!window.dataManager);
     console.log('  - window.menuManager:', !!window.menuManager);
     
@@ -34,46 +41,36 @@ async function initApp() {
     }
     console.log('✅ APP_INIT: AuthManager disponível');
     
-    // ✅ VERIFICAÇÃO CRÍTICA: Aguardar sessão ser estabelecida
-    console.log('🔐 APP_INIT: Verificando sessão antes de carregar dados...');
-    const authResult = await window.authManager.initialize();
+    // ✅ VERIFICAR SESSÃO ATUAL
+    const { data: { session } } = await window.authManager.getSession();
+
+    if (session) {
+      console.log("✅ Sessão ativa:", session.user.id);
+      console.log("🔐 APP_INIT: Profile do usuário:", session.user.user_metadata);
+    } else {
+      console.log("⚠️ Nenhuma sessão ativa");
+    }
     
-    if (!authResult.authenticated) {
-      console.log('⚠️ APP_INIT: Usuário não autenticado, redirecionando para login...');
-      if (window.location.pathname.includes('login.html') || window.location.href.includes('login.html')) {
-        console.log('🔐 APP_INIT: Já está na página de login, não redirecionar');
-      } else {
-        window.location.href = 'login.html';
+    // ✅ INICIALIZAR DATAMANAGER (ÚNICA INSTÂNCIA)
+    if (!window.dataManager) {
+      console.log('🔧 APP_INIT: Criando DataManager com Supabase client...');
+      window.dataManager = new DataManager(window.supabaseClient);
+      console.log("✅ DataManager criado no appInit");
+    } else {
+      console.log("✅ DataManager já existe, reutilizando instância");
+    }
+    
+    // ✅ DISPARAR EVENTO DE APLICAÇÃO PRONTA
+    const appReadyEvent = new CustomEvent('appReady', {
+      detail: {
+        user: session?.user,
+        session: session
       }
-      return;
-    }
+    });
     
-    console.log('✅ APP_INIT: Usuário autenticado, continuando inicialização...');
-    console.log('👤 APP_INIT: Profile do usuário:', authResult.profile);
+    window.dispatchEvent(appReadyEvent);
+    console.log('� APP_INIT: Evento appReady disparado com sucesso!');
     
-    // ✅ VERIFICAÇÃO CRÍTICA: Sessão está ativa
-    const currentSession = await window.authManager.getCurrentSession();
-    if (!currentSession) {
-      console.error('❌ APP_INIT: Sessão não está ativa, abortando carregamento de dados');
-      throw new Error('Sessão não está ativa');
-    }
-    
-    console.log('✅ APP_INIT: Sessão ativa verificada:', currentSession.user.id);
-
-    // Criar DataManager com cliente Supabase
-    window.dataManager = new DataManager(window.supabaseClient);
-    console.log('✅ APP_INIT: DataManager criado');
-
-    // NOVA IMPLEMENTAÇÃO V1.2 - LIMPAR CACHE PARA FORÇAR CARREGAMENTO
-    window.dataManager.cache = {
-      clientes: null,
-      profissionais: null,
-      servicos: null,
-      agendamentos: null,
-      bloqueios: null
-    };
-    console.log('🗑️ APP_INIT: Cache limpo para forçar carregamento inicial');
-
     // ✅ CARREGAR DADOS APÓS VERIFICAR SESSÃO
     console.log('🔄 APP_INIT: Carregando dados iniciais (com sessão verificada)...');
     
@@ -92,11 +89,6 @@ async function initApp() {
       console.log(`👩 Profissionais: ${window.dataManager.profissionais.length}`);
       console.log(`📅 Agendamentos: ${window.dataManager.agendamentos.length}`);
       console.log(`🚫 Bloqueios: ${window.dataManager.bloqueios.length}`);
-
-      // Disparar evento de aplicação pronta
-      console.log("🚀 APP_INIT: Disparando evento appReady...");
-      window.dispatchEvent(new CustomEvent('appReady'));
-      console.log("✅ APP_INIT: Evento appReady disparado");
       
     } catch (dataError) {
       console.error('❌ APP_INIT: Erro ao carregar dados:', dataError);

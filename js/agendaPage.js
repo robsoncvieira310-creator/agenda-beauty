@@ -65,7 +65,12 @@ class AgendaPage extends PageManager {
 
   async initializeCalendar() {
     try {
-      this.calendarManager = new CalendarManager('calendar');
+      // Validar se CalendarManager está disponível
+      if (!window.CalendarManager) {
+        throw new Error("CalendarManager não carregado");
+      }
+      
+      this.calendarManager = new window.CalendarManager('calendar');
       await this.calendarManager.initialize();
     } catch (error) {
       console.error('Erro ao inicializar calendário:', error);
