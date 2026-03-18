@@ -21,23 +21,53 @@ class MenuManager {
       ],
       // Itens visíveis para PROFISSIONAL
       profissional: [
+        { href: 'index.html', icon: '🏠', text: 'Início', id: 'nav-dashboard' },
         { href: 'agenda.html', icon: '📅', text: 'Agenda', id: 'nav-agenda' },
         { href: 'clientes.html', icon: '👥', text: 'Clientes', id: 'nav-clientes' }
       ]
     };
+
+    this.currentUser = null;
+    
+    this.init();
   }
 
-  /**
-   * Inicializa o menu baseado no role do usuário
-   */
-  initialize() {
-    console.log('🔐 MENU_MANAGER: Inicializando controle de menu...');
+  async init() {
+    // Esperar o DOM carregar
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.setup());
+    } else {
+      this.setup();
+    }
+  }
+
+  async setup() {
+    // Obter usuário atual
+    await this.getCurrentUser();
     
-    // Aguardar profile do usuário estar disponível
-    this.waitForUserProfile().then(() => {
-      this.updateMenu();
-      this.addLogoutButton();
-    });
+    // Configurar menu baseado no role
+    this.setupMenu();
+    
+    // Adicionar botão de logout
+    this.addLogoutButton();
+    
+    console.log('✅ MenuManager inicializado com sucesso');
+  }
+
+  async getCurrentUser() {
+    try {
+      // Aguardar o profile estar disponível
+      await this.waitForUserProfile();
+      
+      if (window.currentUserProfile) {
+        this.currentUser = window.currentUserProfile;
+        console.log('🔐 MENU_MANAGER: Usuário carregado:', this.currentUser.role);
+      } else {
+        console.warn('🔐 MENU_MANAGER: Nenhum usuário encontrado');
+      }
+    } catch (error) {
+      console.error('🔐 MENU_MANAGER: Erro ao obter usuário:', error);
+    }
   }
 
   /**
@@ -54,197 +84,114 @@ class MenuManager {
           setTimeout(checkProfile, 100);
         }
       };
+      
       checkProfile();
     });
   }
 
-  /**
-   * Atualiza o menu baseado no role do usuário
-   */
-  updateMenu() {
-    const role = window.currentUserProfile?.role;
-    const nav = document.querySelector('nav');
-    
-    if (!nav) {
-      console.error('❌ MENU_MANAGER: Navegação não encontrada');
+  setupMenu() {
+    if (!this.currentUser) {
+      console.warn('🔐 MENU_MANAGER: Nenhum usuário para configurar menu');
       return;
     }
 
-    console.log(`🔐 MENU_MANAGER: Atualizando menu para role: ${role}`);
-    
+    const userRole = this.currentUser.role;
+    const allowedItems = this.menuItems[userRole] || [];
+
     // Limpar menu atual
-    nav.innerHTML = '';
-    
-    // Obter itens permitidos para o role
-    const allowedItems = this.menuItems[role] || this.menuItems.profissional;
-    
-    // Renderizar itens permitidos
-    allowedItems.forEach(item => {
-      const navItem = document.createElement('a');
-      navItem.href = item.href;
-      navItem.className = 'nav-item';
-      navItem.id = item.id;
+    const nav = document.querySelector('.sidebar nav');
+    if (nav) {
+      nav.innerHTML = '';
       
-      // Verificar se é a página atual
-      const currentPage = window.location.pathname.split('/').pop();
-      if (item.href === currentPage) {
-        navItem.classList.add('active');
-      }
-      
-      navItem.innerHTML = `
-        <span class="nav-icon">${item.icon}</span>
-        <span class="nav-text">${item.text}</span>
-      `;
-      
-      nav.appendChild(navItem);
-    });
+      // Adicionar itens permitidos
+      allowedItems.forEach(item => {
+        const navItem = document.createElement('a');
+        navItem.href = item.href;
+        navItem.className = 'nav-item';
+        navItem.id = item.id;
+        
+        navItem.innerHTML = `
+          <span class="nav-icon">${item.icon}</span>
+          <span class="nav-text">${item.text}</span>
+        `;
+        
+        // Marcar item ativo baseado na página atual
+        if (window.location.pathname.includes(item.href) || 
+            (item.href === 'index.html' && window.location.pathname.endsWith('/'))) {
+          navItem.classList.add('active');
+        }
+        
+        nav.appendChild(navItem);
+      });
 
-    // Adicionar separador antes do logout
-    const separator = document.createElement('div');
-    separator.style.cssText = `
-      height: 1px;
-      background: rgba(255, 255, 255, 0.1);
-      margin: 10px 0;
-    `;
-    nav.appendChild(separator);
-
-    console.log(`✅ MENU_MANAGER: Menu atualizado com ${allowedItems.length} itens`);
-    
-    // Log para diagnóstico
-    if (role === 'admin') {
-      console.log('👑 MENU_MANAGER: ROLE_ADMIN - Menu completo ativado');
-    } else if (role === 'profissional') {
-      console.log('👩 MENU_MANAGER: ROLE_PROFISSIONAL - Menu restrito ativado');
+      console.log(`🔐 MENU_MANAGER: Menu configurado para role ${userRole} com ${allowedItems.length} itens`);
     }
+
+    // Esconder elementos não autorizados
+    this.hideUnauthorizedElements();
   }
 
-  /**
-   * Adiciona botão de logout no menu
-   */
   addLogoutButton() {
-    const nav = document.querySelector('nav');
-    
-    if (!nav) {
-      console.error('❌ MENU_MANAGER: Navegação não encontrada');
-      return;
-    }
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    // Verificar se já existe botão de logout
+    if (document.querySelector('.logout-btn')) return;
 
     // Criar botão de logout
-    const logoutItem = document.createElement('a');
-    logoutItem.href = '#';
-    logoutItem.className = 'nav-item nav-logout';
-    logoutItem.id = 'nav-logout';
-    logoutItem.style.cssText = `
-      color: #dc2626;
-      border-top: 1px solid rgba(220, 38, 38, 0.2);
-      margin-top: 10px;
-      padding-top: 15px;
-    `;
-    
-    logoutItem.innerHTML = `
-      <span class="nav-icon">🚪</span>
-      <span class="nav-text">Sair</span>
-    `;
-    
-    // Adicionar evento de logout
-    logoutItem.addEventListener('click', async (e) => {
-      e.preventDefault();
-      await this.handleLogout();
-    });
-    
-    nav.appendChild(logoutItem);
-    
-    console.log('✅ MENU_MANAGER: Botão de logout adicionado');
+    const logoutBtn = document.createElement('button');
+    logoutBtn.className = 'logout-btn';
+    logoutBtn.innerHTML = '🚪 Sair';
+    logoutBtn.onclick = () => this.logout();
+
+    // Adicionar ao final do sidebar
+    sidebar.appendChild(logoutBtn);
+
+    console.log('🔐 MENU_MANAGER: Botão de logout adicionado');
   }
 
-  /**
-   * Manipula o logout do usuário
-   */
-  async handleLogout() {
-    console.log('🚪 MENU_MANAGER: Iniciando logout...');
-    
-    // Mostrar confirmação com ConfirmDialog padrão
-    const confirmed = await window.ConfirmDialog.confirmDelete({
-      title: 'Sair do Sistema',
-      message: 'Tem certeza que deseja sair do sistema?',
-      itemName: '',
-      confirmText: 'Sair',
-      cancelText: 'Cancelar'
-    });
-    
-    if (!confirmed) {
-      console.log('⏹️ MENU_MANAGER: Logout cancelado pelo usuário');
-      return;
-    }
-    
+  async logout() {
     try {
-      // Executar logout
-      const result = await window.authManager.logout();
+      console.log('🔐 MENU_MANAGER: Iniciando logout...');
       
-      if (result.success) {
-        console.log('✅ MENU_MANAGER: Logout realizado com sucesso');
-        
-        // Mostrar mensagem de sucesso
-        this.showToast('Logout realizado com sucesso!', 'success');
-        
-        // Redirecionar para login após 1 segundo
-        setTimeout(() => {
-          window.location.href = 'login.html';
-        }, 1000);
+      // Mostrar loading
+      this.showToast('Fazendo logout...', 'info');
+      
+      // Fazer logout via AuthManager
+      if (window.authManager && typeof window.authManager.logout === 'function') {
+        await window.authManager.logout();
       } else {
-        console.error('❌ MENU_MANAGER: Erro no logout:', result.error);
-        this.showToast('Erro ao fazer logout: ' + result.error, 'error');
+        // Fallback: limpar localStorage e redirecionar
+        localStorage.clear();
+        window.location.href = 'index.html';
       }
+      
     } catch (error) {
-      console.error('❌ MENU_MANAGER: Erro inesperado no logout:', error);
-      this.showToast('Ocorreu um erro inesperado ao fazer logout', 'error');
+      console.error('🔐 MENU_MANAGER: Erro no logout:', error);
+      this.showToast('Erro ao fazer logout', 'error');
     }
   }
 
-  /**
-   * Mostra uma mensagem toast
-   */
-  showToast(message, type = 'info') {
-    // Remover toast existente
-    const existingToast = document.querySelector('.menu-toast');
-    if (existingToast) {
-      existingToast.remove();
+  hideUnauthorizedElements() {
+    console.log('🔐 MENU_MANAGER: Escondendo elementos não autorizados...');
+    
+    // Esconder botões de novo serviço
+    if (!this.hasPermission('servicos')) {
+      const btnNovoServico = document.getElementById('btnNovoServico');
+      if (btnNovoServico) {
+        btnNovoServico.style.display = 'none';
+        console.log('🔐 MENU_MANAGER: Botão Novo Serviço oculto');
+      }
     }
     
-    // Criar novo toast
-    const toast = document.createElement('div');
-    toast.className = `menu-toast toast-${type}`;
-    toast.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: ${type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : '#3b82f6'};
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 10000;
-      font-size: 14px;
-      font-weight: 500;
-      max-width: 300px;
-      word-wrap: break-word;
-      animation: slideInRight 0.3s ease-out;
-    `;
-    
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    // Auto-remover após 3 segundos
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.style.animation = 'slideOutRight 0.3s ease-in';
-        setTimeout(() => {
-          if (toast.parentNode) {
-            toast.remove();
-          }
-        }, 300);
+    // Esconder botões de novo profissional
+    if (!this.hasPermission('profissionais')) {
+      const btnNovoProfissional = document.getElementById('btnNovoProfissional');
+      if (btnNovoProfissional) {
+        btnNovoProfissional.style.display = 'none';
+        console.log('🔐 MENU_MANAGER: Botão Novo Profissional oculto');
       }
-    }, 3000);
+    }
   }
 
   /**
@@ -270,82 +217,69 @@ class MenuManager {
   }
 
   /**
-   * Esconde elementos baseado em permissões
+   * Mostra toast de notificação
    */
-  hideUnauthorizedElements() {
-    console.log('🔐 MENU_MANAGER: Escondendo elementos não autorizados...');
+  showToast(message, type = 'info') {
+    // Criar elemento toast
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
     
-    // Esconder botões de novo serviço
-    if (!this.hasPermission('servicos')) {
-      const btnNovoServico = document.getElementById('btnNovoServico');
-      if (btnNovoServico) {
-        btnNovoServico.style.display = 'none';
-        console.log('🔐 MENU_MANAGER: Botão Novo Serviço oculto');
+    // Estilos do toast
+    Object.assign(toast.style, {
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      backgroundColor: type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6',
+      color: 'white',
+      padding: '12px 20px',
+      borderRadius: '8px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      zIndex: '10000',
+      fontSize: '14px',
+      fontWeight: '500',
+      opacity: '0',
+      transform: 'translateX(100%)',
+      transition: 'all 0.3s ease'
+    });
+    
+    // Adicionar ao DOM
+    document.body.appendChild(toast);
+    
+    // Animar entrada
+    setTimeout(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+          }
+        }, 300);
       }
-    }
-    
-    // Esconder botões de novo profissional
-    if (!this.hasPermission('profissionais')) {
-      const btnNovoProfissional = document.getElementById('btnNovoProfissional');
-      if (btnNovoProfissional) {
-        btnNovoProfissional.style.display = 'none';
-        console.log('🔐 MENU_MANAGER: Botão Novo Profissional oculto');
-      }
-    }
-    
-    // Esconder botões de excluir em serviços
-    if (!this.hasPermission('servicos')) {
-      document.querySelectorAll('[data-action="delete-servico"]').forEach(btn => {
-        btn.style.display = 'none';
-      });
-      console.log('🔐 MENU_MANAGER: Botões de excluir serviços ocultos');
-    }
-    
-    // Esconder botões de excluir em profissionais
-    if (!this.hasPermission('profissionais')) {
-      document.querySelectorAll('[data-action="delete-profissional"]').forEach(btn => {
-        btn.style.display = 'none';
-      });
-      console.log('🔐 MENU_MANAGER: Botões de excluir profissionais ocultos');
-    }
+    }, 3000);
   }
 }
 
-// Adicionar animações CSS para toast
-const toastStyles = `
-  @keyframes slideInRight {
-    from {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-  
-  @keyframes slideOutRight {
-    from {
-      transform: translateX(0);
-      opacity: 1;
-    }
-    to {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-  }
-  
-  .nav-logout:hover {
-    background: rgba(220, 38, 38, 0.1) !important;
-  }
-`;
+// Inicializar automaticamente
+let menuManager;
 
-// Adicionar estilos ao head
-const styleSheet = document.createElement('style');
-styleSheet.textContent = toastStyles;
-document.head.appendChild(styleSheet);
+// Esperar o DOM carregar
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    menuManager = new MenuManager();
+    window.menuManager = menuManager;
+  });
+} else {
+  menuManager = new MenuManager();
+  window.menuManager = menuManager;
+}
 
-// Criar instância global
-window.menuManager = new MenuManager();
-
-console.log('✅ MENU_MANAGER: MenuManager inicializado com sucesso');
+// Exportar para uso global
+window.MenuManager = MenuManager;
