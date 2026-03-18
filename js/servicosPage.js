@@ -168,7 +168,7 @@ class ServicosPage extends PageManager {
           </div>
         </td>
         <td>
-          <span class="badge badge-primary">${servico.duracao_min || servico.duracao_minutos || servico.duracao || 0} min</span>
+          <span class="badge badge-primary">${servico.duracao_min || 0} min</span>
         </td>
         <td>
           <span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span>
@@ -209,8 +209,8 @@ class ServicosPage extends PageManager {
         return;
       }
 
-      const duracoes = this.servicos.map(s => s.duracao_min || s.duracao_minutos || s.duracao || 0);
-      const valores = this.servicos.map(s => s.valor || s.preco || 0);
+      const duracoes = this.servicos.map(s => s.duracao_min || 0);
+      const valores = this.servicos.map(s => s.valor || 0);
       
       const duracaoMedia = duracoes.reduce((a, b) => a + b, 0) / duracoes.length;
       const valorMedio = valores.reduce((a, b) => a + b, 0) / valores.length;
@@ -253,8 +253,8 @@ class ServicosPage extends PageManager {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><strong>${servico.nome}</strong></td>
-        <td><span class="badge badge-primary">${servico.duracao_min || servico.duracao_minutos || servico.duracao || 0} min</span></td>
-        <td><span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span></td>
+        <td><span class="badge badge-primary">${servico.duracao_min || 0} min</span></td>
+        <td><span class="badge badge-success">${this.formatCurrency(servico.valor || 0)}</span></td>
         <td><span class="badge badge-info">${agendamentosCount}</span></td>
         <td>
           <button class="btn btn-sm btn-warning" onclick="pageManager.editService('${servico.nome}')">✏️</button>
@@ -300,8 +300,8 @@ class ServicosPage extends PageManager {
     
     // Preencher formulário
     document.getElementById('nomeServico').value = servico.nome || '';
-    document.getElementById('duracaoServico').value = servico.duracao_min || servico.duracao_minutos || servico.duracao || '';
-    document.getElementById('valorServico').value = servico.valor || servico.preco || '';
+    document.getElementById('duracaoServico').value = servico.duracao_min || 30;  // CORREÇÃO: Usar apenas duracao_min
+    document.getElementById('valorServico').value = servico.valor || 0;
     document.getElementById('descricaoServico').value = servico.descricao || '';
     
     // Preencher cor (usar cor padrão se não existir)
@@ -414,13 +414,15 @@ class ServicosPage extends PageManager {
         
         // Criar novo serviço (com cor agora)
         console.log('💾 Criando novo serviço...');
-        await window.dataManager.addServico({ 
-          nome, 
-          duracao_min: duracao, // Novo campo
-          valor, // Novo campo
-          descricao,
-          cor: corServico
-        });
+        const servicoData = {
+          nome: nome.trim(),
+          duracao_min: duracao,  // CORREÇÃO: Usar apenas duracao_min
+          valor: valor,
+          descricao: descricao.trim(),
+          categoria: this.categorizarServico(nome),
+          cor: document.getElementById('corServico').value || '#78909c'
+        };
+        await window.dataManager.addServico(servicoData);
         console.log('✅ Serviço criado com sucesso');
         UIUtils.showAlert('Serviço criado com sucesso', 'success');
       }

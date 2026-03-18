@@ -101,7 +101,17 @@ class CalendarManager {
     if (!profissionalId) return 'Profissional não informado';
     
     const profissional = dataManager.profissionaisPorId[profissionalId];
-    return profissional ? profissional.nome : `Profissional ${profissionalId}`;
+    if (profissional && profissional.nome) {
+      return profissional.nome;
+    }
+    
+    // CORREÇÃO: Tentar encontrar no array principal
+    const profissionalAlt = dataManager.profissionais.find(p => p.id == profissionalId);
+    if (profissionalAlt && profissionalAlt.nome) {
+      return profissionalAlt.nome;
+    }
+    
+    return `Profissional não encontrado (${profissionalId})`;
   }
 
   async initialize() {
