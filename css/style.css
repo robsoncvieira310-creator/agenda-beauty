@@ -17,6 +17,19 @@ ESTILO GERAL / LAYOUT - L'ANGE BEAUTY
   --card-shadow: 0 8px 32px rgba(212, 175, 55, 0.15);
 }
 
+/* MELHORIA V1.4: Animações para estatísticas */
+.stat-updated {
+  animation: statPulse 0.5s ease-in-out;
+  color: var(--primary-gold) !important;
+  font-weight: 600 !important;
+}
+
+@keyframes statPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); color: var(--accent-gold); }
+  100% { transform: scale(1); }
+}
+
 body{
   font-family: 'Poppins', sans-serif;
   margin:0;
