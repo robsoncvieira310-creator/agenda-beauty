@@ -2,9 +2,8 @@
 // VERSÃO: 2.0.0 - LIMPA E FUNCIONAL
 console.log('👥 ClientesPage V2.0.0 carregado - Limpa e funcional');
 
-class ClientesPage extends PageManager {
+class ClientesPage {
   constructor() {
-    super();
     this.clientes = [];
     this.clienteEditando = null;
     this.clienteIdAnamnese = null;
@@ -12,7 +11,7 @@ class ClientesPage extends PageManager {
     this.supabase = window.supabaseClient;
   }
 
-  async initializeSpecificPage() {
+  async init() {
     console.log('📋 Inicializando página de clientes...');
     await this.loadClientes();
     this.setupEventListeners();
@@ -547,11 +546,9 @@ class ClientesPage extends PageManager {
         console.log('📋 Ficha existente encontrada:', anamneseData);
         this.populateAnamneseForm(anamneseData);
         this.anamneseEditando = anamneseData;
-        this.currentAnamneseId = anamneseData.id; // CORREÇÃO: Salvar ID da ficha
       } else {
         console.log('📝 Nenhuma ficha encontrada, formulário limpo');
         this.anamneseEditando = null;
-        this.currentAnamneseId = null; // CORREÇÃO: Limpar ID
       }
       
       return { cliente, anamnese: anamneseData };
@@ -707,22 +704,15 @@ class ClientesPage extends PageManager {
 
       console.log('✅ Serviços carregados:', this.servicos.length);
       
-      // Adicionar serviços ao select do formulário de anamnese
-      const selectServico = document.getElementById('anamneseServico');
+      // Adicionar serviços ao select
+      const selectServico = document.getElementById('servico');
       if (selectServico) {
-        // Limpar opções existentes (exceto a primeira)
-        selectServico.innerHTML = '<option value="">Selecione um serviço...</option>';
-        
         data.forEach(servico => {
           const option = document.createElement('option');
           option.value = servico.nome;
           option.textContent = servico.nome;
           selectServico.appendChild(option);
         });
-        
-        console.log('✅ Serviços adicionados ao select anamneseServico:', data.length);
-      } else {
-        console.warn('❌ Select anamneseServico não encontrado!');
       }
       
     } catch (error) {
@@ -804,14 +794,7 @@ class ClientesPage extends PageManager {
               }
               
               if (!found) {
-                console.warn('⚠️ Serviço não encontrado na lista, adicionando dinamicamente:', value);
-                
-                // CORREÇÃO: Adicionar opção dinamicamente se não existir
-                const newOption = document.createElement('option');
-                newOption.value = value;
-                newOption.textContent = value;
-                newOption.selected = true;
-                element.appendChild(newOption);
+                console.warn('Serviço não encontrado:', value);
               }
               
               // Forçar atualização visual do select
@@ -820,6 +803,8 @@ class ClientesPage extends PageManager {
           }
         } else {
           // Preencher outros campos normalmente
+          console.log(`🔍 Campo ${fieldId} (${dbField}):`, value);
+          
           if (element.type === 'checkbox') {
             element.checked = value || false;
           } else {
@@ -1034,6 +1019,8 @@ class ClientesPage extends PageManager {
 
   async saveAnamnese() {
     try {
+      console.log('💾 Salvando anamnese...');
+      
       // Coletar dados do formulário
       const anamneseData = {
         nome_completo: document.getElementById('anamneseNomeCompleto')?.value || '',
@@ -1069,37 +1056,32 @@ class ClientesPage extends PageManager {
       }
 
       // Obter ID do cliente atual
-      const modalTitulo = document.getElementById('modalAnamneseTitulo')?.textContent || '';
-      
-      // CORREÇÃO: Aceitar ambos os formatos de título
-      const clienteNome = modalTitulo.match(/(?:Ficha de Anamnese|Editar Ficha) - (.+)/)?.[1] || '';
-      
+      const clienteNome = document.getElementById('modalAnamneseTitulo')?.textContent?.match(/Ficha de Anamnese - (.+)/)?.[1] || '';
       const cliente = this.clientes.find(c => c.nome === clienteNome);
       
       if (!cliente) {
-        console.error('❌ Cliente não encontrado para nome:', clienteNome);
         UIUtils.showAlert('Cliente não encontrado', 'error');
         return;
       }
 
-      // Salvar no Supabase - CORREÇÃO: Usar UPDATE para edição (ficha já existe)
+      // Salvar no Supabase
       const { data, error } = await window.supabase
-        .from('anamnese_clientes')
-        .update({
+        .from('anamnese')
+        .upsert({
           ...anamneseData,
-          cliente_id: cliente.id
+          cliente_id: cliente.id,
+          created_at: new Date().toISOString()
         })
-        .eq('id', this.currentAnamneseId)
         .select()
         .single();
 
       if (error) {
-        console.error('❌ Erro ao salvar anamnese:', error);
+        console.error('Erro ao salvar anamnese:', error);
         UIUtils.showAlert('Erro ao salvar ficha de anamnese', 'error');
         return;
       }
 
-      console.log('✅ Anamnese salva com sucesso');
+      console.log('✅ Anamnese salva com sucesso:', data);
       UIUtils.showAlert('Ficha de anamnese salva com sucesso', 'success');
       
       // Fechar modal

@@ -17,19 +17,6 @@ ESTILO GERAL / LAYOUT - L'ANGE BEAUTY
   --card-shadow: 0 8px 32px rgba(212, 175, 55, 0.15);
 }
 
-/* MELHORIA V1.4: Animações para estatísticas */
-.stat-updated {
-  animation: statPulse 0.5s ease-in-out;
-  color: var(--primary-gold) !important;
-  font-weight: 600 !important;
-}
-
-@keyframes statPulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); color: var(--accent-gold); }
-  100% { transform: scale(1); }
-}
-
 body{
   font-family: 'Poppins', sans-serif;
   margin:0;
@@ -38,158 +25,10 @@ body{
 }
 
 .layout{
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  overflow: hidden;
-}
-
-.sidebar{
-  width: 240px;
-  background: var(--sidebar-bg);
-  color: var(--primary-beige);
-  padding: 30px 20px;
-  box-shadow: 4px 0 24px rgba(0,0,0,0.1);
-  flex-shrink: 0;
-  transition: width 0.3s ease, padding 0.3s ease;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display:flex;
+  min-height:100vh;
   position: relative;
-}
-
-.sidebar.collapsed {
-  width: 0;
-  padding: 0;
-}
-
-.sidebar.collapsed * {
-  display: none;
-}
-
-.sidebar h2 {
-  margin: 0 0 30px 0;
-  font-family: 'Playfair Display', serif;
-  font-size: 24px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--primary-gold);
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-}
-
-.sidebar nav {
-  flex: 1;
-  min-height: 0;
-}
-
-.sidebar .logout-btn {
-  margin-top: auto;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.content{
-  flex: 1;
-  min-width: 0;
-  padding: 30px 40px;
-  background: white;
-  overflow-y: auto;
-  transition: none;
-}
-
-/* Menu Toggle Button - Renderização Condicional */
-.menu-toggle {
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 10px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.menu-toggle:hover {
-  background: var(--primary-beige);
-  border-color: var(--primary-gold);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Quando sidebar está fechada - botão no header */
-.sidebar.collapsed + .content .menu-toggle {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 1000;
-}
-
-/* Quando sidebar está aberta - botão dentro da sidebar */
-.sidebar:not(.collapsed) .menu-toggle {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 1001;
-}
-
-/* Animação do hambúrguer */
-.menu-toggle.active .hamburger-line:nth-child(1) {
-  transform: rotate(45deg) translate(5px, 5px);
-}
-
-.menu-toggle.active .hamburger-line:nth-child(2) {
-  opacity: 0;
-}
-
-.menu-toggle.active .hamburger-line:nth-child(3) {
-  transform: rotate(-45deg) translate(5px, -5px);
-}
-
-.hamburger-line {
-  width: 20px;
-  height: 2px;
-  background: var(--text-dark);
-  transition: all 0.3s ease;
-  transform-origin: center;
-  margin: 2px 0;
-}
-
-/* Responsividade */
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    height: 100vh;
-    z-index: 999;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-  }
-  
-  .sidebar:not(.collapsed) {
-    transform: translateX(0);
-  }
-  
-  .sidebar.collapsed {
-    transform: translateX(-100%);
-  }
-  
-  .content {
-    padding: 20px;
-  }
-  
-  .menu-toggle {
-    left: 20px;
-  }
-  
-  .menu-toggle.active {
-    left: 20px;
-  }
+  z-index: 2;
 }
 
 /* NOVA IMPLEMENTAÇÃO V1.2 - ESTILOS PARA FILTROS DINÂMICOS */
@@ -402,6 +241,28 @@ body{
 .loading-card-text {
   color: var(--text-light);
   font-size: 14px;
+}
+
+.sidebar{
+  width:260px;
+  background: var(--sidebar-bg);
+  color: var(--primary-beige);
+  padding:30px 20px;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 3;
+}
+
+.sidebar h2{
+  margin:0 0 30px 0;
+  font-family: 'Playfair Display', serif;
+  font-size:24px;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  color: var(--primary-gold);
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
 /* =====================================================
@@ -765,36 +626,7 @@ MODAL
   box-shadow: 0 6px 20px rgba(244, 67, 54, 0.3);
 }
 
-/* Botão de Logout - Dentro da Sidebar */
-.logout-btn {
-  background: rgba(220, 38, 38, 0.9);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 12px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
-  width: 100%;
-  justify-content: flex-start;
-}
-
-.logout-btn:hover {
-  background: rgba(220, 38, 38, 1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-}
-
-.logout-btn:active {
-  transform: translateY(0);
-}
-
-/* =====================================================
-CAIXA DO FORMULÁRIO
+/* ESTILOS PADRONIZADOS PARA BOTÃO DE LOGOUT
 ===================================================== */
 
 .modal-content label{
@@ -2131,4 +1963,163 @@ ESTILOS DA FICHA DE ANAMNESE
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* =====================================================
+ESTILOS PADRONIZADOS PARA BOTÃO DE LOGOUT
+===================================================== */
+
+.logout-btn {
+  position: fixed !important;
+  bottom: 20px !important;
+  left: 20px !important;
+  right: auto !important;
+  z-index: 999999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #dc3545 !important;
+  color: white !important;
+  border: none !important;
+  padding: 12px 24px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  font-family: 'Poppins', sans-serif !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+  width: auto !important;
+  min-width: 150px !important;
+  max-width: 200px !important;
+  height: auto !important;
+  min-height: 43px !important;
+  max-height: 43px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.logout-btn:hover {
+  background: #b91c1c;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+}
+
+.logout-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.logout-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3);
+}
+
+/* Responsividade para o botão de logout */
+@media (max-width: 768px) {
+  .logout-btn {
+    bottom: 15px;
+    left: 15px;
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .logout-btn {
+    bottom: 10px;
+    left: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
+
+/* =====================================================
+ESTILOS PARA SIDEBAR COLLAPSIBLE - GOOGLE CALENDAR STYLE
+===================================================== */
+
+.sidebar.collapsed {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.sidebar.collapsed * {
+  display: none;
+}
+
+/* EXCEÇÃO: Botão de logout deve sempre ser gerenciado pelo JavaScript, não pelo CSS */
+.sidebar.collapsed .logout-btn {
+  display: none !important;
+}
+
+/* Botão de toggle da sidebar */
+.menu-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: var(--primary-gold);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 1001;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+}
+
+.menu-toggle:hover {
+  background: #b8941f;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+}
+
+.menu-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Quando a sidebar está fechada, botão fica no conteúdo */
+.sidebar.collapsed + .content .menu-toggle {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: var(--primary-gold);
+}
+
+.sidebar.collapsed + .content .menu-toggle:hover {
+  background: #b8941f;
+}
+
+/* Animação suave da sidebar */
+.sidebar {
+  transition: width 0.3s ease, padding 0.3s ease;
+}
+
+/* Ajuste do conteúdo quando sidebar está fechada */
+.sidebar.collapsed + .content {
+  margin-left: 0;
+  width: 100%;
+}
+
+/* Responsividade para o botão */
+@media (max-width: 768px) {
+  .menu-toggle {
+    width: 35px;
+    height: 35px;
+    font-size: 16px;
+    top: 15px;
+    right: 15px;
+  }
+  
+  .sidebar.collapsed + .content .menu-toggle {
+    top: 15px;
+    left: 15px;
+  }
 }

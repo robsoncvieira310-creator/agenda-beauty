@@ -6,9 +6,8 @@ class PageManager {
   }
 
   setupEventListeners() {
-    // Configurar navegação após appReady
-    window.addEventListener('appReady', () => {
-      console.log('🚀 PageManager: appReady recebido, inicializando...');
+    // Configurar navegação
+    document.addEventListener('DOMContentLoaded', () => {
       this.initializePage();
     });
     
@@ -38,32 +37,6 @@ class PageManager {
     }
   }
 
-  detectCurrentPage() {
-    const path = window.location.pathname;
-    const filename = path.split('/').pop() || '';
-    
-    if (filename.includes('agenda')) {
-      this.currentPage = 'agenda';
-      window.pageManager = new AgendaPage();
-      console.log('📅 Página agenda detectada');
-    } else if (filename.includes('profissionais')) {
-      this.currentPage = 'profissionais';
-      window.pageManager = new ProfissionaisPage();
-      console.log('👩 Página profissionais detectada');
-    } else if (filename.includes('clientes')) {
-      this.currentPage = 'clientes';
-      window.pageManager = new ClientesPage();
-      console.log('👥 Página clientes detectada');
-    } else if (filename.includes('servicos')) {
-      this.currentPage = 'servicos';
-      window.pageManager = new ServicosPage();
-      console.log('💇 Página serviços detectada');
-    } else {
-      this.currentPage = 'dashboard';
-      console.log('📊 Página dashboard detectada');
-    }
-  }
-
   async loadBaseData() {
     console.log("📊 Carregando dados base...");
     // Carregar dados necessários para todas as páginas
@@ -71,13 +44,13 @@ class PageManager {
     
     // Todas as páginas precisam de clientes, serviços e profissionais
     console.log("🔍 Adicionando loadServicos() às promises...");
-    promises.push(window.dataManager.loadServicos());
-    promises.push(window.dataManager.loadClientes());
-    promises.push(window.dataManager.loadProfissionais());
+    promises.push(dataManager.loadServicos());
+    promises.push(dataManager.loadClientes());
+    promises.push(dataManager.loadProfissionais());
     
     // Páginas específicas podem precisar de mais dados
     if (this.needsAgendamentos()) {
-      promises.push(window.dataManager.loadAgendamentos());
+      promises.push(dataManager.loadAgendamentos());
     }
     
     await Promise.all(promises);
@@ -284,7 +257,3 @@ class PageManager {
 
 // Exportar para uso global
 window.PageManager = PageManager;
-
-// Criar instância global imediatamente
-window.pageManagerInstance = new PageManager();
-console.log('✅ PageManager instanciado globalmente');

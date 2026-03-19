@@ -2,6 +2,12 @@
 const SUPABASE_URL = "https://kckbcjjgbipcqzkynwpy.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtja2JjampnYmlwY3F6a3lud3B5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NDIxMjgsImV4cCI6MjA4ODMxODEyOH0.h3Z8LkzH_PXxE-BBHPii3WUwfHQH5HESsvzHUHKY7ZE";
 
+// Verificar se o Supabase está disponível globalmente
+if (!window.supabase) {
+  console.error('❌ SUPABASE_CLIENT: Supabase não disponível globalmente');
+  throw new Error('Supabase não disponível');
+}
+
 // Criar cliente Supabase com configurações de sessão CORRETAS
 const client = window.supabase.createClient(
   SUPABASE_URL,
@@ -18,7 +24,7 @@ const client = window.supabase.createClient(
 );
 
 // Disponibilizar globalmente
-window.supabase = client;
 window.supabaseClient = client; // Manter compatibilidade
 
 console.log("✅ Supabase inicializado com configurações de sessão corretas");
+console.log("✅ SupabaseClient disponível globalmente");

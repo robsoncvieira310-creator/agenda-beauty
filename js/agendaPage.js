@@ -14,42 +14,26 @@ class AgendaPage extends PageManager {
   async initializeSpecificPage() {
     console.log('📅 Inicializando página de agenda...');
     
-    try {
-      // MELHORIA V1.4: Inicialização robusta com fallbacks
-      const initPromises = [];
-      
-      // Inicializar componentes específicos
-      initPromises.push(this.initializeCalendar());
-      initPromises.push(this.initializeModal());
-      
-      // Aguardar inicialização básica
-      await Promise.allSettled(initPromises);
-      
-      // Configurar botões específicos
-      this.setupAgendaButtons();
-      
-      // MELHORIA V1.4: Configurar filtros dinâmicos com controle de acesso
-      await this.setupFiltros();
-      
-      // Carregar estatísticas
-      await this.updateStatistics();
-      
-      console.log(' Página de agenda inicializada com sucesso');
-      
-    } catch (error) {
-      console.error(' Erro na inicialização da agenda:', error);
-      this.showError('Erro ao carregar página de agenda');
-    }
+    // Inicializar componentes específicos
+    await this.initializeCalendar();
+    await this.initializeModal();
+    
+    // Configurar botões específicos
+    this.setupAgendaButtons();
+    
+    // NOVA IMPLEMENTAÇÃO V1.2 - CONFIGURAR FILTROS DINÂMICOS
+    await this.setupFiltros();
+    
+    // Carregar estatísticas
+    await this.updateStatistics();
+    
+    // Configurar atualização automática
+    this.setupAutoRefresh();
   }
 
   async initializeCalendar() {
     try {
-      // Validar se CalendarManager está disponível
-      if (!window.CalendarManager) {
-        throw new Error("CalendarManager não carregado");
-      }
-      
-      this.calendarManager = new window.CalendarManager('calendar');
+      this.calendarManager = new CalendarManager('calendar');
       await this.calendarManager.initialize();
     } catch (error) {
       console.error('Erro ao inicializar calendário:', error);
@@ -67,16 +51,6 @@ class AgendaPage extends PageManager {
   }
 
   setupAgendaButtons() {
-    // Botão Novo Agendamento
-    const btnNovoAgendamento = document.getElementById('btnNovoAgendamento');
-    if (btnNovoAgendamento) {
-      btnNovoAgendamento.addEventListener('click', () => {
-        if (this.modalManager) {
-          this.modalManager.abrirModalAgendamento({ tipo: 'novo' });
-        }
-      });
-    }
-
     // Botão Hoje
     const btnHoje = document.getElementById('btnHoje');
     if (btnHoje) {
@@ -115,62 +89,37 @@ class AgendaPage extends PageManager {
 
   async updateStatistics() {
     try {
-      const agendamentos = window.dataManager.agendamentos;
+      const agendamentos = dataManager.agendamentos;
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
       const amanha = new Date(hoje);
       amanha.setDate(amanha.getDate() + 1);
 
-      // MELHORIA V1.4: Cálculos detalhados de estatísticas
       // Agendamentos hoje
       const agendamentosHoje = agendamentos.filter(a => {
-        const dataAg = new Date(a.data_inicio || a.inicio);
+        const dataAg = new Date(a.inicio);
         return dataAg >= hoje && dataAg < amanha;
       });
 
       // Confirmados hoje
-      const confirmadosHoje = agendamentosHoje.filter(a => 
-        a.status === 'confirmado' || a.status === 'confirmado'
-      );
+      const confirmadosHoje = agendamentosHoje.filter(a => a.status === 'confirmado');
 
       // Próximos agendamentos (próximos 7 dias)
       const proximosAgendamentos = agendamentos.filter(a => {
-        const dataAg = new Date(a.data_inicio || a.inicio);
+        const dataAg = new Date(a.inicio);
         return dataAg > hoje && dataAg < new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
       });
 
-      // MELHORIA V1.4: Atualizar DOM com validação
+      // Atualizar DOM
       const totalElement = document.getElementById('totalAgendamentos');
       const confirmadosElement = document.getElementById('confirmadosHoje');
       const proximosElement = document.getElementById('proximosAgendamentos');
 
-      if (totalElement) {
-        totalElement.textContent = agendamentosHoje.length;
-        totalElement.classList.add('stat-updated');
-        setTimeout(() => totalElement.classList.remove('stat-updated'), 500);
-      }
-      
-      if (confirmadosElement) {
-        confirmadosElement.textContent = confirmadosHoje.length;
-        confirmadosElement.classList.add('stat-updated');
-        setTimeout(() => confirmadosElement.classList.remove('stat-updated'), 500);
-      }
-      
-      if (proximosElement) {
-        proximosElement.textContent = proximosAgendamentos.length;
-        proximosElement.classList.add('stat-updated');
-        setTimeout(() => proximosElement.classList.remove('stat-updated'), 500);
-      }
-
-      // Log detalhado para debug (removível em produção)
-      console.log('📊 Estatísticas atualizadas:', {
-        hoje: agendamentosHoje.length,
-        confirmados: confirmadosHoje.length,
-        proximos: proximosAgendamentos.length
-      });
-
+      if (totalElement) totalElement.textContent = agendamentosHoje.length;
+      if (confirmadosElement) confirmadosElement.textContent = confirmadosHoje.length;
+      if (proximosElement) proximosElement.textContent = proximosAgendamentos.length;
     } catch (error) {
-      console.error('❌ Erro ao atualizar estatísticas:', error);
+      console.error('Erro ao atualizar estatísticas:', error);
     }
   }
 
@@ -186,42 +135,33 @@ class AgendaPage extends PageManager {
     console.log(' Configurando filtros dinâmicos...');
     
     try {
-      // MELHORIA V1.4: CONTROLE DE ACESSO MULTI-PROFISSIONAIS
+      // NOVA IMPLEMENTAÇÃO MULTI-PROFISSIONAIS
       // Obter profissional logado
       const profissionalLogado = await window.dataManager.getProfissionalLogado();
       
-      // Preencher filtro de profissionais
-      const filtroProfissional = document.getElementById('filtroProfissional');
-      if (filtroProfissional) {
-        if (profissionalLogado && profissionalLogado.role === 'admin') {
-          // ADMIN: Mostrar todos os profissionais como selecionáveis
-          const profissionais = await window.dataManager.getProfissionais();
-          filtroProfissional.innerHTML = '<option value="">Todos</option>';
-          profissionais.forEach(profissional => {
-            const option = document.createElement('option');
-            option.value = profissional.id; // Usar ID em vez de nome
-            option.textContent = profissional.nome;
-            filtroProfissional.appendChild(option);
-          });
-          filtroProfissional.disabled = false;
-          console.log(' Filtro de profissional configurado para ADMIN: Todos visíveis');
-        } else if (profissionalLogado) {
-          // PROFISSIONAL: Mostrar apenas seu próprio nome
-          filtroProfissional.innerHTML = `<option value="${profissionalLogado.id}" selected>${profissionalLogado.nome}</option>`;
+      if (profissionalLogado) {
+        // Se for profissional, esconder filtro de profissionais e mostrar apenas ele
+        const filtroProfissional = document.getElementById('filtroProfissional');
+        if (filtroProfissional) {
+          filtroProfissional.innerHTML = `<option value="${profissionalLogado.nome}" selected>${profissionalLogado.nome}</option>`;
           filtroProfissional.disabled = true; // Desabilitar pois só pode ver o próprio
-          console.log(' Filtro de profissional configurado para profissional logado:', profissionalLogado.id);
-        } else {
-          // SEM SESSÃO: Mostrar todos
-          const profissionais = await window.dataManager.getProfissionais();
+          console.log(' Filtro de profissional configurado para profissional logado:', profissionalLogado.nome);
+        }
+      } else {
+        // Se for admin, mostrar todos os profissionais
+        const profissionais = await window.dataManager.getProfissionais();
+        
+        // Preencher filtro de profissionais
+        const filtroProfissional = document.getElementById('filtroProfissional');
+        if (filtroProfissional) {
           filtroProfissional.innerHTML = '<option value="">Todos</option>';
           profissionais.forEach(profissional => {
             const option = document.createElement('option');
-            option.value = profissional.id;
+            option.value = profissional.nome;
             option.textContent = profissional.nome;
             filtroProfissional.appendChild(option);
           });
-          filtroProfissional.disabled = false;
-          console.log(' Filtro de profissional configurado sem sessão: Todos visíveis');
+          console.log(' Filtro de profissional configurado para admin - todos visíveis');
         }
       }
       
@@ -238,17 +178,12 @@ class AgendaPage extends PageManager {
         });
       }
       
-      // Aplicar filtros iniciais baseados no profissional logado
-      if (profissionalLogado) {
-        this.aplicarFiltros();
-      }
-      
-      // Adicionar event listeners (depois de aplicar filtros para evitar eventos indesejados)
+      // Adicionar event listeners
       this.setupFiltrosListeners();
       
-      console.log(' Filtros configurados com sucesso');
+      console.log('✅ Filtros configurados com sucesso');
     } catch (error) {
-      console.error(' Erro ao configurar filtros:', error);
+      console.error('❌ Erro ao configurar filtros:', error);
     }
   }
 
@@ -300,91 +235,78 @@ class AgendaPage extends PageManager {
     const cliente = document.getElementById('filtroCliente')?.value || '';
     
     console.log('🔍 Aplicando filtros:', { profissional, servico, cliente });
+    console.log('🔍 CalendarManager disponível:', !!this.calendarManager);
+    console.log('🔍 Calendar disponível:', !!this.calendarManager.calendar);
     
-    // Se não houver filtros ativos, mostrar todos os eventos
-    if (!profissional && !servico && !cliente) {
-      console.log('🔍 Nenhum filtro ativo, mostrando todos os eventos');
-      
-      // Obter todos os eventos atuais
-      const eventosAtuais = this.calendarManager.calendar.getEvents();
-      console.log('🔍 Total de eventos atuais:', eventosAtuais.length);
-      
-      // Se não houver eventos, carregar todos do DataManager
-      if (eventosAtuais.length === 0) {
-        console.log('🔍 Calendário vazio, carregando todos os eventos...');
-        const agendamentos = window.dataManager.agendamentos || [];
-        const bloqueios = window.dataManager.bloqueios || [];
-        
-        this.calendarManager.processarEventos(agendamentos, bloqueios);
-        this.calendarManager.adicionarEventosAoCalendario();
-      }
-      
-      return;
-    }
+    // Obter todos os eventos atuais
+    const eventosAtuais = this.calendarManager.calendar.getEvents();
+    console.log('🔍 Total de eventos atuais:', eventosAtuais.length);
     
-    try {
-      // Obter todos os eventos atuais
-      const eventosAtuais = this.calendarManager.calendar.getEvents();
-      console.log('🔍 Total de eventos atuais:', eventosAtuais.length);
+    // Log detalhado dos eventos
+    eventosAtuais.forEach((evento, index) => {
+      console.log(`🔍 Evento ${index}:`, {
+        title: evento.title,
+        tipo: evento.extendedProps?.tipo,
+        profissional: evento.extendedProps?.profissional,
+        servico: evento.extendedProps?.servico,
+        cliente: evento.extendedProps?.cliente
+      });
+    });
+    
+    // Remover todos os eventos do calendário
+    eventosAtuais.forEach(evento => evento.remove());
+    
+    // Obter dados filtrados do DataManager
+    const agendamentos = window.dataManager.agendamentos || [];
+    const bloqueios = window.dataManager.bloqueios || [];
+    
+    console.log('🔍 Agendamentos no DataManager:', agendamentos.length);
+    console.log('🔍 Bloqueios no DataManager:', bloqueios.length);
+    
+    // Log detalhado dos bloqueios para diagnóstico
+    bloqueios.forEach((bloqueio, index) => {
+      console.log(`🔍 Bloqueio ${index} completo:`, bloqueio);
+      console.log(`🔍 Bloqueio ${index} - ID do banco:`, bloqueio.id);
+      console.log(`🔍 Bloqueio ${index} - Tem ID numérico?:`, !isNaN(parseInt(bloqueio.id)));
+    });
+    
+    // Log detalhado dos agendamentos para diagnóstico
+    agendamentos.forEach((agendamento, index) => {
+      console.log(`🔍 Agendamento ${index} completo:`, agendamento);
+    });
+    
+    // REMOVIDO: Agendamentos de teste - usar apenas dados reais do Supabase
+    
+    // Filtrar agendamentos
+    const agendamentosFiltrados = agendamentos.filter(agendamento => {
+      const matchProfissional = !profissional || agendamento.profissional === profissional;
+      const matchServico = !servico || agendamento.servico === servico;
+      const matchCliente = !cliente || agendamento.cliente?.toLowerCase().includes(cliente.toLowerCase());
       
-      // Remover todos os eventos do calendário (apenas se houver filtros)
-      eventosAtuais.forEach(evento => evento.remove());
-      
-      // Obter dados filtrados do DataManager
-      const agendamentos = window.dataManager.agendamentos || [];
-      const bloqueios = window.dataManager.bloqueios || [];
-      
-      console.log('🔍 Agendamentos no DataManager:', agendamentos.length);
-      console.log('🔍 Bloqueios no DataManager:', bloqueios.length);
-      
-      // MELHORIA V1.4: Filtragem robusta com validação
-      const agendamentosFiltrados = agendamentos.filter(agendamento => {
-        // CORREÇÃO: Comparar por ID em vez de nome
-        const matchProfissional = !profissional || 
-          (agendamento.profissional_id && agendamento.profissional_id.toString() === profissional);
-        const matchServico = !servico || 
-          (agendamento.servico && agendamento.servico === servico);
-        const matchCliente = !cliente || 
-          (agendamento.cliente && agendamento.cliente.toLowerCase().includes(cliente.toLowerCase()));
-        
-        const match = matchProfissional && matchServico && matchCliente;
-        
-        // Log detalhado apenas se houver filtros ativos
-        if (profissional || servico || cliente) {
-          console.log(`🔍 Agendamento "${agendamento.cliente || 'N/A'} - ${agendamento.servico || 'N/A'}" - Matches:`, {
-            match,
-            matchProfissional,
-            matchServico,
-            matchCliente,
-            agendamentoProfissional: agendamento.profissional_id,
-            agendamentoServico: agendamento.servico,
-            agendamentoCliente: agendamento.cliente
-          });
-        }
-        
-        return match;
+      const match = matchProfissional && matchServico && matchCliente;
+      console.log(`🔍 Agendamento "${agendamento.cliente} - ${agendamento.servico}" - Matches:`, {
+        matchProfissional,
+        matchServico,
+        matchCliente,
+        agendamentoProfissional: agendamento.profissional,
+        agendamentoServico: agendamento.servico,
+        agendamentoCliente: agendamento.cliente
       });
       
-      console.log(`🔍 Agendamentos filtrados: ${agendamentosFiltrados.length}/${agendamentos.length}`);
-      
-      // Usar o método processarEventos do CalendarManager
-      const eventosFormatados = this.calendarManager.processarEventos(agendamentosFiltrados, bloqueios);
-      
-      // Adicionar eventos ao calendário
-      eventosFormatados.forEach(evento => {
-        this.calendarManager.calendar.addEvent(evento);
-      });
-      
-      console.log(`✅ Filtros aplicados: ${eventosFormatados.length} eventos adicionados`);
-      
-      // MELHORIA V1.4: Atualizar estatísticas após filtrar
-      this.updateStatistics();
-      
-    } catch (error) {
-      console.error('❌ Erro ao aplicar filtros:', error);
-      // Tentar recarregar eventos sem filtros em caso de erro
-      this.calendarManager.refreshEvents();
-    }
+      return match;
+    });
+    
+    console.log(`🔍 Agendamentos filtrados: ${agendamentosFiltrados.length}/${agendamentos.length}`);
+    
+    // Usar o método processarEventos do CalendarManager
+    const eventosFormatados = this.calendarManager.processarEventos(agendamentosFiltrados, bloqueios);
+    
+    // Adicionar eventos ao calendário
+    eventosFormatados.forEach(evento => {
+      this.calendarManager.calendar.addEvent(evento);
+    });
+    
+    console.log(`✅ Filtros aplicados: ${eventosFormatados.length} eventos adicionados`);
   }
 
   limparFiltros() {
@@ -440,7 +362,6 @@ class AgendaPage extends PageManager {
     if (btn) UIUtils.showLoading(btn);
     
     try {
-      // MELHORIA V1.4: Carregamento otimizado com fallback
       await this.loadBaseData();
       
       if (this.calendarManager) {
@@ -449,22 +370,9 @@ class AgendaPage extends PageManager {
       
       await this.updateStatistics();
       this.showSuccess('Dados atualizados com sucesso');
-      
-      // MELHORIA V1.4: Aplicar filtros atuais após refresh
-      setTimeout(() => this.aplicarFiltros(), 100);
-      
     } catch (error) {
-      console.error('❌ Erro ao atualizar dados:', error);
+      console.error('Erro ao atualizar dados:', error);
       this.showError('Erro ao atualizar dados');
-      
-      // MELHORIA V1.4: Tentar recuperação automática
-      try {
-        if (this.calendarManager) {
-          await this.calendarManager.refreshEvents();
-        }
-      } catch (recoveryError) {
-        console.error('❌ Erro na recuperação:', recoveryError);
-      }
     } finally {
       if (btn) UIUtils.hideLoading(btn);
     }

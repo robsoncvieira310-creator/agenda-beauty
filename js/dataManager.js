@@ -4,12 +4,12 @@
 console.log('💾 DataManager V1.4.0 carregado - Versão limpa');
 
 class DataManager {
-  constructor(supabaseClient) {
-    if (!supabaseClient) {
-      throw new Error("Supabase client não fornecido ao DataManager");
+  constructor(supabase) {
+    if (!supabase) {
+      throw new Error('Supabase client é obrigatório para DataManager');
     }
-    
-    this.supabase = supabaseClient;
+
+    this.supabase = supabase;
     this.clientes = [];
     this.servicos = [];
     this.profissionais = [];
@@ -29,25 +29,23 @@ class DataManager {
   }
 
   async loadClientes() {
-    if (!this.supabase) {
-      throw new Error("Supabase não inicializado no DataManager");
-    }
-    
     try {
+      console.log('🔍 Carregando clientes...');
+      
       const { data, error } = await this.supabase
-        .from("clientes")
-        .select("*")
-        .order("created_at", { ascending: true });
+        .from('clientes')
+        .select('*')
+        .order('nome');
 
       if (error) {
-        console.error('Erro ao carregar clientes do Supabase:', error);
+        console.error('❌ Erro ao carregar clientes do Supabase:', error);
         this.clientes = [];
       } else {
         this.clientes = data || [];
+        console.log('✅ Clientes carregados do Supabase:', this.clientes.length);
+        this.cache.clientes = this.clientes;
+        console.log('💾 Clientes salvos no cache:', this.clientes.length);
       }
-      
-      // Salvar no cache
-      this.cache.clientes = this.clientes;
       
       return this.clientes;
     } catch (error) {
@@ -59,6 +57,8 @@ class DataManager {
 
   async loadServicos() {
     try {
+      console.log('Carregando serviços...');
+      
       const { data, error } = await this.supabase
         .from('servicos')
         .select('*')
@@ -69,10 +69,16 @@ class DataManager {
         this.servicos = [];
       } else {
         this.servicos = data || [];
+        console.log('Serviços carregados do Supabase:', this.servicos.length);
+        this.servicos = this.servicos.map(servico => ({
+          ...servico,
+          duracao_min: parseInt(servico.duracao_min) || 30,
+          valor: parseFloat(servico.valor) || 0
+        }));
+        console.log('Serviços mapeados para formato compatível:', this.servicos.length);
+        this.cache.servicos = this.servicos;
+        console.log('Serviços salvos no cache:', this.servicos.length);
       }
-      
-      // Salvar no cache
-      this.cache.servicos = this.servicos;
       
       return this.servicos;
     } catch (error) {
@@ -84,19 +90,25 @@ class DataManager {
 
   async loadBloqueios() {
     try {
+      console.log('🔍 Carregando bloqueios...');
+      console.log('🔍 Verificando this.supabase:', this.supabase);
+      
+      // ✅ CORRIGIDO: Usar colunas corretas da tabela bloqueios
       const { data, error } = await this.supabase
         .from('bloqueios')
         .select('*')
         .order('inicio', { ascending: true });
 
       if (error) {
-        console.error('Erro ao carregar bloqueios:', error);
+        console.error('❌ Erro ao carregar bloqueios:', error);
         this.bloqueios = [];
       } else {
         this.bloqueios = data || [];
-        // Mapear para formato compatível
+        console.log('✅ Bloqueios carregados:', this.bloqueios.length);
+        // ✅ CORRIGIDO: Mapear para formato compatível
         this.bloqueios = this.bloqueios.map(bloqueio => ({
           ...bloqueio,
+          // Mapear nomes das colunas para compatibilidade
           data_inicio: bloqueio.inicio,
           data_fim: bloqueio.fim,
           titulo: bloqueio.titulo || 'Bloqueio',
@@ -115,171 +127,177 @@ class DataManager {
 
   async loadProfissionais() {
     try {
-      if (this.cache.profissionais && this.cache.profissionais.length > 0) {
-        this.profissionais = this.cache.profissionais;
+      console.log('🔍 Carregando profissionais da tabela profissionais com merge manual para profiles...');
+      
+      // ✅ VERIFICAR SESSÃO ANTES DA QUERY
+      if (!window.authManager || !window.authManager.currentUserProfile) {
+        console.error('❌ DATA_MANAGER: Nenhum usuário autenticado para carregar profissionais');
+        this.profissionais = [];
         return this.profissionais;
       }
 
-      const { data, error } = await this.supabase
-        .from('profissionais')
-        .select(`
-          id, 
-          telefone, 
-          created_at, 
-          profile_id, 
-          profiles!inner(nome, email, role)
-        `)
-        .order('id', { ascending: true });
-
-      if (error) {
-        console.warn('Erro no JOIN, tentando solução alternativa:', error.message);
-        
-        // SOLUÇÃO ALTERNATIVA: Duas consultas separadas
-        try {
-          // 1. Buscar profissionais
-          const { data: profissionais, error: errorProf } = await this.supabase
-            .from('profissionais')
-            .select('*')
-            .order('id', { ascending: true });
-            
-          if (errorProf) {
-            console.error('❌ Erro ao buscar profissionais:', errorProf);
-            this.profissionais = [];
-            return this.profissionais;
-          }
-          
-          // 2. Buscar profiles com bypass de RLS (admin)
-          const { data: profiles, error: errorProfiles } = await this.supabase
-            .from('profiles')
-            .select('*')
-            .then(async (result) => {
-              // Se der erro RLS, tentar com opções de admin
-              if (result.error && result.error.message.includes('recursion')) {
-                console.log('🔓 Tentando bypass RLS para profiles...');
-                return await this.supabase.rpc('get_profiles_admin'); // Tentar RPC se existir
-              }
-              return result;
-            })
-            .catch(async (err) => {
-              // Último recurso: buscar profiles via auth.users
-              console.log('🔓 Tentando buscar via auth.users...');
-              try {
-                const { data: { users } } = await this.supabase.auth.admin.listUsers();
-                const profilesFromAuth = users.map(user => ({
-                  id: user.id,
-                  nome: user.user_metadata?.nome || user.email?.split('@')[0] || 'Usuário',
-                  email: user.email,
-                  role: user.user_metadata?.role || 'user'
-                }));
-                return { data: profilesFromAuth, error: null };
-              } catch (authError) {
-                console.warn('⚠️ Falha no auth.admin também:', authError.message);
-                return { data: [], error: authError };
-              }
-            });
-            
-          if (errorProfiles) {
-            console.warn('⚠️ Erro ao buscar profiles, tentando auth.users como fallback...');
-            // ÚLTIMO RECURSO: Tentar buscar via auth.users para obter emails
-            try {
-              const { data: { users } } = await this.supabase.auth.admin.listUsers();
-              const usersMap = {};
-              users.forEach(user => {
-                usersMap[user.id] = user;
-              });
-              
-              this.profissionais = profissionais.map(p => {
-                const user = usersMap[p.profile_id];
-                return {
-                  ...p,
-                  nome: user?.user_metadata?.nome || user?.email?.split('@')[0] || `Profissional ${p.id}`,
-                  email: user?.email || 'Email não informado'
-                };
-              });
-              
-              console.log('✅ Profissionais carregados via auth.users fallback:', this.profissionais);
-            } catch (authError) {
-              console.warn('⚠️ Falha no auth.users também, usando placeholders:', authError.message);
-              this.profissionais = profissionais.map(p => ({
-                ...p,
-                nome: `Profissional ${p.id}`,
-                email: 'Email não informado'
-              }));
-            }
-          } else {
-            // 3. Juntar dados manualmente
-            const profilesMap = {};
-            profiles.forEach(profile => {
-              profilesMap[profile.id] = profile;
-            });
-            
-            this.profissionais = profissionais.map(profissional => {
-              const profile = profilesMap[profissional.profile_id];
-              if (profile) {
-                return {
-                  ...profissional,
-                  nome: profile.nome,
-                  email: profile.email,
-                  role: profile.role
-                };
-              } else {
-                return {
-                  ...profissional,
-                  nome: `Profissional ${profissional.id}`,
-                  email: 'Email não informado'
-                };
-              }
-            });
-          }
-          
-        } catch (altError) {
-          console.error('Erro na solução alternativa:', altError);
-          this.profissionais = [];
-        }
-      } else {
-        this.profissionais = data || [];
-        
-        // Mapear para formato compatível
-        this.profissionais = this.profissionais.map(profissional => {
-          const result = {
-            id: parseInt(profissional.id) || profissional.id,
-            nome: profissional.profiles?.nome || `Profissional ${profissional.id}`,
-            email: profissional.profiles?.email || 'Email não informado',
-            telefone: profissional.telefone,
-            role: profissional.profiles?.role || 'user',
-            profile_id: profissional.profile_id,
-            created_at: profissional.created_at,
-            // Manter compatibilidade com código antigo
-            servicos: profissional.servicos || []
-          };
-          return result;
-        });
-        
-        this.cache.profissionais = this.profissionais;
+      const currentUserProfile = window.authManager.currentUserProfile;
+      console.log('👤 DATA_MANAGER: Usuário autenticado:', currentUserProfile.email, 'Role:', currentUserProfile.role);
+      
+      // Verificar cache primeiro
+      if (this.cache.profissionais !== null) {
+        console.log('📦 Retornando profissionais do cache:', this.cache.profissionais.length);
+        this.profissionais = this.cache.profissionais;
+        return this.profissionais;
       }
+      
+      console.log('⚠️ Cache vazio, carregando do Supabase com merge manual (profissionais + profiles)...');
+      
+      // ✅ ETAPA 1: Buscar profissionais
+      console.log('🔍 ETAPA 1: Buscando profissionais...');
+      let query = this.supabase
+        .from('profissionais')
+        .select('*');
+
+      // ✅ FILTRAR BASEADO NO ROLE DO USUÁRIO
+      if (currentUserProfile.role === 'admin') {
+        // Admin: ver todos os profissionais
+        console.log('👑 DATA_MANAGER: Admin detectado - carregando todos os profissionais');
+      } else if (currentUserProfile.role === 'profissional') {
+        // Profissional: ver apenas seu próprio registro
+        query = query.eq('profile_id', currentUserProfile.id);
+        console.log('👩 DATA_MANAGER: Profissional detectado - carregando apenas seu registro');
+      } else {
+        console.error('❌ DATA_MANAGER: Role não permitido:', currentUserProfile.role);
+        this.profissionais = [];
+        return this.profissionais;
+      }
+
+      const { data: profissionais, error: profissionaisError } = await query;
+
+      if (profissionaisError) {
+        console.error('❌ DATA_MANAGER: Erro ao buscar profissionais:', profissionaisError);
+        
+        // ❌ NÃO USAR FALLBACK - PROPAGAR ERRO
+        if (profissionaisError.code === '42501' || profissionaisError.message.includes('row-level security')) {
+          throw new Error(`Erro de permissão RLS: ${profissionaisError.message}. Verifique as políticas de segurança.`);
+        }
+        
+        this.profissionais = [];
+        return this.profissionais;
+      }
+      
+      console.log('✅ DATA_MANAGER: Profissionais encontrados:', profissionais.length);
+      
+      // ✅ ETAPA 2: Extrair profile_ids válidos
+      console.log('🔍 ETAPA 2: Extraindo profile_ids válidos...');
+      const profileIds = profissionais
+        .map(p => p.profile_id)
+        .filter(Boolean); // Remove null, undefined, 0, false, ""
+      
+      console.log("🔍 DEBUG: IDs para profiles:", profileIds);
+      
+      if (profileIds.length === 0) {
+        console.log('⚠️ Nenhum profile_id válido encontrado, retornando profissionais sem dados de perfil');
+        this.profissionais = profissionais.map(p => ({
+          id: p.id,
+          profile_id: p.profile_id,
+          nome: 'Sem nome',
+          email: 'Sem email',
+          telefone: 'Sem telefone',
+          role: 'profissional',
+          created_at: p.created_at
+        }));
+        this.cache.profissionais = this.profissionais;
+        return this.profissionais;
+      }
+      
+      // ✅ ETAPA 3: Buscar profiles
+      console.log('🔍 ETAPA 3: Buscando profiles...');
+      const { data: profiles, error: profilesError } = await this.supabase
+        .from('profiles')
+        .select('*')
+        .in('id', profileIds);
+      
+      if (profilesError) {
+        console.error('❌ DATA_MANAGER: Erro ao buscar profiles:', profilesError);
+        // Continuar com dados parciais
+        this.profissionais = profissionais.map(p => ({
+          id: p.id,
+          profile_id: p.profile_id,
+          nome: 'Sem nome',
+          email: 'Sem email',
+          telefone: 'Sem telefone',
+          role: 'profissional',
+          created_at: p.created_at
+        }));
+        this.cache.profissionais = this.profissionais;
+        return this.profissionais;
+      }
+      
+      console.log('✅ DATA_MANAGER: Profiles encontrados:', profiles.length);
+      
+      // ✅ ETAPA 4: Criar mapa para merge manual
+      console.log('🔍 ETAPA 4: Criando mapa de profiles...');
+      const profilesMap = {};
+      profiles.forEach(p => {
+        profilesMap[p.id] = p;
+      });
+      
+      console.log("🔍 DEBUG: ProfilesMap criado com:", Object.keys(profilesMap).length, "profiles");
+      
+      // ✅ ETAPA 5: Merge manual
+      console.log('🔍 ETAPA 5: Fazendo merge manual...');
+      this.profissionais = profissionais.map(p => {
+        const profile = profilesMap[p.profile_id];
+        
+        return {
+          id: p.id,
+          profile_id: p.profile_id,
+          nome: profile?.nome || 'Sem nome',
+          email: profile?.email || 'Sem email',
+          telefone: profile?.telefone || 'Sem telefone',
+          role: profile?.role || 'profissional',
+          created_at: p.created_at
+        };
+      });
+      
+      console.log('✅ DATA_MANAGER: Merge manual (profissionais + profiles) concluído:', this.profissionais.length);
+      
+      // 🔍 DEBUG: Verificar resultado final
+      const semNome = this.profissionais.filter(p => p.nome === 'Sem nome').length;
+      const semEmail = this.profissionais.filter(p => p.email === 'Sem email').length;
+      const semTelefone = this.profissionais.filter(p => p.telefone === 'Sem telefone').length;
+      
+      console.log("🔍 DEBUG: Resultado final - Sem nome:", semNome, "Sem email:", semEmail, "Sem telefone:", semTelefone);
+      
+      // ✅ ORDENAR POR NOME DO PROFILE (CLIENT-SIDE)
+      this.profissionais.sort((a, b) => a.nome.localeCompare(b.nome));
+      
+      console.log('✅ DATA_MANAGER: Profissionais mapeados (merge manual) com dados completos:', this.profissionais.length);
+      
+      // Salvar no cache (merge manual)
+      this.cache.profissionais = this.profissionais;
+      console.log('💾 DATA_MANAGER: Profissionais (merge manual) salvos no cache:', this.profissionais.length);
       
       return this.profissionais;
     } catch (error) {
-      console.error('Erro ao carregar profissionais:', error);
+      console.error('❌ DATA_MANAGER: Erro crítico ao carregar profissionais:', error);
       this.profissionais = [];
-      return this.profissionais;
+      throw error; // ❌ NÃO ENGOLIR ERROS
     }
   }
 
   async loadAgendamentos() {
     try {
+      console.log("🔍 Carregando agendamentos...");
+      
       // CORREÇÃO: Se cache foi limpo, recarregar do banco
       if (!this.cache.agendamentos) {
+        console.log("🔄 Cache vazio, carregando do banco...");
         
         // Obter profissional logado
         const profissionalLogado = await this.getProfissionalLogado();
         
         if (!profissionalLogado) {
-          // SEM SESSÃO: Retornar vazio
-          this.agendamentos = [];
-          this.cache.agendamentos = this.agendamentos;
-        } else if (profissionalLogado.role === 'admin') {
-          // ADMIN: Carregar todos os agendamentos
+          // ✅ ADMIN: Carregar todos os agendamentos
+          console.log("👑 Admin detectado - carregando todos os agendamentos");
+          
           const { data, error } = await this.supabase
             .from("agendamentos")
             .select("*")
@@ -290,30 +308,18 @@ class DataManager {
             this.agendamentos = [];
           } else {
             this.agendamentos = data || [];
-            console.log('✅ ADMIN: Agendamentos carregados:', this.agendamentos.length, this.agendamentos);
+            console.log("✅ Agendamentos carregados do banco:", this.agendamentos.length);
           }
           
           // Salvar no cache
           this.cache.agendamentos = this.agendamentos;
         } else {
-          // PROFISSIONAL: Carregar apenas seus agendamentos
-          const { data, error } = await this.supabase
-            .from("agendamentos")
-            .select("*")
-            .eq("profissional_id", profissionalLogado.id)
-            .order("data_inicio", { ascending: true });
-
-          if (error) {
-            console.error('Erro ao carregar agendamentos do profissional:', error);
-            this.agendamentos = [];
-          } else {
-            this.agendamentos = data || [];
-          }
-          
-          // Salvar no cache
+          // PROFSSIONAL: Lógica específica (se necessário)
+          this.agendamentos = [];
           this.cache.agendamentos = this.agendamentos;
         }
       } else {
+        console.log("📦 Usando agendamentos do cache:", this.cache.agendamentos.length);
         this.agendamentos = this.cache.agendamentos;
       }
       
@@ -326,35 +332,43 @@ class DataManager {
   }
 
   async getProfissionalLogado() {
-    if (!this.supabase) {
-      throw new Error("Supabase não inicializado no DataManager");
+    // ❌ NÃO IGNORAR RLS - VERIFICAR SESSÃO REAL
+    if (!window.authManager || !window.authManager.currentUserProfile) {
+      console.log('DATA_MANAGER: Nenhum usuário autenticado');
+      return null;
     }
-    
-    try {
-      const { data: { user } } = await this.supabase.auth.getUser();
-      
-      if (!user) {
-        console.log('DATA_MANAGER: Usuário não autenticado');
-        return null;
-      }
 
+    const profile = window.authManager.currentUserProfile;
+    
+    // ✅ VERIFICAR SE É PROFISSIONAL
+    if (profile.role !== 'profissional') {
+      console.log('DATA_MANAGER: Usuário não é profissional:', profile.role);
+      return null;
+    }
+
+    // ✅ BUSCAR PROFISSIONAL REAL VIA PROFILE_ID
+    try {
       const { data, error } = await this.supabase
-        .from('profiles')
+        .from('profissionais')
         .select('*')
-        .eq('id', user.id)
+        .eq('profile_id', profile.id)
         .single();
 
       if (error) {
-        console.error('DATA_MANAGER: Erro ao buscar profile:', error);
-        return null;
+        if (error.code === 'PGRST116') {
+          console.log('DATA_MANAGER: Profissional não encontrado para este profile');
+          return null;
+        }
+        console.error('DATA_MANAGER: Erro ao buscar profissional:', error);
+        throw error;
       }
 
       console.log('DATA_MANAGER: Profissional encontrado:', data);
       return data;
 
     } catch (error) {
-      console.error('DATA_MANAGER: Erro em getProfissionalLogado:', error);
-      return null;
+      console.error('DATA_MANAGER: Erro crítico ao buscar profissional:', error);
+      throw error;
     }
   }
 
@@ -370,7 +384,7 @@ class DataManager {
     this.addingProfissional = true;
     
     try {
-      // FLUXO CORRETO: auth.users → profiles → profissionais
+      // ✅ FLUXO CORRETO: auth.users → profiles → profissionais (sem JOIN)
       console.log('ETAPA 1: Criando usuário no Supabase Auth...');
       
       let userId = null;
@@ -410,19 +424,21 @@ class DataManager {
         console.warn("Falha na criação de usuário:", authError.message);
       }
       
-      // 2. Criar ou atualizar profile
+      // 2. Criar ou atualizar profile (fonte única de dados do usuário)
       if (userId) {
-        console.log("👤 ETAPA 2: Criando/atualizando profile...");
+        console.log("👤 ETAPA 2: Criando/atualizando profile (fonte única de dados)...");
         
         try {
+          // ✅ NOVA ARQUITETURA: profiles é fonte única de dados do usuário
           const { data: profile, error: profileError } = await this.supabase
             .from('profiles')
             .upsert({
               id: userId,
-              nome: dados.nome, // ✅ CORRIGIDO: Salvar nome em profiles
-              email: dados.email, // ✅ CORRIGIDO: Salvar email em profiles
+              nome: dados.nome, // ✅ Dados principais em profiles
+              email: dados.email, // ✅ Dados principais em profiles
+              telefone: dados.telefone, // ✅ Telefone pertence exclusivamente a profiles
               role: 'profissional',
-              first_login_completed: true // ✅ CORRIGIDO: true pois profissional ainda não logou
+              first_login_completed: true
             })
             .select()
             .single();
@@ -438,54 +454,30 @@ class DataManager {
         }
       }
       
-      // 3. Criar registro na tabela profissionais
-      console.log("ETAPA 3: Criando registro profissional...");
+      // 3. Criar registro na tabela profissionais (apenas profile_id - relacionamento)
+      console.log("ETAPA 3: Criando registro profissional (apenas profile_id)...");
       
       let profissionalData = {};
       
-      // Tentar com colunas completas primeiro
+      // ✅ NOVA ARQUITETURA: profissionais apenas com profile_id (relacionamento)
       if (userId) {
         profissionalData = {
-          nome: dados.nome,
-          telefone: dados.telefone,
-          email: dados.email,
-          especialidade: dados.especialidade || 'Geral',
-          ativo: true,
-          profile_id: userId // RELACIONAMENTO CORRETO
+          profile_id: userId // ✅ Apenas profile_id - dados ficam em profiles
         };
       } else {
         // Fallback: criar sem profile_id
         profissionalData = {
-          telefone: dados.telefone,
           profile_id: null
         };
       }
       
       console.log("Dados para profissionais:", profissionalData);
       
-      let { data: profissional, error: profissionalError } = await this.supabase
+      const { data: profissional, error: profissionalError } = await this.supabase
         .from('profissionais')
         .insert(profissionalData)
         .select()
         .single();
-      
-      // Se falhar por coluna inexistente, tentar com colunas mínimas
-      if (profissionalError && profissionalError.message.includes('column')) {
-        console.warn("Colunas completas não funcionaram, tentando mínimas...");
-        
-        profissionalData = userId ? 
-          { telefone: dados.telefone, profile_id: userId } :
-          { telefone: dados.telefone, profile_id: null };
-        
-        const result = await this.supabase
-          .from('profissionais')
-          .insert(profissionalData)
-          .select()
-          .single();
-        
-        profissional = result.data;
-        profissionalError = result.error;
-      }
       
       if (profissionalError) {
         console.error("Erro ao criar profissional:", profissionalError);
@@ -494,25 +486,25 @@ class DataManager {
       
       console.log("Profissional criado com sucesso:", profissional);
       
-      // 4. Retornar resultado completo
+      // 4. Retornar resultado completo (merge manual, sem JOIN)
       const resultado = {
         profissional: {
           ...profissional,
-          nome: dados.nome || `Profissional ${profissional.id}`,
-          email: dados.email,
-          especialidade: dados.especialidade || 'Geral',
-          ativo: true
+          nome: dados.nome || 'Sem nome',
+          email: dados.email || 'Sem email',
+          telefone: dados.telefone || 'Sem telefone', // ✅ Dados vêm do profile (única fonte de dados)
+          especialidade: dados.especialidade || 'Geral'
         },
         usuario: userId ? { id: userId, email: dados.email } : null,
         profile: profileData,
         fluxo: userId ? 
-          "FLUXO COMPLETO: auth.users → profiles → profissionais" : 
+          "FLUXO COMPLETO: auth.users → profiles (dados) → profissionais (relacionamento)" : 
           "FLUXO PARCIAL: apenas profissionais (crie usuário manualmente)"
       };
       
       console.log("Resultado do fluxo:", resultado);
       
-      // Adicionar ao cache local
+      // Adicionar ao cache local (lista de profissionais)
       this.profissionais.push(resultado.profissional);
       this.cache.profissionais = null;
       
@@ -523,6 +515,70 @@ class DataManager {
       throw error;
     } finally {
       this.addingProfissional = false;
+    }
+  }
+
+  async updateProfissional(id, dados) {
+    try {
+      console.log('🔧 Atualizando profissional:', id, dados);
+      
+      // 1. Atualizar profile (se tiver profile_id) - AGORA INCLUI TELEFONE
+      if (dados.profile_id) {
+        const { error: profileError } = await this.supabase
+          .from('profiles')
+          .update({
+            nome: dados.nome,
+            email: dados.email,
+            telefone: dados.telefone, // ✅ NOVO: Telefone agora em profiles
+            role: 'profissional'
+          })
+          .eq('id', dados.profile_id);
+          
+        if (profileError) {
+          console.error('❌ Erro ao atualizar profile:', profileError);
+          throw new Error(`Erro ao atualizar profile: ${profileError.message}`);
+        }
+        
+        console.log('✅ Profile atualizado com sucesso');
+      }
+      
+      // 2. Atualizar profissionais (APENAS CAMPOS ESPECÍFICOS - SEM TELEFONE)
+      const profissionalUpdate = {};
+      // Não atualizar mais telefone na tabela profissionais
+      
+      const { data, error } = await this.supabase
+        .from('profissionais')
+        .update(profissionalUpdate)
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('❌ Erro ao atualizar profissional:', error);
+        throw new Error(`Erro ao atualizar profissional: ${error.message}`);
+      }
+      
+      console.log('✅ Profissional atualizado com sucesso:', data);
+      
+      // 3. Limpar cache
+      this.cache.profissionais = null;
+      
+      // 4. Atualizar lista local
+      const index = this.profissionais.findIndex(p => p.id === id);
+      if (index !== -1) {
+        this.profissionais[index] = {
+          ...this.profissionais[index],
+          nome: dados.nome, // Do profile
+          email: dados.email, // Do profile
+          telefone: dados.telefone // Do profile (agora vem do profile)
+        };
+      }
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar profissional:', error);
+      throw error;
     }
   }
 
@@ -632,15 +688,17 @@ class DataManager {
         console.warn("⚠️ Falha no signup:", signupError.message);
       }
       
-      // Se conseguiu criar usuário, criar profile
+      // Se conseguiu criar usuário, criar profile (fonte única de dados do usuário)
       if (userId) {
         try {
+          // ✅ NOVA ARQUITETURA: profiles é fonte única de dados do usuário
           const { data: profile, error: profileError } = await this.supabase
             .from('profiles')
             .insert({
               id: userId,
               nome: dados.nome,
               email: dados.email,
+              telefone: dados.telefone, // ✅ Telefone pertence exclusivamente a profiles
               role: 'profissional',
               first_login_completed: false
             })
@@ -658,14 +716,9 @@ class DataManager {
         }
       }
       
-      // Criar registro na tabela profissionais
+      // Criar registro na tabela profissionais (apenas profile_id - relacionamento)
       const profissionalData = {
-        nome: dados.nome,
-        telefone: dados.telefone,
-        email: dados.email,
-        especialidade: dados.especialidade || 'Geral',
-        ativo: true,
-        profile_id: userId || null // Associar se tiver usuário
+        profile_id: userId || null // ✅ Apenas profile_id - dados em profiles
       };
       
       console.log("📊 Dados para inserir na tabela profissionais:", profissionalData);
@@ -695,7 +748,7 @@ class DataManager {
       
       console.log("🎉 Resultado completo:", resultado);
       
-      // Adicionar ao cache local
+      // Adicionar ao cache local (lista de profissionais)
       this.profissionais.push(data);
       this.cache.profissionais = null;
       
@@ -711,13 +764,8 @@ class DataManager {
     try {
       console.log("🔧 Criando profissional com método simplificado:", dados);
       
-      // ✅ CORRIGIDO: Usar colunas que agora existem na tabela
+      // ✅ NOVA ARQUITETURA: Apenas profile_id - dados ficam em profiles
       const profissionalData = {
-        nome: dados.nome,
-        telefone: dados.telefone,
-        email: dados.email,
-        especialidade: dados.especialidade || 'Geral',
-        ativo: true,
         profile_id: null // Sem usuário associado inicialmente
       };
       
@@ -736,10 +784,18 @@ class DataManager {
       
       console.log("✅ Profissional criado com sucesso:", data);
       
-      // Adicionar ao cache local
-      this.profissionais.push(data);
+      // Adicionar ao cache local com dados temporários (pois não tem profile associado)
+      const profissionalCompleto = {
+        ...data,
+        nome: dados.nome || 'Sem nome',
+        email: dados.email || 'Sem email',
+        telefone: dados.telefone || 'Sem telefone', // ✅ Dados temporários (sem profile associado)
+        especialidade: dados.especialidade || 'Geral'
+      };
       
-      // Limpar cache para forçar recarregamento
+      this.profissionais.push(profissionalCompleto);
+      
+      // Limpar cache para forçar recarregamento (lista de profissionais)
       this.cache.profissionais = null;
       
       return data;
@@ -814,114 +870,28 @@ class DataManager {
   }
 
   getClientes() {
+    console.log('📋 getClientes() chamado - carregando clientes...');
     return this.loadClientes();
   }
 
   getServicos() {
+    console.log('💇 getServicos() chamado - carregando serviços...');
     return this.loadServicos();
   }
 
   getAgendamentos() {
+    console.log('📅 getAgendamentos() chamado - carregando agendamentos...');
     return this.loadAgendamentos();
   }
 
   getBloqueios() {
+    console.log('🚫 getBloqueios() chamado - carregando bloqueios...');
     return this.loadBloqueios();
   }
 
   getProfissionais() {
+    console.log('📋 getProfissionais() chamado - carregando profissionais... (cache)');
     return this.loadProfissionais();
-  }
-
-  // Atualizar cliente - VERSÃO CORRIGIDA COM CAMPOS REAIS
-  async updateCliente(id, dados) {
-    try {
-      // CORREÇÃO: Campos que REALMENTE existem na tabela clientes
-      const clienteData = {
-        nome: dados.nome.trim(),
-        telefone: dados.telefone?.trim() || null,
-        observacoes: dados.observacoes?.trim() || null, // ✅ EXISTE NA TABELA
-        updated_at: new Date().toISOString() // ✅ EXISTE NA TABELA
-      };
-      
-      const { data, error } = await this.supabase
-        .from('clientes')
-        .update(clienteData)
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('❌ Erro ao atualizar cliente:', error);
-        throw new Error(`Erro ao atualizar cliente: ${error.message}`);
-      }
-      
-      // Atualizar cache local
-      const index = this.clientes.findIndex(c => c.id === id);
-      if (index !== -1) {
-        this.clientes[index] = data;
-      }
-      
-      // Limpar cache para forçar recarregamento
-      this.cache.clientes = null;
-      
-      return data;
-      
-    } catch (error) {
-      console.error('❌ Erro ao atualizar cliente:', error);
-      throw error;
-    }
-  }
-
-  // Adicionar cliente - VERSÃO CORRIGIDA COM CAMPOS REAIS
-  async addCliente(cliente) {
-    try {
-      if (this.supabase) {
-        // Gerar token único para ficha de anamnese - VERSÃO v1.4
-        const fichaToken = this.generateUniqueToken();
-
-        // CORREÇÃO: Campos que REALMENTE existem na tabela clientes
-        const clienteWithToken = {
-          nome: cliente.nome,
-          telefone: cliente.telephone || cliente.telefone, // Compatibilidade
-          observacoes: cliente.observacoes || null, // ✅ EXISTE NA TABELA
-          created_at: new Date().toISOString(), // ✅ EXISTE NA TABELA
-          ficha_token: fichaToken
-        };
-
-        const { data, error } = await this.supabase
-          .from("clientes")
-          .insert([clienteWithToken])
-          .select();
-
-        if (error) {
-          console.error("❌ Erro ao criar cliente:", error);
-          throw error;
-        }
-
-        // CORREÇÃO: Limpar cache de clientes após CREATE
-        this.cache.clientes = null;
-
-        return data;
-      }
-    } catch (error) {
-      console.error('❌ Erro ao criar cliente:', error);
-      throw error;
-    }
-  }
-
-  // Gerar token único para ficha de anamnese - VERSÃO RESTAURADA v1.4
-  generateUniqueToken() {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `ficha_${timestamp}_${random}`;
-  }
-
-  // Gerar token único para ficha de anamnese
-  gerarTokenFicha() {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substr(2, 9);
-    return `${timestamp}${random}`.toUpperCase();
   }
 
   // Adicionar agendamento
@@ -987,91 +957,16 @@ class DataManager {
       
       console.log('✅ Profissional encontrado:', profissional);
       
-      // Usar profile_id do profissional como userId do Supabase Auth
-      const userId = profissional.profile_id;
-      console.log('🔐 Usando profile_id como userId:', userId);
-      
-      // Atualizar senha no Supabase Auth via Edge Function segura
-      console.log('🔐 Atualizando senha via Edge Function...');
-      
-      // 🔧 1. CHAMADA COM TOKEN VÁLIDO
-      console.log('🔐 Obtendo sessão para reset de senha...');
-      
-      const session = await this.supabase.auth.getSession();
-      const token = session.data.session.access_token;
-
-      console.log('🔍 Token obtido:', !!token);
-      
-      // 🔍 DEBUG: Chamada direta para Edge Function
-      try {
-        const response = await fetch("https://kckbcjjgbipcqzkynwpy.supabase.co/functions/v1/reset-password", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}` 
-          },
-          body: JSON.stringify({
-            userId,
-            newPassword: novaSenha
-          })
-        });
-
-        console.log('🔍 RESPONSE STATUS:', response.status);
-        console.log('🔍 RESPONSE HEADERS:', Object.fromEntries(response.headers.entries()));
-        
-        const data = await response.json();
-        console.log('🔍 RESPONSE DATA:', data);
-
-        if (!response.ok) {
-          console.error('❌ ERRO NA EDGE FUNCTION:', {
-            status: response.status,
-            statusText: response.statusText,
-            data
-          });
-          throw new Error(data.error || `Erro ${response.status}: ${response.statusText}`);
-        }
-
-        console.log('✅ Edge Function executada com sucesso');
-        const resetData = data;
-        const resetError = null;
-        
-      } catch (fetchError) {
-        console.error('❌ ERRO NO FETCH:', fetchError);
-        throw new Error('Erro ao comunicar com Edge Function: ' + fetchError.message);
-      }
-      
-      // Mantendo compatibilidade com código existente
-      if (resetError) {
-        throw new Error('Erro ao atualizar senha: ' + resetError.message);
-      }
-      
-      if (!resetData || !resetData.success) {
-        throw new Error('Falha ao atualizar senha no servidor');
-      }
-      
-      console.log('✅ Senha atualizada com sucesso via Edge Function');
-      
-      // Resetar first_login_completed para forçar troca no próximo login
-      try {
-        await this.supabase
-          .from('profiles')
-          .update({ first_login_completed: false })
-          .eq('id', userId);
-        console.log('✅ first_login_completed resetado');
-      } catch (profileError) {
-        console.warn('⚠️ Erro ao resetar first_login_completed:', profileError);
-      }
-      
-      // Retornar sucesso com senha atualizada automaticamente
+      // Retornar senha para admin atualizar manualmente no Supabase Auth
       return {
         success: true,
         email: email,
         senhaTemporaria: novaSenha,
-        message: 'Senha atualizada automaticamente no Supabase Auth',
-        instructions: `Senha atualizada com sucesso!\n\n📧 Email: ${email}\n🔑 Nova Senha: ${novaSenha}\n\nO profissional já pode usar esta senha para fazer login.`,
+        message: 'Senha temporária gerada com sucesso',
+        instructions: `INSTRUÇÕES:\n\n1. Acesse Supabase Dashboard\n2. Authentication → Users\n3. Encontre: ${email}\n4. Clique "Reset Password"\n5. Insira: ${novaSenha}\n6. Salve\n\nO profissional já poderá usar esta senha.`,
         profileId: profissional.id,
         nome: profissional.nome,
-        method: 'supabase_auth_automatic'
+        method: 'supabase_auth_manual'
       };
       
     } catch (error) {
@@ -1366,11 +1261,11 @@ class DataManager {
     }
     
     // Garantir que tenha letra maiúscula, minúscula e número
-    if (!/\d/.test(senha)) {
-      senha += Math.floor(Math.random() * 10);
-    }
-
-    return senha;
+    const maiuscula = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.charAt(Math.floor(Math.random() * 26));
+    const minuscula = 'abcdefghijklmnopqrstuvwxyz'.charAt(Math.floor(Math.random() * 26));
+    const numero = '0123456789'.charAt(Math.floor(Math.random() * 10));
+    
+    return maiuscula + minuscula + numero + senha.substring(3);
   }
 }
 

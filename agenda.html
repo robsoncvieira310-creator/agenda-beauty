@@ -12,16 +12,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <!-- CSS -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260319153000">
   <link rel="stylesheet" href="css/fullcalendar.min.css">
   <link rel="stylesheet" href="css/calendar-google-style.css">
 </head>
 <body>
   <div class="layout">
-    <!-- Botão será inserido dinamicamente via JavaScript -->
-    
     <aside class="sidebar" id="sidebar">
-      <h2>💇 L'ange Beauty</h2>
+      <h2>💇 Agenda Beauty</h2>
       <nav>
         <a href="index.html" class="nav-item">
           <span class="nav-icon">🏠</span>
@@ -45,9 +43,9 @@
         </a>
       </nav>
       
-      <button class="logout-btn" id="logoutButton">
-        <span>🚪</span>
-        <span>Sair</span>
+      <!-- Botão de Logout -->
+      <button id="logoutButton" class="btn btn-danger logout-btn">
+        🚪 Sair
       </button>
     </aside>
 
@@ -55,13 +53,10 @@
       <div class="page-header">
         <h1>📅 Agenda - L'ange Beauty</h1>
         <div class="header-actions">
-          <button id="btnNovoAgendamento" class="btn btn-primary">
-            ➕ Novo Agendamento
-          </button>
           <button id="btnHoje" class="btn btn-secondary">
             📅 Hoje
           </button>
-          <button id="btnAtualizar" class="btn btn-secondary">
+          <button id="btnAtualizar" class="btn btn-primary">
             🔄 Atualizar
           </button>
         </div>
@@ -279,71 +274,61 @@
   <script src="js/utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js"></script>
-  <script src="js/authManager.js"></script>
+  <script src="js/authManager.js?v=20260319143200"></script>
   <script src="js/firstLoginManager.js"></script>
-  <script src="js/dataManager.js"></script>
-  <script src="js/sidebarManager.js"></script>
-  <script src="js/menuManager.js"></script>
-  <script src="js/modalManager.js"></script>
-  <script src="js/calendarManager.js"></script>
+  <script src="js/dataManager.js?v=20260313210500"></script>
+  <script src="js/modalManager.js?v=20260311142500"></script>
+  <script src="js/calendarManager.js?v=20260313250000&t=1710255600000"></script>
   <script src="js/pageManager.js"></script>
+  <script src="js/logoutManager.js?v=20260319160000"></script>
+  <script src="js/sidebarManager.js?v=20260319153000"></script>
   <script src="js/agendaPage.js"></script>
   <script src="js/enhancements.js"></script>
   <script src="js/appInit.js"></script>
   
   <script>
-    // Fluxo V1.5 - Criar instância manualmente
-    window.addEventListener('appReady', async () => {
-      console.log('🚀 Inicializando página de agenda...');
-      
-      try {
-        console.log('🚀 Criando AgendaPage...');
-        window.pageManager = new AgendaPage();
-        console.log('✅ AgendaPage criada:', window.pageManager);
+    // INICIALIZAÇÃO NORMAL DA AGENDA
+    setTimeout(() => {
+      // Se DataManager já existe e tem dados, o evento já foi disparado
+      if (window.dataManager && window.dataManager.agendamentos) {
         
-        // Forçar inicialização específica da página
-        if (window.pageManager.initializeSpecificPage) {
-          console.log('🔄 Forçando inicialização específica da agenda...');
-          await window.pageManager.initializeSpecificPage();
-        }
-      } catch (error) {
-        console.error('❌ Erro ao criar AgendaPage:', error);
-      }
-    });
-  </script>
-
-    // Configurar botão de logout
-    const logoutBtn = document.getElementById('logoutButton');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', async () => {
-        console.log('🚪 LOGOUT: Botão clicado');
-        
-        // Confirmar logout
-        const confirmed = confirm('Tem certeza que deseja sair do sistema?');
-        if (!confirmed) {
-          console.log('⏹️ LOGOUT: Cancelado pelo usuário');
+        if (typeof FullCalendar === 'undefined') {
+          document.getElementById('calendar').innerHTML = '<div style="padding: 20px; color: red;">FullCalendar não carregou. Verifique os arquivos JS.</div>';
           return;
         }
         
         try {
-          // Executar logout
-          const result = await window.authManager.logout();
+          window.pageManager = new AgendaPage();
           
-          if (result.success) {
-            console.log('✅ LOGOUT: Sucesso!');
-            window.location.href = 'login.html';
-          } else {
-            console.error('❌ LOGOUT: Erro:', result.error);
-            alert('Erro ao fazer logout: ' + result.error);
+          // Forçar inicialização manual
+          if (window.pageManager.initializePage) {
+            window.pageManager.initializePage();
           }
         } catch (error) {
-          console.error('❌ LOGOUT: Erro inesperado:', error);
-          alert('Ocorreu um erro inesperado ao fazer logout');
+          console.error('❌ Erro ao criar AgendaPage:', error);
         }
-      });
-      
-      console.log('✅ LOGOUT: Botão configurado');
-    }
+      } else {
+        // Registrar listener para o evento
+        window.addEventListener('appReady', async () => {
+          
+          if (typeof FullCalendar === 'undefined') {
+            document.getElementById('calendar').innerHTML = '<div style="padding: 20px; color: red;">FullCalendar não carregou. Verifique os arquivos JS.</div>';
+            return;
+          }
+          
+          try {
+            window.pageManager = new AgendaPage();
+            
+            // Forçar inicialização manual
+            if (window.pageManager.initializePage) {
+              await window.pageManager.initializePage();
+            }
+          } catch (error) {
+            console.error('❌ Erro ao criar AgendaPage:', error);
+          }
+        });
+      }
+    }, 100);
   </script>
 </body>
 </html>

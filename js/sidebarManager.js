@@ -27,8 +27,11 @@ class SidebarManager {
       return;
     }
 
-    // Criar e inserir botão dinamicamente
+    // Criar botão dinamicamente
     this.createToggleButton();
+
+    // POSICIONAR BOTÃO INICIALMENTE - ESTAVA FALTANDO!
+    this.updateButtonPosition();
 
     // Adicionar listener para tecla ESC
     document.addEventListener('keydown', (e) => {
@@ -37,7 +40,7 @@ class SidebarManager {
       }
     });
 
-    // Restaurar estado salvo
+    // Restaurar estado salvo (depois de posicionar o botão)
     this.restoreState();
 
     console.log('✅ SidebarManager inicializado com sucesso');
@@ -118,17 +121,17 @@ class SidebarManager {
   restoreState() {
     try {
       const savedState = localStorage.getItem('sidebarCollapsed');
-      if (savedState === 'true') {
-        this.isCollapsed = false; // Invertido pois vamos chamar toggle()
-        this.toggle();
-      } else {
-        // Garantir que o botão comece com o estado correto
-        this.menuToggle.classList.add('active');
-        this.menuToggle.setAttribute('aria-expanded', 'true');
-        this.menuToggle.setAttribute('title', 'Fechar Menu');
-      }
+      // SEMPRE começar com sidebar aberta para garantir visibilidade do botão logout
+      // Não restaurar estado colapsado para evitar problemas
+      console.log('🔧 SIDEBAR_MANAGER: Forçando sidebar aberta para garantir visibilidade do botão logout');
+      this.isCollapsed = false;
+      this.sidebar.classList.remove('collapsed');
+      this.updateButtonPosition();
     } catch (error) {
-      console.warn('SidebarManager: Erro ao restaurar estado:', error);
+      console.warn('⚠️ SIDEBAR_MANAGER: Erro ao restaurar estado:', error);
+      // Em caso de erro, garantir que sidebar comece aberta
+      this.isCollapsed = false;
+      this.sidebar.classList.remove('collapsed');
     }
   }
 

@@ -1,7 +1,6 @@
 // Página de Profissionais
-class ProfissionaisPage extends PageManager {
+class ProfissionaisPage {
   constructor() {
-    super();
     this.profissionais = [];
     this.profissionalEditando = null;
     this.profissionaisPorId = {};
@@ -11,16 +10,15 @@ class ProfissionaisPage extends PageManager {
 
   async initializeSpecificPage() {
     console.log('Inicializando página de profissionais...');
-    
-    // Configurar botões
-    this.setupProfessionalButtons();
-    
     await this.initialize();
     this.renderProfessionalTable();
   }
 
   async initialize() {
     console.log('ProfissionaisPage iniciada');
+    
+    // Configurar botões
+    this.setupProfessionalButtons();
     
     // Carregar profissionais
     await this.loadProfissionais();
@@ -247,9 +245,9 @@ class ProfissionaisPage extends PageManager {
     const row = document.createElement('tr');
     
     // ✅ CORRIGIDO: Usar dados completos que o DataManager retorna
-    const nome = profissional.nome || `Profissional ${profissional.id}`;
-    const email = profissional.email || 'Email não informado';
-    const telefone = profissional.telefone || 'Não informado';
+    const nome = profissional.nome || 'Sem nome';
+    const email = profissional.email || 'Sem email';
+    const telefone = profissional.telefone || 'Sem telefone';
     
     console.log('🔍 Renderizando profissional:', {
       id: profissional.id,

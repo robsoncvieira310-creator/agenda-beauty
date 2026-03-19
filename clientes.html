@@ -6,12 +6,10 @@
   <title>Clientes - Agenda Beauty</title>
   
   <!-- CSS -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260319153000">
 </head>
 <body>
   <div class="layout">
-    <!-- Botão será inserido dinamicamente via JavaScript -->
-    
     <aside class="sidebar" id="sidebar">
       <h2>💇 Agenda Beauty</h2>
       <nav>
@@ -37,9 +35,9 @@
         </a>
       </nav>
       
-      <button class="logout-btn" id="logoutButton">
-        <span>🚪</span>
-        <span>Sair</span>
+      <!-- Botão de Logout -->
+      <button id="logoutButton" class="btn btn-danger logout-btn">
+        🚪 Sair
       </button>
     </aside>
 
@@ -367,65 +365,30 @@
   <script src="js/utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js"></script>
-  <script src="js/authManager.js"></script>
+  <script src="js/authManager.js?v=20260319143200"></script>
   <script src="js/firstLoginManager.js"></script>
   <script src="js/dataManager.js"></script>
   <script src="js/pageManager.js"></script>
+  <script src="js/logoutManager.js?v=20260319160000"></script>
+  <script src="js/sidebarManager.js?v=20260319153000"></script>
   <script src="js/clientesPage.js"></script>
   <script src="js/appInit.js"></script>
   
   <script>
-    // Fluxo V1.5 - Criar instância manualmente
-    window.addEventListener('appReady', async () => {
-      console.log('🚀 Inicializando página de clientes...');
-      
-      try {
-        console.log('🚀 Criando ClientesPage...');
+    // INICIALIZAÇÃO NORMAL DE CLIENTES
+    setTimeout(() => {
+      // Se DataManager já existe e tem dados, o evento já foi disparado
+      if (window.dataManager && window.dataManager.clientes) {
         window.pageManager = new ClientesPage();
-        console.log('✅ ClientesPage criada:', window.pageManager);
-        
-        // Forçar inicialização específica da página
-        if (window.pageManager.initializeSpecificPage) {
-          console.log('🔄 Forçando inicialização específica dos clientes...');
-          await window.pageManager.initializeSpecificPage();
-        }
-      } catch (error) {
-        console.error('❌ Erro ao criar ClientesPage:', error);
-      }
-      
-      // Configurar botão de logout
-      const logoutBtn = document.getElementById('logoutButton');
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-          console.log('🚪 LOGOUT: Botão clicado');
-          
-          // Confirmar logout
-          const confirmed = confirm('Tem certeza que deseja sair do sistema?');
-          if (!confirmed) {
-            console.log('⏹️ LOGOUT: Cancelado pelo usuário');
-            return;
-          }
-          
-          try {
-            // Executar logout
-            const result = await window.authManager.logout();
-            
-            if (result.success) {
-              console.log('✅ LOGOUT: Sucesso!');
-              window.location.href = 'login.html';
-            } else {
-              console.error('❌ LOGOUT: Erro:', result.error);
-              alert('Erro ao fazer logout: ' + result.error);
-            }
-          } catch (error) {
-            console.error('❌ LOGOUT: Erro inesperado:', error);
-            alert('Ocorreu um erro inesperado ao fazer logout');
-          }
+        window.pageManager.init();
+      } else {
+        // Registrar listener para o evento
+        window.addEventListener('appReady', () => {
+          window.pageManager = new ClientesPage();
+          window.pageManager.init();
         });
-        
-        console.log('✅ LOGOUT: Botão configurado');
       }
-    });
+    }, 100);
   </script>
   
   <style>
