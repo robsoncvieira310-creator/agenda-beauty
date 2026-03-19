@@ -34,32 +34,17 @@ class AgendaPage extends PageManager {
       // Carregar estatísticas
       await this.updateStatistics();
       
-      // Configurar atualização automática
-      this.setupAutoRefresh();
+      // Aplicar filtros se houver profissional logado
+      const profissionalLogado = await window.dataManager.getProfissionalLogado();
+      if (profissionalLogado) {
+        this.aplicarFiltros();
+      }
       
-      // MELHORIA V1.4: Aplicar filtros iniciais se houver profissional logado
-      setTimeout(() => {
-        const profissionalLogado = window.dataManager?.getProfissionalLogado;
-        if (profissionalLogado) {
-          this.aplicarFiltros();
-        }
-      }, 200);
-      
-      console.log('✅ Página de agenda inicializada com sucesso');
+      console.log(' Página de agenda inicializada com sucesso');
       
     } catch (error) {
-      console.error('❌ Erro na inicialização da agenda:', error);
+      console.error(' Erro na inicialização da agenda:', error);
       this.showError('Erro ao carregar página de agenda');
-      
-      // MELHORIA V1.4: Tentar recuperação parcial
-      try {
-        if (!this.calendarManager) {
-          await this.initializeCalendar();
-        }
-        await this.updateStatistics();
-      } catch (recoveryError) {
-        console.error('❌ Erro na recuperação:', recoveryError);
-      }
     }
   }
 
@@ -88,6 +73,16 @@ class AgendaPage extends PageManager {
   }
 
   setupAgendaButtons() {
+    // Botão Novo Agendamento
+    const btnNovoAgendamento = document.getElementById('btnNovoAgendamento');
+    if (btnNovoAgendamento) {
+      btnNovoAgendamento.addEventListener('click', () => {
+        if (this.modalManager) {
+          this.modalManager.abrirModalAgendamento({ tipo: 'novo' });
+        }
+      });
+    }
+
     // Botão Hoje
     const btnHoje = document.getElementById('btnHoje');
     if (btnHoje) {
@@ -126,7 +121,7 @@ class AgendaPage extends PageManager {
 
   async updateStatistics() {
     try {
-      const agendamentos = dataManager.agendamentos;
+      const agendamentos = window.dataManager.agendamentos;
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
       const amanha = new Date(hoje);

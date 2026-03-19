@@ -12,6 +12,42 @@ class AuthManager {
         return user;
     }
 
+    async login(email, password) {
+        try {
+            const result = await this.supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            
+            return {
+                success: !result.error,
+                data: result.data,
+                error: result.error
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    async logout() {
+        try {
+            const { error } = await this.supabase.auth.signOut();
+            
+            return {
+                success: !error,
+                error: error
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
     async getProfile() {
         const { data: { user } } = await this.supabase.auth.getUser();
 
@@ -32,5 +68,4 @@ class AuthManager {
     }
 }
 
-// instância global
 window.authManager = new AuthManager(window.supabaseClient);

@@ -63,28 +63,6 @@ class SidebarManager {
     // Lógica de resize pode ser implementada futuramente
   }
 
-    // Adicionar linhas do hambúrguer
-    for (let i = 0; i < 3; i++) {
-      const line = document.createElement('span');
-      line.className = 'hamburger-line';
-      this.menuToggle.appendChild(line);
-    }
-
-    // Adicionar event listener
-    this.menuToggle.addEventListener('click', () => this.toggle());
-
-    // Adicionar evento de teclado (acessibilidade)
-    this.menuToggle.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        this.toggle();
-      }
-    });
-
-    // Inserir no DOM baseado no estado inicial
-    this.updateButtonPosition();
-  }
-
   updateButtonPosition() {
     // Remover botão do DOM atual
     if (this.menuToggle.parentNode) {

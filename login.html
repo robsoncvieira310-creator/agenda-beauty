@@ -298,9 +298,9 @@
         console.log('🔍 LOGIN: Verificando sessão existente...');
         
         try {
-          const result = await window.authManager.initialize();
+          const { data: { session } } = await window.authManager.getSession();
           
-          if (result.authenticated) {
+          if (session) {
             console.log('✅ LOGIN: Sessão existente encontrada, redirecionando...');
             this.showSuccess('Sessão recuperada com sucesso!');
             setTimeout(() => {
@@ -344,7 +344,7 @@
             }, 1500);
           } else {
             console.error('❌ LOGIN: Falha na autenticação:', result.error);
-            this.showError(result.error || 'Falha ao realizar login. Verifique suas credenciais.');
+            this.showError(result.error?.message || 'Falha ao realizar login. Verifique suas credenciais.');
           }
         } catch (error) {
           console.error('❌ LOGIN: Erro inesperado:', error);

@@ -55,10 +55,13 @@
       <div class="page-header">
         <h1>📅 Agenda - L'ange Beauty</h1>
         <div class="header-actions">
+          <button id="btnNovoAgendamento" class="btn btn-primary">
+            ➕ Novo Agendamento
+          </button>
           <button id="btnHoje" class="btn btn-secondary">
             📅 Hoje
           </button>
-          <button id="btnAtualizar" class="btn btn-primary">
+          <button id="btnAtualizar" class="btn btn-secondary">
             🔄 Atualizar
           </button>
         </div>
@@ -293,25 +296,15 @@
     window.addEventListener('appReady', async () => {
       console.log('🚀 Inicializando página de agenda...');
       
-      console.log('🔍 Verificando FullCalendar:', typeof FullCalendar);
-      console.log('🔍 FullCalendar disponível?', !!FullCalendar);
-      console.log('🔍 FullCalendar.Calendar?', !!FullCalendar?.Calendar);
-      
-      if (typeof FullCalendar === 'undefined') {
-        console.error('❌ FullCalendar não está carregado!');
-        document.getElementById('calendar').innerHTML = '<div style="padding: 20px; color: red;">FullCalendar não carregou. Verifique os arquivos JS.</div>';
-        return;
-      }
-      
       try {
         console.log('🚀 Criando AgendaPage...');
         window.pageManager = new AgendaPage();
         console.log('✅ AgendaPage criada:', window.pageManager);
         
-        // Forçar inicialização manual
-        if (window.pageManager.initializePage) {
-          console.log('🔄 Inicializando página manualmente...');
-          await window.pageManager.initializePage();
+        // Forçar inicialização específica da página
+        if (window.pageManager.initializeSpecificPage) {
+          console.log('🔄 Forçando inicialização específica da agenda...');
+          await window.pageManager.initializeSpecificPage();
         }
       } catch (error) {
         console.error('❌ Erro ao criar AgendaPage:', error);

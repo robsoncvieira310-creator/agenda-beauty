@@ -44,13 +44,13 @@ class PageManager {
     
     // Todas as páginas precisam de clientes, serviços e profissionais
     console.log("🔍 Adicionando loadServicos() às promises...");
-    promises.push(dataManager.loadServicos());
-    promises.push(dataManager.loadClientes());
-    promises.push(dataManager.loadProfissionais());
+    promises.push(window.dataManager.loadServicos());
+    promises.push(window.dataManager.loadClientes());
+    promises.push(window.dataManager.loadProfissionais());
     
     // Páginas específicas podem precisar de mais dados
     if (this.needsAgendamentos()) {
-      promises.push(dataManager.loadAgendamentos());
+      promises.push(window.dataManager.loadAgendamentos());
     }
     
     await Promise.all(promises);

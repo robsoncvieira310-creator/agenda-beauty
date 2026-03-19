@@ -54,8 +54,8 @@ class CalendarManager {
   // Método para obter cor baseada no serviço (nova lógica)
   getCorPorServico(nomeServico, servicoId) {
     // Primeiro, tentar obter cor personalizada do serviço pelo ID
-    if (servicoId && dataManager.servicosPorId && dataManager.servicosPorId[servicoId]) {
-      const servico = dataManager.servicosPorId[servicoId];
+    if (servicoId && window.dataManager.servicosPorId && window.dataManager.servicosPorId[servicoId]) {
+      const servico = window.dataManager.servicosPorId[servicoId];
       if (servico.cor) {
         return servico.cor;
       }
@@ -86,27 +86,27 @@ class CalendarManager {
   getNomeCliente(clienteId) {
     if (!clienteId) return 'Cliente não informado';
     
-    const cliente = dataManager.clientesPorId[clienteId];
+    const cliente = window.dataManager.clientesPorId[clienteId];
     return cliente ? cliente.nome : `Cliente ${clienteId}`;
   }
   
   getNomeServico(servicoId) {
     if (!servicoId) return 'Serviço não informado';
     
-    const servico = dataManager.servicosPorId[servicoId];
+    const servico = window.dataManager.servicosPorId[servicoId];
     return servico ? servico.nome : `Serviço ${servicoId}`;
   }
   
   getNomeProfissional(profissionalId) {
     if (!profissionalId) return 'Profissional não informado';
     
-    const profissional = dataManager.profissionaisPorId[profissionalId];
+    const profissional = window.dataManager.profissionaisPorId[profissionalId];
     if (profissional && profissional.nome) {
       return profissional.nome;
     }
     
     // CORREÇÃO: Tentar encontrar no array principal
-    const profissionalAlt = dataManager.profissionais.find(p => p.id == profissionalId);
+    const profissionalAlt = window.dataManager.profissionais.find(p => p.id == profissionalId);
     if (profissionalAlt && profissionalAlt.nome) {
       return profissionalAlt.nome;
     }
@@ -135,17 +135,17 @@ class CalendarManager {
     
     // CORREÇÃO: Carregar clientes, serviços e profissionais PRIMEIRO
     const [clientes, servicos, profissionais] = await Promise.all([
-      dataManager.getClientes(),
-      dataManager.getServicos(),
-      dataManager.getProfissionais()
+      window.dataManager.getClientes(),
+      window.dataManager.getServicos(),
+      window.dataManager.getProfissionais()
     ]);
     
     console.log("✅ Dados de referência carregados:", { clientes, servicos, profissionais });
     
     // AGORA carregar agendamentos e bloqueios
     const [agendamentos, bloqueios] = await Promise.all([
-      dataManager.loadAgendamentos(),
-      dataManager.loadBloqueios()
+      window.dataManager.loadAgendamentos(),
+      window.dataManager.loadBloqueios()
     ]);
 
     console.log("✅ Todos os dados carregados:", { clientes, servicos, profissionais, agendamentos, bloqueios });
@@ -353,7 +353,7 @@ class CalendarManager {
       
       // NOVA LÓGICA: Cor baseada no serviço (personalizada ou padrão)
       const corServico = this.getCorPorServico(servico, a.servico_id);
-      const corStatus = dataManager.gerarCorPorStatus(a.status, corServico);
+      const corStatus = window.dataManager.gerarCorPorStatus(a.status, corServico);
       
       console.log("🔍 DEBUG - Cores geradas:", { corServico, corStatus });
       
@@ -418,7 +418,7 @@ class CalendarManager {
       };
 
       if (b.profissional_id) {
-        const prof = dataManager.profissionaisPorId[b.profissional_id];
+        const prof = window.dataManager.profissionaisPorId[b.profissional_id];
         if (prof) {
           eventosBlq.push({
             id: `b-${b.id}-${prof.id}`,
@@ -515,7 +515,7 @@ class CalendarManager {
       };
       
       // CORREÇÃO: Adicionar IDs que estão no agendamento original
-      const agendamentoOriginal = dataManager.agendamentos.find(a => a.id == modalData.realId);
+      const agendamentoOriginal = window.dataManager.agendamentos.find(a => a.id == modalData.realId);
       if (agendamentoOriginal) {
         console.log('🔍 Agendamento original encontrado:', agendamentoOriginal);
         modalData.cliente_id = agendamentoOriginal.cliente_id;
@@ -590,10 +590,10 @@ class CalendarManager {
         endLocal: new Date(ev.end.getTime() - ev.end.getTimezoneOffset() * 60000).toISOString().slice(0, 19)
       });
 
-      await dataManager.updateAgendamento(ev.id, dadosAtualizacao);
+      await window.dataManager.updateAgendamento(ev.id, dadosAtualizacao);
 
       // Limpar cache para forçar recarregamento
-      dataManager.cache.agendamentos = null;
+      window.dataManager.cache.agendamentos = null;
 
       await this.refreshEvents();
       UIUtils.showAlert('Agendamento movido com sucesso', 'success');
@@ -660,10 +660,10 @@ class CalendarManager {
         endLocal: new Date(ev.end.getTime() - ev.end.getTimezoneOffset() * 60000).toISOString().slice(0, 19)
       });
 
-      await dataManager.updateAgendamento(ev.id, dadosAtualizacao);
+      await window.dataManager.updateAgendamento(ev.id, dadosAtualizacao);
 
       // Limpar cache para forçar recarregamento
-      dataManager.cache.agendamentos = null;
+      window.dataManager.cache.agendamentos = null;
 
       await this.refreshEvents();
       UIUtils.showAlert('Duração atualizada com sucesso', 'success');
