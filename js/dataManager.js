@@ -373,148 +373,73 @@ class DataManager {
   }
 
   async addProfissional(dados) {
-    console.log('Adicionando profissional (fluxo correto):', dados);
-    
-    // PROTEÇÃO CONTRA EXECUÇÃO DUPLICADA
-    if (this.addingProfissional) {
-      console.log('addProfissional já está em execução, ignorando chamada duplicada');
-      return;
-    }
-    
-    this.addingProfissional = true;
-    
     try {
-      // ✅ FLUXO CORRETO: auth.users → profiles → profissionais (sem JOIN)
-      console.log('ETAPA 1: Criando usuário no Supabase Auth...');
-      
-      let userId = null;
-      let profileData = null;
-      
-      // 1. Criar usuário no auth.users
-      try {
-        const { data: authData, error: authError } = await this.supabase.auth.signUp({
+      console.log("ETAPA 1: Criando usuário no Auth...");
+
+      const { data: authData, error: authError } = await this.supabase.auth.signUp({
+        email: dados.email,
+        password: "123456" // ou gerar automático
+      });
+
+      if (authError || !authData.user) {
+        throw new Error("Erro ao criar usuário no auth: " + (authError?.message || "Usuário não criado"));
+      }
+
+      const userId = authData.user.id;
+      console.log("Usuário criado:", userId);
+
+      console.log("ETAPA 2: Criando profile...");
+
+      const { error: profileError } = await this.supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+          nome: dados.nome,
           email: dados.email,
-          password: dados.senhaTemporaria || 'temp123456',
-          options: {
-            data: {
-              role: 'profissional',
-              nome: dados.nome
-            }
-          }
+          telefone: dados.telefone,
+          role: "profissional"
         });
-        
-        if (authError) {
-          console.warn("Erro ao criar usuário:", authError.message);
-          
-          // Se email já existe, tentar buscar usuário existente
-          if (authError.message.includes('already registered')) {
-            console.log("Email já registrado, buscando usuário existente...");
-            const { data: { users } } = await this.supabase.auth.admin.listUsers();
-            const existingUser = users.find(u => u.email === dados.email);
-            if (existingUser) {
-              userId = existingUser.id;
-              console.log("Usuário existente encontrado:", userId);
-            }
-          }
-        } else {
-          userId = authData.user?.id;
-          console.log("Usuário criado com sucesso:", userId);
-        }
-      } catch (authError) {
-        console.warn("Falha na criação de usuário:", authError.message);
+
+      if (profileError) {
+        console.error("Erro profile:", profileError);
+
+        // rollback: deletar usuário criado
+        await this.supabase.rpc("delete_user_completo", {
+          user_id: userId
+        });
+
+        throw new Error("Erro ao criar profile: " + profileError.message);
       }
-      
-      // 2. Criar ou atualizar profile (fonte única de dados do usuário)
-      if (userId) {
-        console.log("👤 ETAPA 2: Criando/atualizando profile (fonte única de dados)...");
-        
-        try {
-          // ✅ NOVA ARQUITETURA: profiles é fonte única de dados do usuário
-          const { data: profile, error: profileError } = await this.supabase
-            .from('profiles')
-            .upsert({
-              id: userId,
-              nome: dados.nome, // ✅ Dados principais em profiles
-              email: dados.email, // ✅ Dados principais em profiles
-              telefone: dados.telefone, // ✅ Telefone pertence exclusivamente a profiles
-              role: 'profissional',
-              first_login_completed: true
-            })
-            .select()
-            .single();
-            
-          if (profileError) {
-            console.warn("⚠️ Erro ao criar profile:", profileError.message);
-          } else {
-            profileData = profile;
-            console.log("✅ Profile criado/atualizado:", profileData);
-          }
-        } catch (profileError) {
-          console.warn("⚠️ Falha ao criar profile:", profileError.message);
-        }
-      }
-      
-      // 3. Criar registro na tabela profissionais (apenas profile_id - relacionamento)
-      console.log("ETAPA 3: Criando registro profissional (apenas profile_id)...");
-      
-      let profissionalData = {};
-      
-      // ✅ NOVA ARQUITETURA: profissionais apenas com profile_id (relacionamento)
-      if (userId) {
-        profissionalData = {
-          profile_id: userId // ✅ Apenas profile_id - dados ficam em profiles
-        };
-      } else {
-        // Fallback: criar sem profile_id
-        profissionalData = {
-          profile_id: null
-        };
-      }
-      
-      console.log("Dados para profissionais:", profissionalData);
-      
-      const { data: profissional, error: profissionalError } = await this.supabase
-        .from('profissionais')
-        .insert(profissionalData)
+
+      console.log("Profile criado com sucesso");
+
+      console.log("ETAPA 3: Criando profissional...");
+
+      const { data: profissional, error: profError } = await this.supabase
+        .from("profissionais")
+        .insert({
+          profile_id: userId
+        })
         .select()
         .single();
-      
-      if (profissionalError) {
-        console.error("Erro ao criar profissional:", profissionalError);
-        throw new Error(`Erro ao criar profissional: ${profissionalError.message}`);
+
+      if (profError) {
+        console.error("Erro profissional:", profError);
+
+        await this.supabase.rpc("delete_user_completo", {
+          user_id: userId
+        });
+
+        throw new Error("Erro ao criar profissional: " + profError.message);
       }
-      
+
       console.log("Profissional criado com sucesso:", profissional);
-      
-      // 4. Retornar resultado completo (merge manual, sem JOIN)
-      const resultado = {
-        profissional: {
-          ...profissional,
-          nome: dados.nome || 'Sem nome',
-          email: dados.email || 'Sem email',
-          telefone: dados.telefone || 'Sem telefone', // ✅ Dados vêm do profile (única fonte de dados)
-          especialidade: dados.especialidade || 'Geral'
-        },
-        usuario: userId ? { id: userId, email: dados.email } : null,
-        profile: profileData,
-        fluxo: userId ? 
-          "FLUXO COMPLETO: auth.users → profiles (dados) → profissionais (relacionamento)" : 
-          "FLUXO PARCIAL: apenas profissionais (crie usuário manualmente)"
-      };
-      
-      console.log("Resultado do fluxo:", resultado);
-      
-      // Adicionar ao cache local (lista de profissionais)
-      this.profissionais.push(resultado.profissional);
-      this.cache.profissionais = null;
-      
-      return resultado;
-      
+
+      return profissional;
+
     } catch (error) {
-      console.error('Erro ao adicionar profissional:', error);
+      console.error("ERRO COMPLETO:", error);
       throw error;
-    } finally {
-      this.addingProfissional = false;
     }
   }
 

@@ -343,12 +343,15 @@ class ProfissionaisPage {
   }
 
   async saveProfessional() {
+    console.log('🔄 saveProfessional() iniciado...');
+    
     if (this.saving) {
       console.log('⚠️ saveProfessional já está em execução, ignorando chamada duplicada');
       return;
     }
     
     this.saving = true;
+    console.log('🔒 Bloqueando execuções duplicadas...');
     
     try {
       // Coletar dados do formulário
@@ -372,6 +375,9 @@ class ProfissionaisPage {
         return;
       }
       
+      console.log('📋 Dados coletados:', { nome, telefone, email });
+      console.log('🔍 Profissional editando:', this.profissionalEditando ? 'SIM' : 'NÃO');
+      
       const dadosParaSalvar = {
         nome: nome,
         telefone: telefone,
@@ -379,32 +385,41 @@ class ProfissionaisPage {
       };
 
       if (this.profissionalEditando) {
-        // Editar profissional existente
+        console.log('🔧 MODO EDIÇÃO: Atualizando profissional existente...');
         await window.dataManager.updateProfissional(this.profissionalEditando.id, dadosParaSalvar);
+        console.log('✅ Profissional atualizado com sucesso');
         this.showSuccess('Profissional atualizado com sucesso');
       } else {
+        console.log('➕ MODO CRIAÇÃO: Criando novo profissional...');
         // Criar novo profissional
         if (this.profissionais.some(p => p.nome === nome)) {
+          console.log('❌ Validação: Nome já existe');
           this.showError('Já existe um profissional com este nome');
           return;
         }
         
         if (this.profissionais.some(p => p.email === email)) {
+          console.log('❌ Validação: Email já existe');
           this.showError('Este email já está cadastrado para outro profissional');
           return;
         }
         
+        console.log('🚀 Chamando addProfissional...');
         await window.dataManager.addProfissional(dadosParaSalvar);
+        console.log('✅ Profissional criado com sucesso');
         this.showSuccess('Profissional criado com sucesso');
       }
       
+      console.log('🔄 Atualizando lista de profissionais...');
       await this.refreshProfissionais();
+      console.log('🚪 Fechando modal...');
       this.closeModal();
       
     } catch (error) {
-      console.error('Erro ao salvar profissional:', error);
+      console.error('❌ Erro ao salvar profissional:', error);
       this.showError('Erro ao salvar profissional: ' + error.message);
     } finally {
+      console.log('🔓 Liberando bloqueio de execuções duplicadas...');
       this.saving = false;
     }
   }
@@ -444,11 +459,21 @@ class ProfissionaisPage {
   }
 
   showError(message) {
-    alert(message); // Substituir por seu sistema de alertas
+    console.log('❌ ERROR:', message);
+    if (window.UIUtils) {
+      window.UIUtils.showAlert(message, 'error');
+    } else {
+      alert(message);
+    }
   }
 
   showSuccess(message) {
-    alert(message); // Substituir por seu sistema de alertas
+    console.log('✅ SUCCESS:', message);
+    if (window.UIUtils) {
+      window.UIUtils.showAlert(message, 'success');
+    } else {
+      alert(message);
+    }
   }
 
   showLoading(message = 'Carregando...') {

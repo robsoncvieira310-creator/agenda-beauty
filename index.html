@@ -201,5 +201,101 @@
       }
     }
   </script>
+  
+  <script>
+    // ✅ VERIFICAR SESSÃO ANTES DE INICIAR PÁGINA
+    setTimeout(async () => {
+      console.log('🔍 INDEX: Verificando sessão antes de inicializar...');
+      
+      // ✅ Usar AuthManager global protegido
+      if (!window.authManager) {
+        console.error('❌ INDEX: AuthManager não encontrado');
+        return;
+      }
+      
+      // ✅ Verificar sessão atual
+      const session = await window.authManager.getCurrentSession();
+      if (!session) {
+        console.error('❌ INDEX: SEM SESSÃO - usuário não autenticado');
+        window.location.href = 'login.html';
+        return;
+      }
+      
+      console.log('✅ INDEX: Sessão verificada, usuário:', session.user.email);
+      
+      // ✅ Verificar se appReady já foi disparado
+      if (window.dataManager && window.dataManager.clientes) {
+        console.log('🚀 INDEX: appReady já foi disparado, inicializando diretamente...');
+        
+        // GARANTIR QUE O LOGOUT MANAGER FUNCIONE EM INDEX
+        console.log('🔍 Verificando botão de logout em index...');
+        const logoutBtn = document.getElementById('logoutButton');
+        if (logoutBtn) {
+          console.log('✅ Botão de logout encontrado, garantindo inicialização do LogoutManager...');
+          console.log('🔍 DEBUG - Botão encontrado:', logoutBtn);
+          console.log('🔍 DEBUG - Classes do botão:', logoutBtn.className);
+          console.log('🔍 DEBUG - Parent do botão:', logoutBtn.parentElement);
+          
+          // Forçar criação do LogoutManager se não existir
+          if (!window.logoutManager) {
+            console.log('🔧 Criando LogoutManager manualmente em index...');
+            window.logoutManager = new LogoutManager();
+          }
+          
+          // Forçar visibilidade e posicionamento do botão
+          logoutBtn.style.display = 'flex';
+          logoutBtn.style.visibility = 'visible';
+          logoutBtn.style.opacity = '1';
+          logoutBtn.style.position = 'absolute';
+          logoutBtn.style.bottom = '20px';
+          logoutBtn.style.left = '20px';
+          logoutBtn.style.right = '20px';
+          logoutBtn.style.zIndex = '1000';
+          console.log('🔧 Forçando visibilidade e posicionamento do botão em index...');
+          
+        } else {
+          console.error('❌ Botão de logout não encontrado no HTML de index!');
+        }
+      } else {
+        console.log('⏳ INDEX: appReady ainda não foi disparado, registrando listener...');
+        window.addEventListener('appReady', () => {
+          console.log('🚀 INDEX: appReady recebido, inicializando página...');
+          
+          // GARANTIR QUE O LOGOUT MANAGER FUNCIONE EM INDEX
+          console.log('🔍 Verificando botão de logout em index...');
+          const logoutBtn = document.getElementById('logoutButton');
+          if (logoutBtn) {
+            console.log('✅ Botão de logout encontrado, garantindo inicialização do LogoutManager...');
+            console.log('🔍 DEBUG - Botão encontrado:', logoutBtn);
+            console.log('🔍 DEBUG - Classes do botão:', logoutBtn.className);
+            console.log('🔍 DEBUG - Parent do botão:', logoutBtn.parentElement);
+            
+            // Forçar criação do LogoutManager se não existir
+            if (!window.logoutManager) {
+              console.log('🔧 Criando LogoutManager manualmente em index...');
+              window.logoutManager = new LogoutManager();
+            }
+            
+            // Forçar visibilidade e posicionamento do botão
+            logoutBtn.style.display = 'flex';
+            logoutBtn.style.visibility = 'visible';
+            logoutBtn.style.opacity = '1';
+            logoutBtn.style.position = 'absolute';
+            logoutBtn.style.bottom = '20px';
+            logoutBtn.style.left = '20px';
+            logoutBtn.style.right = '20px';
+            logoutBtn.style.zIndex = '1000';
+            console.log('🔧 Forçando visibilidade e posicionamento do botão em index...');
+            
+          } else {
+            console.error('❌ Botão de logout não encontrado no HTML de index!');
+          }
+        });
+      }
+      
+      // LogoutManager cuidará do botão de logout automaticamente
+      console.log('✅ Index: LogoutManager gerenciará o botão de logout');
+    }, 200);
+  </script>
 </body>
 </html>
