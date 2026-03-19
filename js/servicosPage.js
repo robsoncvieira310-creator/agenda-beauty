@@ -2,31 +2,18 @@
 class ServicosPage extends PageManager {
   constructor() {
     super();
-    console.log("🚀 ServicosPage iniciada");
-    this.currentPage = 'servicos';
-    this.servicos = [];
     this.servicoEditando = null;
-    
-    // VERSÃO ORIGINAL
-    // this.init();
-    
-    // NOVA IMPLEMENTAÇÃO V1.2 - EVENTO appReady
-    document.addEventListener('appReady', () => {
-      console.log('🚀 appReady recebido em ServicosPage');
-      this.init();
-    });
-  }
-
-  async init() {
-    console.log("🔄 Inicializando página de serviços");
-    await this.loadServicos();
-    this.setupColorPicker();
-    this.setupServiceButtons();
+    console.log("🚀 ServicosPage iniciada");
   }
 
   // NOVA IMPLEMENTAÇÃO V1.2 - MÉTODO initializeSpecificPage() PARA COMPATIBILIDADE
   async initializeSpecificPage() {
     console.log("📋 Inicializando página de serviços (V1.2)");
+    
+    // Mover lógica do init() para cá
+    await this.loadServicos();
+    this.setupColorPicker();
+    this.setupServiceButtons();
     
     // Configurar botões específicos
     this.setupServiceButtons();

@@ -292,7 +292,7 @@
   <script src="js/appInit.js"></script>
   
   <script>
-    // Inicializar página quando aplicação estiver pronta
+    // Fluxo V1.5 - Criar instância manualmente
     window.addEventListener('appReady', async () => {
       console.log('🚀 Inicializando página de agenda...');
       
@@ -310,6 +310,7 @@
         console.error('❌ Erro ao criar AgendaPage:', error);
       }
     });
+  </script>
 
     // Configurar botão de logout
     const logoutBtn = document.getElementById('logoutButton');

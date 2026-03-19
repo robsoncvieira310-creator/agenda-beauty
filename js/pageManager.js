@@ -6,8 +6,9 @@ class PageManager {
   }
 
   setupEventListeners() {
-    // Configurar navegação
-    document.addEventListener('DOMContentLoaded', () => {
+    // Configurar navegação após appReady
+    window.addEventListener('appReady', () => {
+      console.log('🚀 PageManager: appReady recebido, inicializando...');
       this.initializePage();
     });
     
@@ -34,6 +35,32 @@ class PageManager {
     } catch (error) {
       console.error('❌ Erro ao inicializar página:', error);
       this.showError('Erro ao carregar página. Recarregue.');
+    }
+  }
+
+  detectCurrentPage() {
+    const path = window.location.pathname;
+    const filename = path.split('/').pop() || '';
+    
+    if (filename.includes('agenda')) {
+      this.currentPage = 'agenda';
+      window.pageManager = new AgendaPage();
+      console.log('📅 Página agenda detectada');
+    } else if (filename.includes('profissionais')) {
+      this.currentPage = 'profissionais';
+      window.pageManager = new ProfissionaisPage();
+      console.log('👩 Página profissionais detectada');
+    } else if (filename.includes('clientes')) {
+      this.currentPage = 'clientes';
+      window.pageManager = new ClientesPage();
+      console.log('👥 Página clientes detectada');
+    } else if (filename.includes('servicos')) {
+      this.currentPage = 'servicos';
+      window.pageManager = new ServicosPage();
+      console.log('💇 Página serviços detectada');
+    } else {
+      this.currentPage = 'dashboard';
+      console.log('📊 Página dashboard detectada');
     }
   }
 
@@ -257,3 +284,7 @@ class PageManager {
 
 // Exportar para uso global
 window.PageManager = PageManager;
+
+// Criar instância global imediatamente
+window.pageManagerInstance = new PageManager();
+console.log('✅ PageManager instanciado globalmente');

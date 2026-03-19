@@ -127,7 +127,7 @@ class DataManager {
           telefone, 
           created_at, 
           profile_id, 
-          profiles!profissionais_profiles_fk(nome, email, role)
+          profiles!inner(nome, email, role)
         `)
         .order('id', { ascending: true });
 
@@ -179,12 +179,33 @@ class DataManager {
             });
             
           if (errorProfiles) {
-            console.warn('⚠️ Erro ao buscar profiles, usando dados básicos:', errorProfiles.message);
-            this.profissionais = profissionais.map(p => ({
-              ...p,
-              nome: `Profissional ${p.id}`,
-              email: 'Email não informado'
-            }));
+            console.warn('⚠️ Erro ao buscar profiles, tentando auth.users como fallback...');
+            // ÚLTIMO RECURSO: Tentar buscar via auth.users para obter emails
+            try {
+              const { data: { users } } = await this.supabase.auth.admin.listUsers();
+              const usersMap = {};
+              users.forEach(user => {
+                usersMap[user.id] = user;
+              });
+              
+              this.profissionais = profissionais.map(p => {
+                const user = usersMap[p.profile_id];
+                return {
+                  ...p,
+                  nome: user?.user_metadata?.nome || user?.email?.split('@')[0] || `Profissional ${p.id}`,
+                  email: user?.email || 'Email não informado'
+                };
+              });
+              
+              console.log('✅ Profissionais carregados via auth.users fallback:', this.profissionais);
+            } catch (authError) {
+              console.warn('⚠️ Falha no auth.users também, usando placeholders:', authError.message);
+              this.profissionais = profissionais.map(p => ({
+                ...p,
+                nome: `Profissional ${p.id}`,
+                email: 'Email não informado'
+              }));
+            }
           } else {
             // 3. Juntar dados manualmente
             const profilesMap = {};
@@ -205,8 +226,7 @@ class DataManager {
                 return {
                   ...profissional,
                   nome: `Profissional ${profissional.id}`,
-                  email: 'Email não informado',
-                  role: 'user'
+                  email: 'Email não informado'
                 };
               }
             });
@@ -255,8 +275,11 @@ class DataManager {
         const profissionalLogado = await this.getProfissionalLogado();
         
         if (!profissionalLogado) {
+          // SEM SESSÃO: Retornar vazio
+          this.agendamentos = [];
+          this.cache.agendamentos = this.agendamentos;
+        } else if (profissionalLogado.role === 'admin') {
           // ADMIN: Carregar todos os agendamentos
-          
           const { data, error } = await this.supabase
             .from("agendamentos")
             .select("*")
@@ -267,13 +290,27 @@ class DataManager {
             this.agendamentos = [];
           } else {
             this.agendamentos = data || [];
+            console.log('✅ ADMIN: Agendamentos carregados:', this.agendamentos.length, this.agendamentos);
           }
           
           // Salvar no cache
           this.cache.agendamentos = this.agendamentos;
         } else {
-          // PROFSSIONAL: Lógica específica (se necessário)
-          this.agendamentos = [];
+          // PROFISSIONAL: Carregar apenas seus agendamentos
+          const { data, error } = await this.supabase
+            .from("agendamentos")
+            .select("*")
+            .eq("profissional_id", profissionalLogado.id)
+            .order("data_inicio", { ascending: true });
+
+          if (error) {
+            console.error('Erro ao carregar agendamentos do profissional:', error);
+            this.agendamentos = [];
+          } else {
+            this.agendamentos = data || [];
+          }
+          
+          // Salvar no cache
           this.cache.agendamentos = this.agendamentos;
         }
       } else {

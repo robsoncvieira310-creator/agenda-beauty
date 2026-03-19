@@ -375,31 +375,22 @@
   <script src="js/appInit.js"></script>
   
   <script>
-    // NOVA IMPLEMENTAÇÃO V1.2 - GARANTIR ORDEM CORRETA
-    // Esperar um pouco para garantir que appInit.js tenha tempo de disparar o evento
-    setTimeout(() => {
-      console.log(' Verificando se appReady já foi disparado...');
-      console.log('🔍 Verificando se appReady já foi disparado...');
+    // Fluxo V1.5 - Criar instância manualmente
+    window.addEventListener('appReady', async () => {
+      console.log('🚀 Inicializando página de clientes...');
       
-      // Se DataManager já existe e tem dados, o evento já foi disparado
-      if (window.dataManager && window.dataManager.clientes) {
-        console.log('✅ appReady já foi disparado, inicializando diretamente...');
+      try {
+        console.log('🚀 Criando ClientesPage...');
         window.pageManager = new ClientesPage();
+        console.log('✅ ClientesPage criada:', window.pageManager);
         
-        // NOVA IMPLEMENTAÇÃO V1.2 - INICIALIZAR DIRETAMENTE
-        console.log('🚀 Chamando initializeSpecificPage() diretamente...');
-        window.pageManager.initializeSpecificPage();
-      } else {
-        console.log('⏳ appReady ainda não foi disparado, registrando listener...');
-        // Registrar listener para o evento
-        window.addEventListener('appReady', () => {
-          console.log('🚀 appReady recebido, inicializando página de clientes...');
-          window.clientesPage = new ClientesPage();
-          
-          // CHAMAR initializeSpecificPage MANUALMENTE
-          console.log('🚀 Chamando initializeSpecificPage() manualmente...');
-          window.clientesPage.init();
-        });
+        // Forçar inicialização específica da página
+        if (window.pageManager.initializeSpecificPage) {
+          console.log('🔄 Forçando inicialização específica dos clientes...');
+          await window.pageManager.initializeSpecificPage();
+        }
+      } catch (error) {
+        console.error('❌ Erro ao criar ClientesPage:', error);
       }
       
       // Configurar botão de logout
@@ -434,7 +425,7 @@
         
         console.log('✅ LOGOUT: Botão configurado');
       }
-    }, 100);
+    });
   </script>
   
   <style>

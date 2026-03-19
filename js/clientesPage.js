@@ -2,8 +2,9 @@
 // VERSÃO: 2.0.0 - LIMPA E FUNCIONAL
 console.log('👥 ClientesPage V2.0.0 carregado - Limpa e funcional');
 
-class ClientesPage {
+class ClientesPage extends PageManager {
   constructor() {
+    super();
     this.clientes = [];
     this.clienteEditando = null;
     this.clienteIdAnamnese = null;
@@ -11,7 +12,7 @@ class ClientesPage {
     this.supabase = window.supabaseClient;
   }
 
-  async init() {
+  async initializeSpecificPage() {
     console.log('📋 Inicializando página de clientes...');
     await this.loadClientes();
     this.setupEventListeners();

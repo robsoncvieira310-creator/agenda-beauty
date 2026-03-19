@@ -170,76 +170,24 @@
   <script src="js/appInit.js"></script>
   
   <script>
-    // Garantir que ProfissionaisPage esteja disponível globalmente
-    if (typeof ProfissionaisPage !== 'undefined') {
-      window.ProfissionaisPage = ProfissionaisPage;
-      console.log('✅ ProfissionaisPage disponível globalmente');
-    }
-  </script>
-  
-  <script>
-    // ✅ VERIFICAR SESSÃO ANTES DE INICIAR PÁGINA
-    setTimeout(async () => {
-      console.log('🔍 PROFISSIONAIS: Verificando sessão antes de inicializar...');
+    // Fluxo V1.5 - Criar instância manualmente
+    window.addEventListener('appReady', async () => {
+      console.log('🚀 Inicializando página de profissionais...');
       
-      // ✅ Usar AuthManager global protegido
-      if (!window.authManager) {
-        console.error('❌ PROFISSIONAIS: AuthManager não encontrado');
-        return;
-      }
-      
-      // ✅ Verificar sessão atual
-      const { data: { session } } = await window.authManager.getSession();
-      if (!session) {
-        console.error('❌ PROFISSIONAIS: SEM SESSÃO - usuário não autenticado');
-        window.location.href = 'login.html';
-        return;
-      }
-      
-      console.log('✅ PROFISSIONAIS: Sessão verificada, usuário:', session.user.email);
-      
-      // ✅ Verificar se appReady já foi disparado
-      if (window.dataManager && window.dataManager.profissionais) {
-        console.log('🚀 PROFISSIONAIS: appReady já foi disparado, inicializando diretamente...');
-        window.profissionaisPage = new ProfissionaisPage();
-        window.profissionaisPage.initializeSpecificPage();
-      } else {
-        console.log('⏳ PROFISSIONAIS: appReady ainda não foi disparado, registrando listener...');
-        window.addEventListener('appReady', () => {
-          console.log('🚀 PROFISSIONAIS: appReady recebido, inicializando página...');
-          window.profissionaisPage = new ProfissionaisPage();
-          window.profissionaisPage.initializeSpecificPage();
-        });
-      }
-      
-      // ✅ Configurar botão de logout
-      const logoutBtn = document.getElementById('logoutButton');
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-          console.log('🚪 PROFISSIONAIS: Botão de logout clicado');
-          
-          try {
-            if (window.authManager) {
-              await window.authManager.logout();
-              window.location.href = 'login.html';
-            } else {
-              const { error } = await window.supabase.auth.signOut();
-              if (error) {
-                console.error('❌ PROFISSIONAIS: Erro no logout:', error);
-                alert('Erro ao sair: ' + error.message);
-              } else {
-                window.location.href = 'login.html';
-              }
-            }
-          } catch (error) {
-            console.error('❌ PROFISSIONAIS: Erro ao fazer logout:', error);
-            alert('Erro ao sair: ' + error.message);
-          }
-        });
+      try {
+        console.log('🚀 Criando ProfissionaisPage...');
+        window.pageManager = new ProfissionaisPage();
+        console.log('✅ ProfissionaisPage criada:', window.pageManager);
         
-        console.log('✅ PROFISSIONAIS: Botão de logout configurado');
+        // Forçar inicialização específica da página
+        if (window.pageManager.initializeSpecificPage) {
+          console.log('🔄 Forçando inicialização específica dos profissionais...');
+          await window.pageManager.initializeSpecificPage();
+        }
+      } catch (error) {
+        console.error('❌ Erro ao criar ProfissionaisPage:', error);
       }
-    }, 200);
+    });
   </script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 // Página de Profissionais
-class ProfissionaisPage {
+class ProfissionaisPage extends PageManager {
   constructor() {
+    super();
     this.profissionais = [];
     this.profissionalEditando = null;
     this.profissionaisPorId = {};
@@ -10,15 +11,16 @@ class ProfissionaisPage {
 
   async initializeSpecificPage() {
     console.log('Inicializando página de profissionais...');
+    
+    // Configurar botões
+    this.setupProfessionalButtons();
+    
     await this.initialize();
     this.renderProfessionalTable();
   }
 
   async initialize() {
     console.log('ProfissionaisPage iniciada');
-    
-    // Configurar botões
-    this.setupProfessionalButtons();
     
     // Carregar profissionais
     await this.loadProfissionais();
