@@ -395,40 +395,106 @@ class DataManager {
       // 🔍 DIAGNÓSTICO - Verificar sessão e token
       const { data: { session } } = await this.supabase.auth.getSession()
       
-      console.log('🔐 SESSION DEBUG:', session)
+      console.log('🔐 SESSION DEBUG:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        email: session?.user?.email
+      })
       
       if (!session) {
         console.error('❌ Usuário não autenticado - session null')
         throw new Error('Usuário não autenticado. Faça login novamente.');
       }
       
-      console.log('🔑 TOKEN (primeiros 20 chars):', session?.access_token?.substring(0, 20))
-      
-      // Chamar Edge Function - Supabase Client envia token automaticamente
-      const { data, error } = await this.supabase.functions.invoke('create-profissional', {
-        body: {
-          nome: dados.nome,
-          email: dados.email,
-          password: dados.password,
-          telefone: dados.telefone
-        }
-      });
-      
-      // 🔍 DIAGNÓSTICO - Resposta da Edge Function
-      if (error) {
-        console.error('❌ ERRO COMPLETO EDGE FUNCTION:', error)
+      // ⚠️ GARANTIR QUE TOKEN NÃO É UNDEFINED
+      if (!session?.access_token) {
+        console.error('❌ Token de autenticação inválido')
+        throw new Error('Token de autenticação inválido');
       }
       
-      console.log('📥 RESPOSTA EDGE FUNCTION:', data)
+      console.log('🔑 TOKEN:', session.access_token.slice(0, 10) + '...')
       
-      if (error) throw error
+      // 🧨 TIMEOUT - Evita travamento silencioso
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 10000) // 10s
       
-      console.log('✅ Profissional criado com sucesso:', data);
+      // 🔥 CHAMADA DIRETA COM FETCH - COM RETRY AUTOMÁTICO
+      const callFunction = async () => {
+        const functionUrl = `${this.supabase.supabaseUrl}/functions/v1/create-profissional`
+        
+        console.log('🌐 CHAMANDO URL:', functionUrl)
+        
+        const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            nome: dados.nome,
+            email: dados.email,
+            password: dados.password,
+            telefone: dados.telefone
+          }),
+          signal: controller.signal
+        })
+        
+        clearTimeout(timeout)
+        
+        console.log('📡 RESPONSE STATUS:', response.status)
+        console.log('📡 RESPONSE OK:', response.ok)
+        
+        // 🧠 PADRONIZAR RETORNO
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('❌ ERRO COMPLETO DA API:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText
+          })
+          
+          let errorMessage = 'Erro na comunicação com o servidor'
+          try {
+            const errorJson = JSON.parse(errorText)
+            errorMessage = errorJson.error || errorMessage
+          } catch (parseError) {
+            errorMessage = errorText || errorMessage
+          }
+          
+          throw {
+            success: false,
+            message: errorMessage
+          }
+        }
+        
+        const data = await response.json()
+        console.log('📥 RESPOSTA EDGE FUNCTION:', data)
+        
+        return {
+          success: true,
+          data
+        }
+      }
       
-      // Limpar cache para forçar recarregamento
-      this.cache.profissionais = null;
-      
-      return data;
+      // 🚀 RETRY AUTOMÁTICO
+      for (let i = 0; i < 2; i++) {
+        try {
+          const result = await callFunction()
+          console.log('✅ Profissional criado com sucesso:', result.data);
+          
+          // Limpar cache para forçar recarregamento
+          this.cache.profissionais = null;
+          
+          return result.data
+          
+        } catch (error) {
+          if (i === 1) {
+            console.error('❌ Erro definitivo ao criar profissional:', error)
+            throw error
+          }
+          console.warn('🔁 Retry da requisição...', error.message)
+        }
+      }
       
     } catch (error) {
       console.error('❌ Erro ao criar profissional:', error);
