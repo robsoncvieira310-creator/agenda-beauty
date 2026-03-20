@@ -424,6 +424,10 @@ class DataManager {
         
         console.log('🌐 CHAMANDO URL:', functionUrl)
         
+        // 🧪 LOGS DE DIAGNÓSTICO
+        console.log('🧪 SESSION COMPLETA:', session)
+        console.log('🧪 TOKEN:', session?.access_token)
+        
         const response = await fetch(functionUrl, {
           method: 'POST',
           headers: {
