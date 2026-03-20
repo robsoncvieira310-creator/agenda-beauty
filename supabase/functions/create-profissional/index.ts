@@ -21,13 +21,22 @@ Deno.serve(async (req) => {
     // 🔐 AUTH
     // =============================
     
-    // 🔍 DIAGNÓSTICO - Logar todos os headers
-    console.log('📥 HEADERS RECEBIDOS:', Object.fromEntries(req.headers.entries()))
+    // 🔍 LOG CRÍTICO - Todos os headers
+    console.log('📥 HEADERS:', Object.fromEntries(req.headers.entries()))
     
-    const authHeader = req.headers.get('authorization')
+    // 🔥 MAIS SEGURO - Verificar ambos os casos
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization')
+    
+    // 🔥 TESTE CRÍTICO - Verificar se header chegou
+    if (!authHeader) {
+      return new Response(JSON.stringify({
+        error: 'Authorization header NÃO chegou'
+      }), { status: 401 })
+    }
+    
     console.log('🔐 AUTH HEADER COMPLETO:', authHeader)
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Sem token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
