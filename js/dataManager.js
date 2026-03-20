@@ -404,16 +404,13 @@ class DataManager {
       
       console.log('🔑 TOKEN (primeiros 20 chars):', session?.access_token?.substring(0, 20))
       
-      // Chamar Edge Function com token explícito
+      // Chamar Edge Function - Supabase Client envia token automaticamente
       const { data, error } = await this.supabase.functions.invoke('create-profissional', {
         body: {
           nome: dados.nome,
           email: dados.email,
           password: dados.password,
           telefone: dados.telefone
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}` 
         }
       });
       
