@@ -374,7 +374,7 @@ class DataManager {
 
   async addProfissional(dados) {
     try {
-      console.log('🚀 Criando profissional via Edge Function...', dados);
+      console.log('🚀 USANDO FETCH (NOVO FLUXO) - Criando profissional via Edge Function...', dados);
       
       // Validar dados obrigatórios
       if (!dados.nome || !dados.email || !dados.password || !dados.telefone) {
