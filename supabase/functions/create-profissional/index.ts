@@ -39,32 +39,27 @@ Deno.serve(async (req) => {
     // =============================
     // 👤 CLIENT DO USUÁRIO (JWT)
     // =============================
-    const supabaseUser = createClient(
-      supabaseUrl,
-      supabaseAnonKey,
-      {
-        global: {
-          headers: {
-            Authorization: authHeader,
-          },
-        },
+    const token = authHeader.replace('Bearer ', '')
+
+    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: supabaseAnonKey
       }
-    )
+    })
 
-    const {
-      data: { user },
-      error: userError
-    } = await supabaseUser.auth.getUser()
+    const userAuthData = await userResponse.json()
 
-    console.log('👤 USER:', user)
-    console.log('❌ USER ERROR:', userError)
+    console.log('👤 USER DATA:', userAuthData)
 
-    if (userError || !user) {
+    if (!userResponse.ok) {
       return new Response(JSON.stringify({ error: 'Token inválido' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
+
+    const user = userAuthData
 
     // =============================
     // 🔧 CLIENT ADMIN (SERVICE ROLE)
