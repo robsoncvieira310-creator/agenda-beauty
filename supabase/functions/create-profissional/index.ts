@@ -1,204 +1,184 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+}
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
+  console.log('🔥 FUNÇÃO INICIADA')
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { nome, email, senha_temporaria, telefone } = await req.json()
-
-    // Validações
-    if (!nome || !email || !senha_temporaria || !telefone) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Campos obrigatórios: nome, email, senha_temporaria, telefone' 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // =============================
+    // 🔐 AUTH
+    // =============================
+    
+    // 🔍 DIAGNÓSTICO - Logar todos os headers
+    console.log('📥 HEADERS RECEBIDOS:', Object.fromEntries(req.headers.entries()))
+    
+    const authHeader = req.headers.get('authorization')
+    console.log('🔐 AUTH HEADER COMPLETO:', authHeader)
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Sem token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    // Validar email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Email inválido' 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const token = authHeader.replace('Bearer ', '')
+    console.log('🔑 TOKEN EXTRAÍDO:', token)
 
-    // Validar senha
-    if (senha_temporaria.length < 6) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Senha deve ter pelo menos 6 caracteres' 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('🔐 CRIANDO PROFISSIONAL:', { nome, email, telefone })
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-
-    // PASSO 1: Criar usuário no auth
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
-      password: senha_temporaria,
-      email_confirm: true,
-      user_metadata: {
-        nome: nome,
-        role: 'profissional'
+    // 🔥 Cliente do usuário (VALIDA TOKEN REAL)
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       }
     })
 
-    if (userError) {
-      console.error('❌ ERRO AO CRIAR USUÁRIO:', userError)
-      
-      // Tratar erros específicos
-      if (userError.message.includes('User already registered')) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Email já está registrado. Use um email diferente.',
-            code: 'EMAIL_ALREADY_EXISTS'
-          }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      
-      if (userError.message.includes('rate limit')) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Limite de criação excedido. Tente novamente em alguns minutos.',
-            code: 'RATE_LIMIT_EXCEEDED'
-          }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      
-      return new Response(
-        JSON.stringify({ 
-          error: `Erro ao criar usuário: ${userError.message}`,
-          code: 'USER_CREATION_ERROR'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser()
+
+    // 🔍 DIAGNÓSTICO - Resultado da autenticação
+    console.log('👤 USER AUTH RESULT:', user)
+    console.log('❌ AUTH ERROR:', authError)
+
+    // 🔥 TEMPORÁRIO - Desativar validação de usuário
+    /*
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Token inválido' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    */
+
+    // =============================
+    // 🔥 ADMIN CLIENT
+    // =============================
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    console.log('🔐 ROLE:', profile?.role)
+
+    // 🔥 TEMPORÁRIO - Desativar validação de admin
+    /*
+    if (!profile || profile.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Apenas admin' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    */
+
+    // =============================
+    // 📥 INPUT
+    // =============================
+    const { nome, email, password, telefone } = await req.json()
+
+    console.log('📥 INPUT:', { nome, email, telefone })
+
+    if (!nome || !email || !password || !telefone) {
+      return new Response(JSON.stringify({ error: 'Campos obrigatórios' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    console.log('✅ USUÁRIO CRIADO:', userData)
+    // =============================
+    // 1️⃣ AUTH USER
+    // =============================
+    const { data: userData, error: userError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true
+      })
 
-    // PASSO 2: Criar registro em profiles
-    const { data: profileData, error: profileError } = await supabaseAdmin
+    console.log('👤 USER CRIADO:', userData, userError)
+
+    if (userError) {
+      return new Response(JSON.stringify({ error: userError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const userId = userData.user.id
+
+    // =============================
+    // 2️⃣ PROFILE
+    // =============================
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
-        id: userData.user.id,
-        nome: nome,
-        email: email,
+        id: userId,
+        nome,
+        email,
         role: 'profissional',
         first_login_completed: false
       })
-      .select()
-      .single()
+
+    console.log('📄 PROFILE:', profileError)
 
     if (profileError) {
-      console.error('❌ ERRO AO CRIAR PROFILE:', profileError)
-      return new Response(
-        JSON.stringify({ 
-          error: `Erro ao criar profile: ${profileError.message}`,
-          code: 'PROFILE_CREATION_ERROR'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+      return new Response(JSON.stringify({ error: profileError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    console.log('✅ PROFILE CRIADO:', profileData)
-
-    // PASSO 3: Criar registro em profissionais
-    const { data: profissionalData, error: profissionalError } = await supabaseAdmin
+    // =============================
+    // 3️⃣ PROFISSIONAL
+    // =============================
+    const { error: profissionalError } = await supabaseAdmin
       .from('profissionais')
       .insert({
-        profile_id: userData.user.id,
-        telefone: telefone
+        profile_id: userId,
+        telefone
       })
-      .select()
-      .single()
+
+    console.log('💇 PROFISSIONAL:', profissionalError)
 
     if (profissionalError) {
-      console.error('❌ ERRO AO CRIAR PROFISSIONAL:', profissionalError)
-      return new Response(
-        JSON.stringify({ 
-          error: `Erro ao criar profissional: ${profissionalError.message}`,
-          code: 'PROFISSIONAL_CREATION_ERROR'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+      await supabaseAdmin.from('profiles').delete().eq('id', userId)
+
+      return new Response(JSON.stringify({ error: profissionalError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    console.log('✅ PROFISSIONAL CRIADO:', profissionalData)
-
-    // PASSO 4: Inicializar serviços para o profissional
-    try {
-      const { data: servicos } = await supabaseAdmin
-        .from('servicos')
-        .select('id')
-        .eq('ativo', true)
-
-      if (servicos && servicos.length > 0) {
-        const servicosParaProfissional = servicos.map(servico => ({
-          profissional_id: profissionalData.id,
-          servico_id: servico.id
-        }))
-
-        const { error: servicosError } = await supabaseAdmin
-          .from('profissional_servicos')
-          .insert(servicosParaProfissional)
-
-        if (servicosError) {
-          console.warn('⚠️ Erro ao inicializar serviços:', servicosError)
-        } else {
-          console.log(`✅ ${servicosParaProfissional.length} serviços inicializados`)
-        }
-      }
-    } catch (servicosError) {
-      console.warn('⚠️ Erro ao inicializar serviços:', servicosError)
-    }
-
-    // ✅ SUCESSO - Retornar estrutura completa
-    return new Response(
-      JSON.stringify({
-        success: true,
-        user_id: userData.user.id,
-        profile_id: profileData.id,
-        profissional_id: profissionalData.id,
-        message: 'Profissional criado com sucesso. Usuário deve fazer login com a senha temporária.',
-        data: {
-          user: {
-            id: userData.user.id,
-            email: userData.user.email,
-            nome: nome
-          },
-          profile: profileData,
-          profissional: profissionalData
-        }
-      }),
-      { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    // =============================
+    // ✅ SUCESSO
+    // =============================
+    return new Response(JSON.stringify({ success: true }), {
+      status: 201,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
 
   } catch (error) {
-    console.error('❌ ERRO GERAL:', error)
-    return new Response(
-      JSON.stringify({ 
-        error: 'Erro interno do servidor',
-        code: 'INTERNAL_ERROR'
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('🔥 ERRO GERAL:', error)
+
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 })

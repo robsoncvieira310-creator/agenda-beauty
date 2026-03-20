@@ -290,6 +290,12 @@ class ProfissionaisPage {
     document.getElementById('emailProfissional').value = profissional.email || '';
     document.getElementById('telefoneProfissional').value = profissional.telefone || '';
     
+    // Em edição, esconder campo senha (não é permitido alterar)
+    const senhaField = document.getElementById('senhaProfissional').parentElement;
+    if (senhaField) {
+      senhaField.style.display = 'none';
+    }
+    
     // Mostrar apenas botão de resetar senha
     document.getElementById('btnResetSenha').style.display = 'inline-block';
   }
@@ -358,6 +364,7 @@ class ProfissionaisPage {
       const nome = document.getElementById('nomeProfissional').value.trim();
       const telefone = document.getElementById('telefoneProfissional').value.trim();
       const email = document.getElementById('emailProfissional').value.trim();
+      const senha = document.getElementById('senhaProfissional').value;
       
       // Validações
       if (!nome) {
@@ -375,13 +382,24 @@ class ProfissionaisPage {
         return;
       }
       
-      console.log('📋 Dados coletados:', { nome, telefone, email });
+      if (!senha) {
+        this.showError('Senha é obrigatória');
+        return;
+      }
+      
+      if (senha.length < 6) {
+        this.showError('Senha deve ter pelo menos 6 caracteres');
+        return;
+      }
+      
+      console.log('📋 Dados coletados:', { nome, telefone, email, senha: '***' });
       console.log('🔍 Profissional editando:', this.profissionalEditando ? 'SIM' : 'NÃO');
       
       const dadosParaSalvar = {
         nome: nome,
         telefone: telefone,
-        email: email
+        email: email,
+        password: senha
       };
 
       if (this.profissionalEditando) {
@@ -405,9 +423,29 @@ class ProfissionaisPage {
         }
         
         console.log('🚀 Chamando addProfissional...');
-        await window.dataManager.addProfissional(dadosParaSalvar);
-        console.log('✅ Profissional criado com sucesso');
-        this.showSuccess('Profissional criado com sucesso');
+        
+        try {
+          await window.dataManager.addProfissional(dadosParaSalvar);
+          console.log('✅ Profissional criado com sucesso');
+          this.showSuccess('Profissional criado com sucesso');
+        } catch (error) {
+          console.error('❌ Erro ao criar profissional:', error.message);
+          
+          // Tratar erros específicos da Edge Function
+          if (error.message.includes('Email já está registrado')) {
+            this.showError('Email já está registrado. Use um email diferente.');
+            return;
+          }
+          
+          if (error.message.includes('Limite de criação excedido')) {
+            this.showError('Limite de criação excedido. Tente novamente em alguns minutos.');
+            return;
+          }
+          
+          // Erro genérico
+          this.showError('Erro ao salvar profissional: ' + error.message);
+          return;
+        }
       }
       
       console.log('🔄 Atualizando lista de profissionais...');
@@ -429,6 +467,14 @@ class ProfissionaisPage {
     if (modal) {
       modal.style.display = 'block';
       console.log('✅ Modal aberto');
+      
+      // Se não for edição, mostrar campo senha
+      if (!this.profissionalEditando) {
+        const senhaField = document.getElementById('senhaProfissional').parentElement;
+        if (senhaField) {
+          senhaField.style.display = 'block';
+        }
+      }
     } else {
       console.error('❌ Modal não encontrado');
     }
@@ -445,6 +491,13 @@ class ProfissionaisPage {
     document.getElementById('nomeProfissional').value = '';
     document.getElementById('emailProfissional').value = '';
     document.getElementById('telefoneProfissional').value = '';
+    document.getElementById('senhaProfissional').value = '';
+    
+    // Mostrar campo senha novamente (para próxima criação)
+    const senhaField = document.getElementById('senhaProfissional').parentElement;
+    if (senhaField) {
+      senhaField.style.display = 'block';
+    }
     
     // Esconder botão de resetar senha
     document.getElementById('btnResetSenha').style.display = 'none';
@@ -473,6 +526,15 @@ class ProfissionaisPage {
       window.UIUtils.showAlert(message, 'success');
     } else {
       alert(message);
+    }
+  }
+
+  showWarning(message) {
+    console.log('⚠️ WARNING:', message);
+    if (window.UIUtils) {
+      window.UIUtils.showAlert(message, 'warning');
+    } else {
+      alert('⚠️ ' + message);
     }
   }
 

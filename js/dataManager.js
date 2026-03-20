@@ -374,71 +374,67 @@ class DataManager {
 
   async addProfissional(dados) {
     try {
-      console.log("ETAPA 1: Criando usuário no Auth...");
-
-      const { data: authData, error: authError } = await this.supabase.auth.signUp({
-        email: dados.email,
-        password: "123456" // ou gerar automático
-      });
-
-      if (authError || !authData.user) {
-        throw new Error("Erro ao criar usuário no auth: " + (authError?.message || "Usuário não criado"));
+      console.log('🚀 Criando profissional via Edge Function...', dados);
+      
+      // Validar dados obrigatórios
+      if (!dados.nome || !dados.email || !dados.password || !dados.telefone) {
+        throw new Error('Campos obrigatórios: nome, email, password, telefone');
       }
-
-      const userId = authData.user.id;
-      console.log("Usuário criado:", userId);
-
-      console.log("ETAPA 2: Criando profile...");
-
-      const { error: profileError } = await this.supabase
-        .from("profiles")
-        .insert({
-          id: userId,
+      
+      // Validar email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(dados.email)) {
+        throw new Error('Email inválido');
+      }
+      
+      // Validar senha
+      if (dados.password.length < 6) {
+        throw new Error('Senha deve ter pelo menos 6 caracteres');
+      }
+      
+      // 🔍 DIAGNÓSTICO - Verificar sessão e token
+      const { data: { session } } = await this.supabase.auth.getSession()
+      
+      console.log('🔐 SESSION DEBUG:', session)
+      
+      if (!session) {
+        console.error('❌ Usuário não autenticado - session null')
+        throw new Error('Usuário não autenticado. Faça login novamente.');
+      }
+      
+      console.log('🔑 TOKEN (primeiros 20 chars):', session?.access_token?.substring(0, 20))
+      
+      // Chamar Edge Function com token explícito
+      const { data, error } = await this.supabase.functions.invoke('create-profissional', {
+        body: {
           nome: dados.nome,
           email: dados.email,
-          telefone: dados.telefone,
-          role: "profissional"
-        });
-
-      if (profileError) {
-        console.error("Erro profile:", profileError);
-
-        // rollback: deletar usuário criado
-        await this.supabase.rpc("delete_user_completo", {
-          user_id: userId
-        });
-
-        throw new Error("Erro ao criar profile: " + profileError.message);
+          password: dados.password,
+          telefone: dados.telefone
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}` 
+        }
+      });
+      
+      // 🔍 DIAGNÓSTICO - Resposta da Edge Function
+      if (error) {
+        console.error('❌ ERRO COMPLETO EDGE FUNCTION:', error)
       }
-
-      console.log("Profile criado com sucesso");
-
-      console.log("ETAPA 3: Criando profissional...");
-
-      const { data: profissional, error: profError } = await this.supabase
-        .from("profissionais")
-        .insert({
-          profile_id: userId
-        })
-        .select()
-        .single();
-
-      if (profError) {
-        console.error("Erro profissional:", profError);
-
-        await this.supabase.rpc("delete_user_completo", {
-          user_id: userId
-        });
-
-        throw new Error("Erro ao criar profissional: " + profError.message);
-      }
-
-      console.log("Profissional criado com sucesso:", profissional);
-
-      return profissional;
-
+      
+      console.log('📥 RESPOSTA EDGE FUNCTION:', data)
+      
+      if (error) throw error
+      
+      console.log('✅ Profissional criado com sucesso:', data);
+      
+      // Limpar cache para forçar recarregamento
+      this.cache.profissionais = null;
+      
+      return data;
+      
     } catch (error) {
-      console.error("ERRO COMPLETO:", error);
+      console.error('❌ Erro ao criar profissional:', error);
       throw error;
     }
   }
@@ -583,172 +579,15 @@ class DataManager {
   }
 
   async addProfissionalCompleto(dados) {
-    try {
-      console.log("🔧 Criando profissional completo (usuário + profile + profissional):", dados);
-      
-      // ✅ MÉTODO COMPLETO: Tentar criar usuário no Supabase Auth
-      let userId = null;
-      let profileData = null;
-      
-      try {
-        // Tentar criar usuário via signup (sem precisar de admin)
-        const { data: authData, error: authError } = await this.supabase.auth.signUp({
-          email: dados.email,
-          password: dados.senhaTemporaria || 'temp123456',
-          options: {
-            data: {
-              role: 'profissional',
-              nome: dados.nome
-            }
-          }
-        });
-        
-        if (authError) {
-          console.warn("⚠️ Erro ao criar usuário via signup:", authError.message);
-        } else {
-          userId = authData.user?.id;
-          console.log("✅ Usuário criado no Auth:", userId);
-        }
-      } catch (signupError) {
-        console.warn("⚠️ Falha no signup:", signupError.message);
-      }
-      
-      // Se conseguiu criar usuário, criar profile (fonte única de dados do usuário)
-      if (userId) {
-        try {
-          // ✅ NOVA ARQUITETURA: profiles é fonte única de dados do usuário
-          const { data: profile, error: profileError } = await this.supabase
-            .from('profiles')
-            .insert({
-              id: userId,
-              nome: dados.nome,
-              email: dados.email,
-              telefone: dados.telefone, // ✅ Telefone pertence exclusivamente a profiles
-              role: 'profissional',
-              first_login_completed: false
-            })
-            .select()
-            .single();
-            
-          if (profileError) {
-            console.warn("⚠️ Erro ao criar profile:", profileError.message);
-          } else {
-            profileData = profile;
-            console.log("✅ Profile criado:", profileData);
-          }
-        } catch (profileError) {
-          console.warn("⚠️ Falha ao criar profile:", profileError.message);
-        }
-      }
-      
-      // Criar registro na tabela profissionais (apenas profile_id - relacionamento)
-      const profissionalData = {
-        profile_id: userId || null // ✅ Apenas profile_id - dados em profiles
-      };
-      
-      console.log("📊 Dados para inserir na tabela profissionais:", profissionalData);
-      
-      const { data, error } = await this.supabase
-        .from('profissionais')
-        .insert(profissionalData)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("❌ Erro ao inserir profissional:", error);
-        throw new Error(`Erro ao inserir profissional: ${error.message}`);
-      }
-      
-      console.log("✅ Profissional criado com sucesso:", data);
-      
-      // Retornar informações completas
-      const resultado = {
-        profissional: data,
-        usuario: userId ? { id: userId, email: dados.email } : null,
-        profile: profileData,
-        observacao: userId ? 
-          "Profissional completo com usuário e profile criados" : 
-          "Apenas registro profissional criado (crie usuário manualmente)"
-      };
-      
-      console.log("🎉 Resultado completo:", resultado);
-      
-      // Adicionar ao cache local (lista de profissionais)
-      this.profissionais.push(data);
-      this.cache.profissionais = null;
-      
-      return resultado;
-      
-    } catch (error) {
-      console.error("❌ Erro ao criar profissional completo:", error);
-      throw error;
-    }
+    throw new Error("Método removido. Aguardando nova implementação segura.");
   }
 
   async addProfissionalFrontend(dados) {
-    try {
-      console.log("🔧 Criando profissional com método simplificado:", dados);
-      
-      // ✅ NOVA ARQUITETURA: Apenas profile_id - dados ficam em profiles
-      const profissionalData = {
-        profile_id: null // Sem usuário associado inicialmente
-      };
-      
-      console.log("📊 Dados para inserir na tabela profissionais:", profissionalData);
-      
-      const { data, error } = await this.supabase
-        .from('profissionais')
-        .insert(profissionalData)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("❌ Erro ao inserir profissional:", error);
-        throw new Error(`Erro ao inserir profissional: ${error.message}`);
-      }
-      
-      console.log("✅ Profissional criado com sucesso:", data);
-      
-      // Adicionar ao cache local com dados temporários (pois não tem profile associado)
-      const profissionalCompleto = {
-        ...data,
-        nome: dados.nome || 'Sem nome',
-        email: dados.email || 'Sem email',
-        telefone: dados.telefone || 'Sem telefone', // ✅ Dados temporários (sem profile associado)
-        especialidade: dados.especialidade || 'Geral'
-      };
-      
-      this.profissionais.push(profissionalCompleto);
-      
-      // Limpar cache para forçar recarregamento (lista de profissionais)
-      this.cache.profissionais = null;
-      
-      return data;
-      
-    } catch (error) {
-      console.error("❌ Erro ao criar profissional:", error);
-      throw error;
-    }
+    throw new Error("Método removido. Aguardando nova implementação segura.");
   }
 
   async addProfissionalEdgeFunction(dados) {
-    if (!dados.senhaTemporaria) {
-      throw new Error('Senha temporária é obrigatória para criar profissional');
-    }
-    
-    console.log('🔐 CHAMANDO EDGE FUNCTION: create-profissional...');
-    
-    const { data, error } = await this.supabase.functions.invoke('create-profissional', {
-      body: dados
-    });
-    
-    if (error) {
-      console.error('❌ Erro na Edge Function:', error);
-      throw new Error(`Erro na Edge Function: ${error.message}`);
-    }
-    
-    console.log('✅ Edge Function retornou:', data);
-    return data;
+    throw new Error("Método removido. Aguardando nova implementação segura.");
   }
 
   async garantirDadosReferencia() {
