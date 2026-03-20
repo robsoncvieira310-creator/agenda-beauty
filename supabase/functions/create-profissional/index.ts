@@ -11,7 +11,18 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
 Deno.serve(async (req) => {
   console.log('🔥 FUNÇÃO INICIADA')
-
+  console.log('📥 HEADERS:', Object.fromEntries(req.headers.entries()))
+  
+  // 🔥 TESTE DE CONEXÃO - Retorno imediato
+  return new Response(JSON.stringify({
+    success: true,
+    message: 'FUNÇÃO FUNCIONANDO'
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  })
+  
+  // CÓDIGO ORIGINAL COMENTADO TEMPORARIAMENTE
+  /*
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -190,4 +201,5 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
+  */
 })
