@@ -7,12 +7,13 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
 Deno.serve(async (req) => {
   console.log('🔥 FUNÇÃO INICIADA')
 
   // =============================
-  // CORS (IMPORTANTE)
+  // CORS
   // =============================
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -20,7 +21,7 @@ Deno.serve(async (req) => {
 
   try {
     // =============================
-    // 🔐 AUTH (CORRETO)
+    // 🔐 AUTH HEADER
     // =============================
     const authHeader =
       req.headers.get('authorization') ||
@@ -35,10 +36,12 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Cliente com SERVICE ROLE + header original
-    const supabase = createClient(
+    // =============================
+    // 👤 CLIENT DO USUÁRIO (JWT)
+    // =============================
+    const supabaseUser = createClient(
       supabaseUrl,
-      supabaseServiceKey,
+      supabaseAnonKey,
       {
         global: {
           headers: {
@@ -48,11 +51,10 @@ Deno.serve(async (req) => {
       }
     )
 
-    // Validar usuário
     const {
       data: { user },
       error: userError
-    } = await supabase.auth.getUser()
+    } = await supabaseUser.auth.getUser()
 
     console.log('👤 USER:', user)
     console.log('❌ USER ERROR:', userError)
@@ -65,9 +67,17 @@ Deno.serve(async (req) => {
     }
 
     // =============================
+    // 🔧 CLIENT ADMIN (SERVICE ROLE)
+    // =============================
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      supabaseServiceKey
+    )
+
+    // =============================
     // 🔒 VERIFICAR ADMIN
     // =============================
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
@@ -97,10 +107,26 @@ Deno.serve(async (req) => {
     console.log('📥 INPUT:', { nome, email, telefone })
 
     // =============================
+    // 🚫 VERIFICAR DUPLICIDADE
+    // =============================
+    const { data: existingUser } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (existingUser) {
+      return new Response(JSON.stringify({ error: 'Email já cadastrado' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // =============================
     // 1️⃣ CRIAR USER
     // =============================
     const { data: userData, error: createUserError } =
-      await supabase.auth.admin.createUser({
+      await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true
@@ -119,7 +145,7 @@ Deno.serve(async (req) => {
     // =============================
     // 2️⃣ PROFILE
     // =============================
-    const { error: profileInsertError } = await supabase
+    const { error: profileInsertError } = await supabaseAdmin
       .from('profiles')
       .insert({
         id: userId,
@@ -130,7 +156,14 @@ Deno.serve(async (req) => {
       })
 
     if (profileInsertError) {
-      await supabase.auth.admin.deleteUser(userId)
+      console.error('❌ ERRO PROFILE:', profileInsertError)
+
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(userId)
+      } catch (rollbackError) {
+        console.error('🔥 ERRO ROLLBACK USER:', rollbackError)
+      }
+
       return new Response(JSON.stringify({ error: profileInsertError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -140,7 +173,7 @@ Deno.serve(async (req) => {
     // =============================
     // 3️⃣ PROFISSIONAL
     // =============================
-    const { error: profissionalError } = await supabase
+    const { error: profissionalError } = await supabaseAdmin
       .from('profissionais')
       .insert({
         profile_id: userId,
@@ -148,8 +181,14 @@ Deno.serve(async (req) => {
       })
 
     if (profissionalError) {
-      await supabase.auth.admin.deleteUser(userId)
-      await supabase.from('profiles').delete().eq('id', userId)
+      console.error('❌ ERRO PROFISSIONAL:', profissionalError)
+
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(userId)
+        await supabaseAdmin.from('profiles').delete().eq('id', userId)
+      } catch (rollbackError) {
+        console.error('🔥 ERRO ROLLBACK COMPLETO:', rollbackError)
+      }
 
       return new Response(JSON.stringify({ error: profissionalError.message }), {
         status: 500,
