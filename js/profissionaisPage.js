@@ -334,7 +334,7 @@ class ProfissionaisPage {
       this.showLoading('Excluindo profissional...');
       
       // Excluir em cascata: profissionais → profiles → auth.users
-      const resultado = await window.dataManager.deleteProfissional(profissional.id);
+      const resultado = await window.dataManager.deleteProfissional(profissional.profile_id);
       console.log('✅ Resultado da exclusão:', resultado);
       
       this.showSuccess(resultado.message || 'Profissional excluído com sucesso');
