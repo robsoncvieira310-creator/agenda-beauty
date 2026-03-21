@@ -164,39 +164,31 @@ Deno.serve(async (req) => {
       .eq('id', userId)
       .maybeSingle()
 
-    if (!existingProfile) {
-      console.log('📄 Criando profile...')
+    console.log('📄 Criando/atualizando profile...')
 
-      // =============================
-      // 2️⃣ PROFILE (COM TELEFONE)
-      // =============================
-      const { error: profileInsertError } = await supabaseAdmin
-        .from('profiles')
-        .insert({
-          id: userId,
-          nome,
-          email,
-          telefone, // ✅ AGORA AQUI
-          role: 'profissional',
-          first_login_completed: false
-        })
+    // =============================
+    // 2️⃣ PROFILE (COM TELEFONE) - UPSERT
+    // =============================
+    const { error: profileInsertError } = await supabaseAdmin
+      .from('profiles')
+      .upsert({
+        id: userId,
+        nome,
+        email,
+        telefone,
+        role: 'profissional',
+        first_login_completed: false
+      })
 
-      if (profileInsertError) {
-        console.error('❌ ERRO PROFILE:', profileInsertError)
+    if (profileInsertError) {
+      console.error('❌ ERRO PROFILE:', profileInsertError)
 
-        try {
-          await supabaseAdmin.auth.admin.deleteUser(userId)
-        } catch (rollbackError) {
-          console.error('🔥 ERRO ROLLBACK USER:', rollbackError)
-        }
+      await supabaseAdmin.auth.admin.deleteUser(userId)
 
-        return new Response(JSON.stringify({ error: profileInsertError.message }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-    } else {
-      console.log('⚠️ Profile já existia (evitando duplicate key)')
+      return new Response(JSON.stringify({ error: profileInsertError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     // =============================
