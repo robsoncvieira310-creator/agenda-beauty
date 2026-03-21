@@ -170,16 +170,16 @@ Deno.serve(async (req) => {
     
     // 2. Deletar profissional
     console.log('🗑️ 2️⃣ DELETANDO PROFISSIONAL...')
-    const { error: profissionalError } = await supabaseAdmin
+    const { error: deleteProfissionalError } = await supabaseAdmin
       .from('profissionais')
       .delete()
       .eq('profile_id', profile_id)
 
-    if (profissionalError) {
-      console.error('❌ ERRO DELETE PROFISSIONAL:', profissionalError)
+    if (deleteProfissionalError) {
+      console.error('❌ ERRO DELETE PROFISSIONAL:', deleteProfissionalError)
       return new Response(JSON.stringify({ 
         error: 'Erro ao deletar profissional',
-        details: profissionalError.message 
+        details: deleteProfissionalError.message 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -190,16 +190,16 @@ Deno.serve(async (req) => {
 
     // 3. Deletar profile
     console.log('🗑️ 3️⃣ DELETANDO PROFILE...')
-    const { error: profileError } = await supabaseAdmin
+    const { error: deleteProfileError } = await supabaseAdmin
       .from('profiles')
       .delete()
       .eq('id', profile_id)
 
-    if (profileError) {
-      console.error('❌ ERRO DELETE PROFILE:', profileError)
+    if (deleteProfileError) {
+      console.error('❌ ERRO DELETE PROFILE:', deleteProfileError)
       return new Response(JSON.stringify({ 
         error: 'Erro ao deletar profile',
-        details: profileError.message 
+        details: deleteProfileError.message 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
