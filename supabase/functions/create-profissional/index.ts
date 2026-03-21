@@ -219,11 +219,33 @@ Deno.serve(async (req) => {
     }
 
     // =============================
+    // 📋 RETORNAR DADOS COMPLETOS (JOIN)
+    // =============================
+    const { data: profissionalCompleto } = await supabaseAdmin
+      .from('profissionais')
+      .select(`
+        id,
+        profile_id,
+        profiles (
+          nome,
+          email,
+          telefone
+        )
+      `)
+      .eq('profile_id', userId)
+      .single()
+
+    console.log('✅ PROFISSIONAL COMPLETO:', profissionalCompleto)
+
+    // =============================
     // ✅ SUCESSO
     // =============================
     console.log('🎉 PROFISSIONAL CRIADO COM SUCESSO')
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      data: profissionalCompleto 
+    }), {
       status: 201,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

@@ -506,6 +506,99 @@ class DataManager {
     }
   }
 
+  async deleteProfissional(profile_id) {
+    try {
+      console.log('🗑️ Deletando profissional via Edge Function...', profile_id);
+      
+      // 🔍 DIAGNÓSTICO - Verificar sessão e token
+      const { data: { session } } = await this.supabase.auth.getSession()
+      
+      console.log('🔐 SESSION DEBUG:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        email: session?.user?.email
+      })
+      
+      if (!session) {
+        throw new Error('Usuário não autenticado. Faça login novamente.');
+      }
+      
+      // 🔑 VALIDAR TOKEN
+      if (!session?.access_token) {
+        throw new Error('Token de autenticação inválido');
+      }
+      
+      console.log('🔑 TOKEN:', session.access_token.slice(0, 10) + '...');
+      
+      // 🧨 TIMEOUT - Evita travamento silencioso
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 10000) // 10s
+      
+      // 🔥 CHAMADA DIRETA COM FETCH
+      const functionUrl = `${this.supabase.supabaseUrl}/functions/v1/delete-profissional`
+      
+      console.log('🌐 CHAMANDO DELETE URL:', functionUrl)
+      
+      // 🧪 LOGS DE DIAGNÓSTICO
+      console.log('🧪 SESSION COMPLETA:', session)
+      console.log('🧪 TOKEN:', session?.access_token)
+      
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          profile_id: profile_id
+        }),
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeout)
+      
+      console.log('📡 DELETE RESPONSE STATUS:', response.status)
+      console.log('📡 DELETE RESPONSE OK:', response.ok)
+      
+      // 🧪 LOG COMPLETO DA RESPOSTA
+      const responseText = await response.text()
+      console.log('📡 DELETE RESPONSE TEXT:', responseText)
+      
+      let responseData
+      try {
+        responseData = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('❌ ERRO PARSE JSON:', parseError)
+        throw new Error('Resposta inválida do servidor')
+      }
+      
+      console.log('📡 DELETE RESPONSE DATA:', responseData)
+      
+      if (!response.ok) {
+        const errorMessage = responseData?.error || `Erro HTTP ${response.status}`
+        console.error('❌ ERRO DELETE FUNCTION:', errorMessage)
+        throw new Error(errorMessage)
+      }
+      
+      if (!responseData.success) {
+        const errorMessage = responseData?.message || responseData?.error || 'Erro desconhecido'
+        console.error('❌ ERRO DELETE BUSINESS:', errorMessage)
+        throw new Error(errorMessage)
+      }
+      
+      console.log('✅ Profissional deletado com sucesso:', responseData)
+      
+      // Limpar cache
+      this.cache.delete('profissionais')
+      
+      return responseData
+      
+    } catch (error) {
+      console.error('❌ Erro ao deletar profissional:', error)
+      throw error
+    }
+  }
+
   async updateProfissional(id, dados) {
     try {
       console.log('🔧 Atualizando profissional:', id, dados);
@@ -568,93 +661,6 @@ class DataManager {
       console.error('❌ Erro ao atualizar profissional:', error);
       throw error;
     }
-  }
-
-  async deleteProfissional(profissionalId) {
-    try {
-      console.log('🗑️ Excluindo profissional em cascata:', profissionalId);
-      
-      // 1. Buscar dados completos do profissional
-      const { data: profissional, error: errorProf } = await this.supabase
-        .from('profissionais')
-        .select('*')
-        .eq('id', profissionalId)
-        .single();
-      
-      if (errorProf) {
-        throw new Error(`Erro ao buscar profissional: ${errorProf.message}`);
-      }
-      
-      console.log('📋 Dados do profissional:', profissional);
-      
-      // 2. Excluir da tabela profissionais
-      const { error: errorDeleteProf } = await this.supabase
-        .from('profissionais')
-        .delete()
-        .eq('id', profissionalId);
-      
-      if (errorDeleteProf) {
-        throw new Error(`Erro ao excluir profissional: ${errorDeleteProf.message}`);
-      }
-      
-      console.log('✅ Profissional excluído da tabela profissionais');
-      
-      // 3. Se tiver profile_id, excluir o profile
-      if (profissional.profile_id) {
-        const { error: errorDeleteProfile } = await this.supabase
-          .from('profiles')
-          .delete()
-          .eq('id', profissional.profile_id);
-        
-        if (errorDeleteProfile) {
-          console.warn('⚠️ Erro ao excluir profile:', errorDeleteProfile.message);
-        } else {
-          console.log('✅ Profile excluído');
-        }
-        
-        // 4. Excluir usuário do auth (se for admin)
-        try {
-          const { error: errorDeleteUser } = await this.supabase.auth.admin.deleteUser(
-            profissional.profile_id
-          );
-          
-          if (errorDeleteUser) {
-            console.warn('⚠️ Erro ao excluir usuário do auth:', errorDeleteUser.message);
-          } else {
-            console.log('✅ Usuário excluído do auth');
-          }
-        } catch (authError) {
-          console.warn('⚠️ Falha ao excluir usuário do auth:', authError.message);
-        }
-      }
-      
-      // 5. Remover do cache local
-      this.profissionais = this.profissionais.filter(p => p.id !== profissionalId);
-      this.cache.profissionais = null;
-      
-      console.log('🎉 Exclusão em cascata concluída com sucesso');
-      
-      return {
-        success: true,
-        message: 'Profissional excluído com sucesso (usuário, profile e profissional)'
-      };
-      
-    } catch (error) {
-      console.error('❌ Erro ao excluir profissional:', error);
-      throw error;
-    }
-  }
-
-  async addProfissionalCompleto(dados) {
-    throw new Error("Método removido. Aguardando nova implementação segura.");
-  }
-
-  async addProfissionalFrontend(dados) {
-    throw new Error("Método removido. Aguardando nova implementação segura.");
-  }
-
-  async addProfissionalEdgeFunction(dados) {
-    throw new Error("Método removido. Aguardando nova implementação segura.");
   }
 
   async garantirDadosReferencia() {
