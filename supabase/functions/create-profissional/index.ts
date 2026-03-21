@@ -167,12 +167,16 @@ Deno.serve(async (req) => {
     if (!existingProfile) {
       console.log('📄 Criando profile...')
 
+      // =============================
+      // 2️⃣ PROFILE (COM TELEFONE)
+      // =============================
       const { error: profileInsertError } = await supabaseAdmin
         .from('profiles')
         .insert({
           id: userId,
           nome,
           email,
+          telefone, // ✅ AGORA AQUI
           role: 'profissional',
           first_login_completed: false
         })
@@ -180,7 +184,11 @@ Deno.serve(async (req) => {
       if (profileInsertError) {
         console.error('❌ ERRO PROFILE:', profileInsertError)
 
-        await supabaseAdmin.auth.admin.deleteUser(userId)
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(userId)
+        } catch (rollbackError) {
+          console.error('🔥 ERRO ROLLBACK USER:', rollbackError)
+        }
 
         return new Response(JSON.stringify({ error: profileInsertError.message }), {
           status: 500,
@@ -192,22 +200,25 @@ Deno.serve(async (req) => {
     }
 
     // =============================
-    // 3️⃣ PROFISSIONAL
+    // 3️⃣ PROFISSIONAL (SEM TELEFONE)
     // =============================
     console.log('💼 Criando profissional...')
 
     const { error: profissionalError } = await supabaseAdmin
       .from('profissionais')
       .insert({
-        profile_id: userId,
-        telefone
+        profile_id: userId
       })
 
     if (profissionalError) {
       console.error('❌ ERRO PROFISSIONAL:', profissionalError)
 
-      await supabaseAdmin.auth.admin.deleteUser(userId)
-      await supabaseAdmin.from('profiles').delete().eq('id', userId)
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(userId)
+        await supabaseAdmin.from('profiles').delete().eq('id', userId)
+      } catch (rollbackError) {
+        console.error('🔥 ERRO ROLLBACK COMPLETO:', rollbackError)
+      }
 
       return new Response(JSON.stringify({ error: profissionalError.message }), {
         status: 500,
