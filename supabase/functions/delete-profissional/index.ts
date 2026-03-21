@@ -141,16 +141,31 @@ Deno.serve(async (req) => {
     
     // 1. Deletar dados dependentes (agendamentos)
     console.log('🗑️ 1️⃣ DELETANDO AGENDAMENTOS...')
-    const { error: agendamentosError } = await supabaseAdmin
-      .from('agendamentos')
-      .delete()
-      .eq('profissional_id', profile_id)
-
-    if (agendamentosError) {
-      console.error('❌ ERRO DELETE AGENDAMENTOS:', agendamentosError)
-      // Não falhar aqui, só logar
+    
+    // Primeiro buscar o ID do profissional na tabela profissionais
+    const { data: profData, error: profError } = await supabaseAdmin
+      .from('profissionais')
+      .select('id')
+      .eq('profile_id', profile_id)
+      .single()
+    
+    if (profError || !profData) {
+      console.error('❌ ERRO BUSCAR PROFISSIONAL ID:', profError)
+      // Continuar mesmo sem agendamentos
     } else {
-      console.log('✅ AGENDAMENTOS DELETADOS')
+      console.log('✅ PROFISSIONAL ID ENCONTRADO:', profData.id)
+      
+      const { error: agendamentosError } = await supabaseAdmin
+        .from('agendamentos')
+        .delete()
+        .eq('profissional_id', profData.id)
+
+      if (agendamentosError) {
+        console.error('❌ ERRO DELETE AGENDAMENTOS:', agendamentosError)
+        // Não falhar aqui, só logar
+      } else {
+        console.log('✅ AGENDAMENTOS DELETADOS')
+      }
     }
     
     // 2. Deletar profissional
