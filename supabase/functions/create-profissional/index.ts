@@ -37,41 +37,47 @@ Deno.serve(async (req) => {
     }
 
     // =============================
-    // 👤 CLIENT DO USUÁRIO (JWT)
+    // 👤 CLIENT DO USUÁRIO (JWT) - ANON KEY
     // =============================
-    const token = authHeader.replace('Bearer ', '')
-
-    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        apikey: supabaseAnonKey
+    const supabaseUser = createClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
       }
-    })
+    )
 
-    const userAuthData = await userResponse.json()
+    // 👤 Cliente admin - SERVICE ROLE
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      supabaseServiceKey
+    )
 
-    console.log('👤 USER DATA:', userAuthData)
+    // ✅ Validação do usuário
+    console.log('USER CLIENT OK')
+    const {
+      data: { user },
+      error: userError
+    } = await supabaseUser.auth.getUser()
 
-    if (!userResponse.ok) {
+    console.log('👤 USER:', user)
+    console.log('❌ USER ERROR:', userError)
+
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Token inválido' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    const user = userAuthData
-
-    // =============================
-    // 🔧 CLIENT ADMIN (SERVICE ROLE)
-    // =============================
-    const supabaseAdmin = createClient(
-      supabaseUrl,
-      supabaseServiceKey
-    )
-
     // =============================
     // 🔒 VERIFICAR ADMIN
     // =============================
+    console.log('ADMIN CLIENT OK')
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
