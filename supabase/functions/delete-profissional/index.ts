@@ -8,7 +8,7 @@ const corsHeaders = {
 // 🔐 ENV
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const supabaseAnonKey = Deno.env.get('ANON_KEY')!
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
 Deno.serve(async (req) => {
   console.log('🔥 DELETE PROFISSIONAL INICIADA')
@@ -69,6 +69,9 @@ Deno.serve(async (req) => {
     // =============================
     // 👑 CLIENT ADMIN
     // =============================
+    console.log('🔑 SERVICE KEY EXISTS:', !!supabaseServiceKey)
+    console.log('🔑 SERVICE KEY LENGTH:', supabaseServiceKey?.length)
+    
     const supabaseAdmin = createClient(
       supabaseUrl,
       supabaseServiceKey
@@ -133,25 +136,94 @@ Deno.serve(async (req) => {
     console.log('✅ PROFISSIONAL ENCONTRADO:', profissional)
 
     // =============================
-    // 🗑️ DELETE USER (CASCADE)
+    // 🗑️ FLUXO COMPLETO DE EXCLUSÃO (ORDEM CRÍTICA)
     // =============================
-    console.log('🗑️ DELETANDO USUÁRIO DO AUTH...')
-    const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(
-      profile_id
-    )
+    
+    // 1. Deletar dados dependentes (agendamentos)
+    console.log('🗑️ 1️⃣ DELETANDO AGENDAMENTOS...')
+    const { error: agendamentosError } = await supabaseAdmin
+      .from('agendamentos')
+      .delete()
+      .eq('profissional_id', profile_id)
 
-    if (deleteUserError) {
-      console.error('❌ ERRO DELETE USER:', deleteUserError)
+    if (agendamentosError) {
+      console.error('❌ ERRO DELETE AGENDAMENTOS:', agendamentosError)
+      // Não falhar aqui, só logar
+    } else {
+      console.log('✅ AGENDAMENTOS DELETADOS')
+    }
+    
+    // 2. Deletar profissional
+    console.log('🗑️ 2️⃣ DELETANDO PROFISSIONAL...')
+    const { error: profissionalError } = await supabaseAdmin
+      .from('profissionais')
+      .delete()
+      .eq('profile_id', profile_id)
+
+    if (profissionalError) {
+      console.error('❌ ERRO DELETE PROFISSIONAL:', profissionalError)
       return new Response(JSON.stringify({ 
-        error: 'Erro ao deletar usuário do auth',
-        details: deleteUserError.message 
+        error: 'Erro ao deletar profissional',
+        details: profissionalError.message 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    console.log('✅ USUÁRIO DELETADO DO AUTH')
+    console.log('✅ PROFISSIONAL DELETADO')
+
+    // 3. Deletar profile
+    console.log('🗑️ 3️⃣ DELETANDO PROFILE...')
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', profile_id)
+
+    if (profileError) {
+      console.error('❌ ERRO DELETE PROFILE:', profileError)
+      return new Response(JSON.stringify({ 
+        error: 'Erro ao deletar profile',
+        details: profileError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    console.log('✅ PROFILE DELETADO')
+
+    // 4. Deletar auth user (POR ÚLTIMO)
+    console.log('🗑️ 4️⃣ DELETANDO AUTH USER...')
+    
+    try {
+      console.log("🔍 Deletando usuário do auth:", profile_id)
+
+      const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(profile_id)
+
+      if (deleteUserError) {
+        console.error("❌ Erro ao deletar auth:", deleteUserError)
+        return new Response(JSON.stringify({ 
+          error: 'Erro ao deletar usuário do auth',
+          details: deleteUserError.message 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      console.log('✅ AUTH USER DELETADO')
+
+    } catch (err) {
+      console.error("🔥 CRASH NO DELETE USER:", err)
+      return new Response(JSON.stringify({ 
+        error: 'Erro interno ao deletar usuário do auth',
+        details: err.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // =============================
     // ✅ SUCESSO
