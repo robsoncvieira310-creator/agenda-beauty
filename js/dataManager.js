@@ -33,10 +33,15 @@ class DataManager {
 
   // Métodos unificados de cache (compatíveis com Map e Object)
   cacheSet(key, value) {
-    if (this.cache instanceof Map) {
-      this.cache.set(key, value);
-    } else {
-      this.cache[key] = value;
+    try {
+      if (this.cache instanceof Map) {
+        this.cache.set(key, value);
+      } else {
+        this.cache[key] = value;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao definir cache (não bloqueia fluxo):', error.message);
+      // Não lança erro para não quebrar o fluxo principal
     }
   }
 
@@ -57,10 +62,15 @@ class DataManager {
   }
 
   cacheDelete(key) {
-    if (this.cache instanceof Map) {
-      this.cache.delete(key);
-    } else {
-      delete this.cache[key];
+    try {
+      if (this.cache instanceof Map) {
+        this.cache.delete(key);
+      } else {
+        delete this.cache[key];
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao deletar cache (não bloqueia fluxo):', error.message);
+      // Não lança erro para não quebrar o fluxo principal
     }
   }
 
