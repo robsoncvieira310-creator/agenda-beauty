@@ -16,16 +16,52 @@ class DataManager {
     this.agendamentos = [];
     this.bloqueios = [];
     
-    // Cache para performance
-    this.cache = {
-      clientes: null,
-      profissionais: null,
-      servicos: null,
-      agendamentos: null,
-      bloqueios: null
-    };
+    // Cache para performance - USANDO MAP PARA CONSISTÊNCIA
+    // Polyfill para garantir compatibilidade
+    if (typeof Map !== 'undefined') {
+      this.cache = new Map();
+      console.log('✅ Cache criado com Map() nativo');
+    } else {
+      // Fallback para navegadores antigos
+      this.cache = {};
+      console.log('⚠️ Cache criado com objeto simples (fallback)');
+    }
     
     console.log('✅ DataManager criado com cliente Supabase e cache implementado');
+    console.log('🔍 Cache type:', typeof this.cache, 'has method:', typeof this.cache.has);
+  }
+
+  // Métodos unificados de cache (compatíveis com Map e Object)
+  cacheSet(key, value) {
+    if (this.cache instanceof Map) {
+      this.cache.set(key, value);
+    } else {
+      this.cache[key] = value;
+    }
+  }
+
+  cacheGet(key) {
+    if (this.cache instanceof Map) {
+      return this.cache.get(key);
+    } else {
+      return this.cache[key];
+    }
+  }
+
+  cacheHas(key) {
+    if (this.cache instanceof Map) {
+      return this.cache.has(key) && this.cache.get(key) !== null;
+    } else {
+      return this.cache.hasOwnProperty(key) && this.cache[key] !== null;
+    }
+  }
+
+  cacheDelete(key) {
+    if (this.cache instanceof Map) {
+      this.cache.delete(key);
+    } else {
+      delete this.cache[key];
+    }
   }
 
   async loadClientes() {
@@ -43,7 +79,7 @@ class DataManager {
       } else {
         this.clientes = data || [];
         console.log('✅ Clientes carregados do Supabase:', this.clientes.length);
-        this.cache.clientes = this.clientes;
+        this.cacheSet('clientes', this.clientes);
         console.log('💾 Clientes salvos no cache:', this.clientes.length);
       }
       
@@ -76,7 +112,7 @@ class DataManager {
           valor: parseFloat(servico.valor) || 0
         }));
         console.log('Serviços mapeados para formato compatível:', this.servicos.length);
-        this.cache.servicos = this.servicos;
+        this.cacheSet('servicos', this.servicos);
         console.log('Serviços salvos no cache:', this.servicos.length);
       }
       
@@ -140,9 +176,9 @@ class DataManager {
       console.log('👤 DATA_MANAGER: Usuário autenticado:', currentUserProfile.email, 'Role:', currentUserProfile.role);
       
       // Verificar cache primeiro
-      if (this.cache.profissionais !== null) {
-        console.log('📦 Retornando profissionais do cache:', this.cache.profissionais.length);
-        this.profissionais = this.cache.profissionais;
+      if (this.cacheHas('profissionais')) {
+        console.log('📦 Retornando profissionais do cache:', this.cacheGet('profissionais').length);
+        this.profissionais = this.cacheGet('profissionais');
         return this.profissionais;
       }
       
@@ -203,7 +239,7 @@ class DataManager {
           role: 'profissional',
           created_at: p.created_at
         }));
-        this.cache.profissionais = this.profissionais;
+        this.cacheSet('profissionais', this.profissionais);
         return this.profissionais;
       }
       
@@ -226,7 +262,7 @@ class DataManager {
           role: 'profissional',
           created_at: p.created_at
         }));
-        this.cache.profissionais = this.profissionais;
+        this.cacheSet('profissionais', this.profissionais);
         return this.profissionais;
       }
       
@@ -272,7 +308,7 @@ class DataManager {
       console.log('✅ DATA_MANAGER: Profissionais mapeados (merge manual) com dados completos:', this.profissionais.length);
       
       // Salvar no cache (merge manual)
-      this.cache.profissionais = this.profissionais;
+      this.cacheSet('profissionais', this.profissionais);
       console.log('💾 DATA_MANAGER: Profissionais (merge manual) salvos no cache:', this.profissionais.length);
       
       return this.profissionais;
@@ -288,7 +324,7 @@ class DataManager {
       console.log("🔍 Carregando agendamentos...");
       
       // CORREÇÃO: Se cache foi limpo, recarregar do banco
-      if (!this.cache.agendamentos) {
+      if (!this.cacheHas('agendamentos')) {
         console.log("🔄 Cache vazio, carregando do banco...");
         
         // Obter profissional logado
@@ -312,15 +348,15 @@ class DataManager {
           }
           
           // Salvar no cache
-          this.cache.agendamentos = this.agendamentos;
+          this.cacheSet('agendamentos', this.agendamentos);
         } else {
           // PROFSSIONAL: Lógica específica (se necessário)
           this.agendamentos = [];
-          this.cache.agendamentos = this.agendamentos;
+          this.cacheSet('agendamentos', this.agendamentos);
         }
       } else {
-        console.log("📦 Usando agendamentos do cache:", this.cache.agendamentos.length);
-        this.agendamentos = this.cache.agendamentos;
+        console.log("📦 Usando agendamentos do cache:", this.cacheGet('agendamentos').length);
+        this.agendamentos = this.cacheGet('agendamentos');
       }
       
       return this.agendamentos;
@@ -487,7 +523,7 @@ class DataManager {
           console.log('✅ Profissional criado com sucesso:', result.data);
           
           // Limpar cache para forçar recarregamento
-          this.cache.profissionais = null;
+          this.cache.set('profissionais', null);
           
           return result.data
           
@@ -589,7 +625,12 @@ class DataManager {
       console.log('✅ Profissional deletado com sucesso:', responseData)
       
       // Limpar cache
-      this.cache.delete('profissionais')
+      if (this.cache && this.cache instanceof Map) {
+        this.cache.delete('profissionais');
+      } else if (this.cache) {
+        // Fallback para objeto simples (se existir)
+        delete this.cache.profissionais;
+      }
       
       return responseData
       
@@ -642,7 +683,7 @@ class DataManager {
       console.log('✅ Profissional atualizado com sucesso:', data);
       
       // 3. Limpar cache
-      this.cache.profissionais = null;
+      this.cache.set('profissionais', null);
       
       // 4. Atualizar lista local
       const index = this.profissionais.findIndex(p => p.id === id);
@@ -767,7 +808,7 @@ class DataManager {
       this.agendamentos.push(data);
       
       // Limpar cache para forçar recarregamento
-      this.cache.agendamentos = null;
+      this.cache.set('agendamentos', null);
       
       return data;
       
@@ -929,7 +970,7 @@ class DataManager {
       this.agendamentos = this.agendamentos.filter(a => a.id !== id);
       
       // Limpar cache para forçar recarregamento
-      this.cache.agendamentos = null;
+      this.cache.set('agendamentos', null);
       
       return true;
       
@@ -968,7 +1009,7 @@ class DataManager {
       this.bloqueios.push(data);
       
       // Limpar cache para forçar recarregamento
-      this.cache.bloqueios = null;
+      this.cache.set('bloqueios', null);
       
       return data;
       
@@ -1011,7 +1052,7 @@ class DataManager {
       }
       
       // Limpar cache para forçar recarregamento
-      this.cache.bloqueios = null;
+      this.cache.set('bloqueios', null);
       
       return data;
       
@@ -1042,7 +1083,7 @@ class DataManager {
       this.bloqueios = this.bloqueios.filter(b => b.id !== id);
       
       // Limpar cache para forçar recarregamento
-      this.cache.bloqueios = null;
+      this.cache.set('bloqueios', null);
       
       return true;
       
