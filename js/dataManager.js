@@ -516,23 +516,37 @@ class DataManager {
         }
       }
       
-      // 🚀 RETRY AUTOMÁTICO
+      // 🚀 RETRY AUTOMÁTICO - APENAS PARA ERROS DE REDE
       for (let i = 0; i < 2; i++) {
         try {
           const result = await callFunction()
           console.log('✅ Profissional criado com sucesso:', result.data);
           
           // Limpar cache para forçar recarregamento
-          this.cache.set('profissionais', null);
+          this.cacheSet('profissionais', null);
           
           return result.data
           
         } catch (error) {
-          if (i === 1) {
+          // Verificar se é erro de rede (vale retry)
+          const isNetworkError = error.message && (
+            error.message.includes('Failed to fetch') ||
+            error.message.includes('NetworkError') ||
+            error.message.includes('timeout') ||
+            error.message.includes('ECONNRESET') ||
+            error.message.includes('ENOTFOUND')
+          );
+          
+          if (i === 1 || !isNetworkError) {
+            // Última tentativa ou erro não é de rede - não retryar
             console.error('❌ Erro definitivo ao criar profissional:', error)
+            if (!isNetworkError && i === 0) {
+              console.error('❌ Erro interno (não é de rede) - sem retry:', error.message)
+            }
             throw error
           }
-          console.warn('🔁 Retry da requisição...', error.message)
+          
+          console.warn('🔁 Retry da requisição (erro de rede)...', error.message)
         }
       }
       
@@ -683,7 +697,7 @@ class DataManager {
       console.log('✅ Profissional atualizado com sucesso:', data);
       
       // 3. Limpar cache
-      this.cache.set('profissionais', null);
+      this.cacheSet('profissionais', null);
       
       // 4. Atualizar lista local
       const index = this.profissionais.findIndex(p => p.id === id);
@@ -808,7 +822,7 @@ class DataManager {
       this.agendamentos.push(data);
       
       // Limpar cache para forçar recarregamento
-      this.cache.set('agendamentos', null);
+      this.cacheSet('agendamentos', null);
       
       return data;
       
@@ -932,7 +946,7 @@ class DataManager {
       console.log('✅ Agendamento atualizado com sucesso:', data);
       
       // CORREÇÃO: Limpar cache específico do agendamento atualizado
-      this.cache.agendamentos = null;
+      this.cacheSet('agendamentos', null);
       
       // CORREÇÃO: Atualizar cache local imediatamente
       const index = this.agendamentos.findIndex(a => a.id === id);
@@ -970,7 +984,7 @@ class DataManager {
       this.agendamentos = this.agendamentos.filter(a => a.id !== id);
       
       // Limpar cache para forçar recarregamento
-      this.cache.set('agendamentos', null);
+      this.cacheSet('agendamentos', null);
       
       return true;
       
@@ -1009,7 +1023,7 @@ class DataManager {
       this.bloqueios.push(data);
       
       // Limpar cache para forçar recarregamento
-      this.cache.set('bloqueios', null);
+      this.cacheSet('bloqueios', null);
       
       return data;
       
@@ -1052,7 +1066,7 @@ class DataManager {
       }
       
       // Limpar cache para forçar recarregamento
-      this.cache.set('bloqueios', null);
+      this.cacheSet('bloqueios', null);
       
       return data;
       
@@ -1083,7 +1097,7 @@ class DataManager {
       this.bloqueios = this.bloqueios.filter(b => b.id !== id);
       
       // Limpar cache para forçar recarregamento
-      this.cache.set('bloqueios', null);
+      this.cacheSet('bloqueios', null);
       
       return true;
       
