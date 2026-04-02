@@ -1,3 +1,35 @@
+// ========================================
+// 🔥 DELETE PROFISSIONAL - EDGE FUNCTION
+// ========================================
+// ✅ VERSÃO CORRIGIDA - SEM ERROS DE TIPO UUID vs INTEGER
+// 
+// 📋 REGRAS OBRIGATÓRIAS DE TIPOS:
+// 
+// ✅ SEMPRE USAR UUID PARA:
+// - profiles.id
+// - auth.users.id  
+// - profissionais.profile_id
+// - audit_logs.record_id
+// - audit_logs.user_id
+// 
+// ❌ NUNCA USAR INTEGER PARA:
+// - Operações com auth/users
+// - Operações com profiles
+// - Operações com audit_logs
+// 
+// ✅ USAR INTEGER APENAS PARA:
+// - profissionais.id (relacionamentos internos)
+// - agendamentos.profissional_id (relacionamento interno)
+// - bloqueios.profissional_id (relacionamento interno)
+// 
+// 🔄 FLUXO CORRETO:
+// 1. Receber profile_id (UUID) no body
+// 2. Validar que é string (UUID)
+// 3. Usar profile_id para operações com auth/profiles/audit
+// 4. Buscar profissional.id (INTEGER) apenas para deletar dados relacionados
+// 5. Registrar auditoria com profile_id (UUID)
+// ========================================
+
 import { createClient } from "@supabase/supabase-js"
 
 const corsHeaders = {
@@ -26,14 +58,17 @@ Deno.serve(async (req) => {
   try {
     const { profile_id } = await req.json()
 
-    if (!profile_id) {
-      return new Response(JSON.stringify({ error: 'profile_id é obrigatório' }), {
+    // ✅ VALIDAÇÃO: Garantir que profile_id é string (UUID)
+    if (!profile_id || typeof profile_id !== 'string') {
+      return new Response(JSON.stringify({ 
+        error: 'profile_id é obrigatório e deve ser string (UUID)' 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    console.log('📥 PROFILE_ID:', profile_id)
+    console.log('📥 PROFILE_ID (UUID):', profile_id)
 
     // =============================
     // 🔐 AUTH HEADER
@@ -117,13 +152,13 @@ Deno.serve(async (req) => {
     }
 
     // =============================
-    // 🔍 VERIFICAR SE PROFISSIONAL EXISTE
+    // 🔍 VERIFICAR SE PROFISSIONAL EXISTE (usando profile_id UUID)
     // =============================
     console.log('🔍 VERIFICANDO PROFISSIONAL...')
     const { data: profissional, error: profissionalError } = await supabaseAdmin
       .from('profissionais')
       .select('profile_id')
-      .eq('profile_id', profile_id)
+      .eq('profile_id', profile_id) // ✅ Usando profile_id (UUID)
       .single()
 
     if (profissionalError || !profissional) {
@@ -139,26 +174,27 @@ Deno.serve(async (req) => {
     // 🗑️ FLUXO COMPLETO DE EXCLUSÃO (ORDEM CRÍTICA)
     // =============================
     
-    // 1. Deletar dados dependentes (agendamentos)
-    console.log('🗑️ 1️⃣ DELETANDO AGENDAMENTOS...')
+    // 1. Deletar dados dependentes (usando profissional.id INTEGER apenas para relacionamentos internos)
+    console.log('🗑️ 1️⃣ DELETANDO DADOS DEPENDENTES...')
     
-    // Primeiro buscar o ID do profissional na tabela profissionais
+    // Buscar o ID interno (INTEGER) apenas para deletar dados relacionados
     const { data: profData, error: profError } = await supabaseAdmin
       .from('profissionais')
       .select('id')
-      .eq('profile_id', profile_id)
+      .eq('profile_id', profile_id) // ✅ Buscar por profile_id (UUID)
       .single()
     
     if (profError || !profData) {
       console.error('❌ ERRO BUSCAR PROFISSIONAL ID:', profError)
-      // Continuar mesmo sem agendamentos
+      // Continuar mesmo sem encontrar dados relacionados
     } else {
-      console.log('✅ PROFISSIONAL ID ENCONTRADO:', profData.id)
+      console.log('✅ PROFISSIONAL ID INTERNO ENCONTRADO:', profData.id)
       
+      // Deletar agendamentos (relacionamento interno com INTEGER)
       const { error: agendamentosError } = await supabaseAdmin
         .from('agendamentos')
         .delete()
-        .eq('profissional_id', profData.id)
+        .eq('profissional_id', profData.id) // ✅ INTEGER para relação interna
 
       if (agendamentosError) {
         console.error('❌ ERRO DELETE AGENDAMENTOS:', agendamentosError)
@@ -166,14 +202,30 @@ Deno.serve(async (req) => {
       } else {
         console.log('✅ AGENDAMENTOS DELETADOS')
       }
+
+      // Deletar bloqueios (se existir a tabela)
+      try {
+        const { error: bloqueiosError } = await supabaseAdmin
+          .from('bloqueios')
+          .delete()
+          .eq('profissional_id', profData.id) // ✅ INTEGER para relação interna
+
+        if (bloqueiosError) {
+          console.error('❌ ERRO DELETE BLOQUEIOS:', bloqueiosError)
+        } else {
+          console.log('✅ BLOQUEIOS DELETADOS')
+        }
+      } catch (e) {
+        console.log('⚠️ Tabela bloqueios não existe ou outro erro:', e)
+      }
     }
     
-    // 2. Deletar profissional
+    // 2. Deletar profissional (usando profile_id UUID)
     console.log('🗑️ 2️⃣ DELETANDO PROFISSIONAL...')
     const { error: deleteProfissionalError } = await supabaseAdmin
       .from('profissionais')
       .delete()
-      .eq('profile_id', profile_id)
+      .eq('profile_id', profile_id) // ✅ Usando profile_id (UUID)
 
     if (deleteProfissionalError) {
       console.error('❌ ERRO DELETE PROFISSIONAL:', deleteProfissionalError)
@@ -188,12 +240,12 @@ Deno.serve(async (req) => {
 
     console.log('✅ PROFISSIONAL DELETADO')
 
-    // 3. Deletar profile
+    // 3. Deletar profile (usando profile_id UUID)
     console.log('🗑️ 3️⃣ DELETANDO PROFILE...')
     const { error: deleteProfileError } = await supabaseAdmin
       .from('profiles')
       .delete()
-      .eq('id', profile_id)
+      .eq('id', profile_id) // ✅ Usando profile_id (UUID)
 
     if (deleteProfileError) {
       console.error('❌ ERRO DELETE PROFILE:', deleteProfileError)
@@ -240,6 +292,29 @@ Deno.serve(async (req) => {
       })
     }
 
+    // 5. Registrar auditoria (usando profile_id UUID)
+    console.log('📋 5️⃣ REGISTRANDO AUDITORIA...')
+    try {
+      const { error: auditError } = await supabaseAdmin
+        .from('audit_logs')
+        .insert({
+          table_name: 'profissionais',
+          record_id: profile_id, // ✅ UUID correto
+          action: 'DELETE',
+          user_id: user.id // ✅ UUID do usuário que realizou a operação
+        })
+
+      if (auditError) {
+        console.error('❌ ERRO AUDITORIA:', auditError)
+        // Não falhar a operação principal por erro na auditoria
+      } else {
+        console.log('✅ AUDITORIA REGISTRADA')
+      }
+    } catch (e) {
+      console.error('⚠️ ERRO AO REGISTRAR AUDITORIA:', e)
+      // Não falhar a operação principal
+    }
+
     // =============================
     // ✅ SUCESSO
     // =============================
@@ -248,7 +323,13 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true,
       message: 'Profissional deletado com sucesso',
-      deleted_profile_id: profile_id
+      deleted_profile_id: profile_id,
+      audit: {
+        table: 'profissionais',
+        record_id: profile_id, // ✅ UUID
+        action: 'DELETE',
+        user_id: user.id // ✅ UUID
+      }
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -257,7 +338,10 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error('🔥 ERRO GERAL:', err)
 
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ 
+      error: 'Erro interno ao deletar profissional',
+      details: err.message 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
