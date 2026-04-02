@@ -1,75 +1,48 @@
 import { createClient } from "@supabase/supabase-js"
 
-// ========================================
-// 🌐 CORS
-// ========================================
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 }
 
-// ========================================
-// 🔐 ENV
-// ========================================
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!
 
-// ========================================
-// 🚀 HANDLER
-// ========================================
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
 
   try {
-    // ========================================
-    // 📥 INPUT
-    // ========================================
     const { profile_id } = await req.json()
 
     if (!profile_id || typeof profile_id !== "string") {
       return new Response(
-        JSON.stringify({
-          error: "profile_id deve ser um UUID válido (string)",
-        }),
+        JSON.stringify({ error: "profile_id inválido" }),
         { status: 400, headers: corsHeaders }
       )
     }
 
-    // ========================================
-    // 🔐 AUTH HEADER
-    // ========================================
     const authHeader =
       req.headers.get("Authorization") ||
       req.headers.get("authorization")
 
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
-        JSON.stringify({ error: "Token ausente ou inválido" }),
+        JSON.stringify({ error: "Token inválido" }),
         { status: 401, headers: corsHeaders }
       )
     }
 
-    // ========================================
-    // 👤 CLIENT USER (JWT)
-    // ========================================
     const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
+      global: { headers: { Authorization: authHeader } },
     })
 
-    // ========================================
-    // 👑 CLIENT ADMIN (SERVICE ROLE)
-    // ========================================
     const admin = createClient(supabaseUrl, serviceKey)
 
-    // ========================================
-    // ✅ VALIDAR USUÁRIO
-    // ========================================
+    // ✅ USER
     const {
       data: { user },
       error: userError,
@@ -82,105 +55,92 @@ Deno.serve(async (req) => {
       )
     }
 
-    // ========================================
-    // 🔒 VALIDAR ADMIN
-    // ========================================
-    const { data: profile, error: profileError } = await admin
+    // ✅ ADMIN
+    const { data: profile } = await admin
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (profileError || !profile || profile.role !== "admin") {
+    if (!profile || profile.role !== "admin") {
       return new Response(
-        JSON.stringify({
-          error: "Apenas administradores podem deletar",
-        }),
+        JSON.stringify({ error: "Apenas admin" }),
         { status: 403, headers: corsHeaders }
       )
     }
 
-    // ========================================
-    // 🔍 BUSCAR PROFISSIONAL
-    // ========================================
-    const { data: profissional, error: profError } = await admin
+    // 🔍 PROFISSIONAL
+    const { data: profissional } = await admin
       .from("profissionais")
       .select("id")
       .eq("profile_id", profile_id)
       .single()
 
-    if (profError || !profissional) {
+    if (!profissional) {
       return new Response(
         JSON.stringify({ error: "Profissional não encontrado" }),
         { status: 404, headers: corsHeaders }
       )
     }
 
-    const profissionalId = profissional.id // INTEGER
+    const profissionalId = profissional.id
 
-    // ========================================
-    // 🗑️ 1. DELETAR RELACIONADOS (INTEGER)
-    // ========================================
+    // 🗑️ RELACIONADOS
     await admin
       .from("agendamentos")
       .delete()
       .eq("profissional_id", profissionalId)
 
-    await admin
+    const { error: bloqueiosError } = await admin
       .from("bloqueios")
       .delete()
       .eq("profissional_id", profissionalId)
-      .catch(() => null) // não quebra se não existir
 
-    // ========================================
-    // 🗑️ 2. DELETAR PROFISSIONAL
-    // ========================================
-    const { error: deleteProfError } = await admin
+    if (bloqueiosError) {
+      console.log("⚠️ bloqueios:", bloqueiosError.message)
+    }
+
+    // 🗑️ PROFISSIONAL
+    const { error: errProf } = await admin
       .from("profissionais")
       .delete()
       .eq("profile_id", profile_id)
 
-    if (deleteProfError) throw deleteProfError
+    if (errProf) throw errProf
 
-    // ========================================
-    // 🗑️ 3. DELETAR PROFILE
-    // ========================================
-    const { error: deleteProfileError } = await admin
+    // 🗑️ PROFILE
+    const { error: errProfile } = await admin
       .from("profiles")
       .delete()
       .eq("id", profile_id)
 
-    if (deleteProfileError) throw deleteProfileError
+    if (errProfile) throw errProfile
 
-    // ========================================
-    // 🗑️ 4. DELETAR AUTH USER
-    // ========================================
-    const { error: deleteAuthError } =
+    // 🗑️ AUTH
+    const { error: errAuth } =
       await admin.auth.admin.deleteUser(profile_id)
 
-    if (deleteAuthError) throw deleteAuthError
+    if (errAuth) throw errAuth
 
-    // ========================================
-    // 📋 5. AUDITORIA (UUID CORRETO)
-    // ========================================
-    await admin.from("audit_logs").insert({
-      table_name: "profissionais",
-      record_id: profile_id, // ✅ UUID
-      action: "DELETE",
-      user_id: user.id, // ✅ UUID
-      created_at: new Date().toISOString(),
-    })
+    // 📋 AUDITORIA
+    const { error: auditError } = await admin
+      .from("audit_logs")
+      .insert({
+        table_name: "profissionais",
+        record_id: profile_id,
+        action: "DELETE",
+        user_id: user.id,
+      })
 
-    // ========================================
-    // ✅ SUCESSO
-    // ========================================
+    if (auditError) {
+      console.log("⚠️ audit:", auditError.message)
+    }
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Profissional deletado com sucesso",
-      }),
+      JSON.stringify({ success: true }),
       { status: 200, headers: corsHeaders }
     )
+
   } catch (err: any) {
     console.error("❌ ERRO:", err)
 
