@@ -101,6 +101,37 @@ class DataManager {
     }
   }
 
+  async addCliente(dados) {
+    try {
+      console.log('➕ Adicionando cliente:', dados);
+      
+      const { data, error } = await this.supabase
+        .from('clientes')
+        .insert([dados])
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('❌ Erro ao inserir cliente:', error);
+        throw new Error(`Erro ao inserir cliente: ${error.message}`);
+      }
+      
+      console.log('✅ Cliente criado com sucesso:', data);
+      
+      // Adicionar ao cache local
+      this.clientes.push(data);
+      
+      // Limpar cache para forçar recarregamento
+      this.cacheSet('clientes', null);
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao criar cliente:', error);
+      throw error;
+    }
+  }
+
   async loadServicos() {
     try {
       console.log('Carregando serviços...');
