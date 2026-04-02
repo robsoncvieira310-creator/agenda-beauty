@@ -1,3 +1,6 @@
+
+https://robsoncvieira310-creator.github.io/agenda-beauty/profissionais.html
+
 # 🌟 Agenda Beauty - Sistema de Gestão para Salões de Beleza
 
 Um sistema completo e moderno de gestão para salões de beleza, desenvolvido com tecnologias web modernas e integrado com Supabase.
