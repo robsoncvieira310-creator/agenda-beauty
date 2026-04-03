@@ -112,6 +112,40 @@
   <!-- Alert Container -->
   <div id="alertContainer" class="alert-container"></div>
 
+  <!-- Modal de Reset de Senha -->
+  <div id="modalResetSenha" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Redefinir Senha</h3>
+        <button type="button" id="btnFecharModalReset" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-section">
+          <div class="form-group">
+            <label for="novaSenha">Nova Senha *</label>
+            <input type="password" id="novaSenha" class="form-control" required placeholder="Mínimo 6 caracteres" minlength="6">
+          </div>
+
+          <div class="form-group">
+            <label for="confirmarSenha">Confirmar Senha *</label>
+            <input type="password" id="confirmarSenha" class="form-control" required placeholder="Confirme a nova senha">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btnCancelarReset" class="btn btn-secondary">
+          Cancelar
+        </button>
+        <button type="button" id="btnConfirmarReset" class="btn btn-primary">
+          <span class="btn-icon">🔑</span>
+          Redefinir Senha
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de Profissional -->
   <div id="modalProfissional" class="modal">
     <div class="modal-content">

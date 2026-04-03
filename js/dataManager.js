@@ -1072,7 +1072,96 @@ class DataManager {
       throw new Error('Erro ao resetar senha: ' + error.message);
     }
   }
-  
+
+  // Atualizar senha de profissional via Edge Function
+  async updateSenhaProfissional(userId, novaSenha) {
+    try {
+      console.log('🔐 Atualizando senha do profissional:', userId);
+
+      // 🔍 DIAGNÓSTICO - Verificar sessão e token
+      const { data: { session } } = await this.supabase.auth.getSession();
+      
+      if (!session) {
+        console.error('❌ Usuário não autenticado - session null');
+        throw new Error('Usuário não autenticado. Faça login novamente.');
+      }
+
+      if (!session?.access_token) {
+        console.error('❌ Token de autenticação inválido');
+        throw new Error('Token de autenticação inválido');
+      }
+
+      // 🧨 TIMEOUT - Evita travamento silencioso
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s
+
+      // 🔥 CHAMADA DIRETA COM FETCH - COM RETRY AUTOMÁTICO
+      const callFunction = async () => {
+        const functionUrl = `${this.supabase.supabaseUrl}/functions/v1/reset-password`;
+        
+        console.log('🌐 CHAMANDO EDGE FUNCTION:', functionUrl);
+        
+        const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            password: novaSenha
+          }),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erro na Edge Function');
+        }
+        
+        const data = await response.json();
+        console.log('📥 RESPOSTA EDGE FUNCTION:', data);
+        
+        return {
+          success: true,
+          data
+        };
+      };
+      
+      // 🚀 RETRY AUTOMÁTICO - APENAS PARA ERROS DE REDE
+      for (let i = 0; i < 2; i++) {
+        try {
+          const result = await callFunction();
+          console.log('✅ Senha atualizada com sucesso:', result.data);
+          
+          return result.data;
+          
+        } catch (error) {
+          // Verificar se é erro de rede (vale retry)
+          const isNetworkError = error.message && (
+            error.message.includes('Failed to fetch') ||
+            error.message.includes('NetworkError') ||
+            error.message.includes('timeout') ||
+            error.message.includes('ECONNRESET') ||
+            error.message.includes('ENOTFOUND')
+          );
+          
+          if (i === 1 || !isNetworkError) {
+            // Última tentativa ou erro não é de rede - não retryar
+            console.error('❌ Erro definitivo ao atualizar senha:', error);
+            throw error;
+          }
+          
+          console.warn('🔁 Retry da requisição (erro de rede)...', error.message);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar senha:', error);
+      throw new Error('Erro ao atualizar senha: ' + error.message);
+    }
+  }
+
   // Métodos auxiliares para acesso rápido por ID
   get servicosPorId() {
     if (!this._servicosPorId || this.servicos.length !== Object.keys(this._servicosPorId).length) {

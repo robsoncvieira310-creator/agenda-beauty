@@ -79,13 +79,98 @@ class ProfissionaisPage {
     }
     
     if (btnResetSenha) {
-      btnResetSenha.addEventListener('click', () => this.handleResetSenhaDireto());
+      btnResetSenha.addEventListener('click', () => this.openResetSenhaModal());
+    }
+
+    // Event listeners do modal de reset de senha
+    const btnFecharModalReset = document.getElementById('btnFecharModalReset');
+    const btnCancelarReset = document.getElementById('btnCancelarReset');
+    const btnConfirmarReset = document.getElementById('btnConfirmarReset');
+
+    if (btnFecharModalReset) {
+      btnFecharModalReset.addEventListener('click', () => this.closeResetSenhaModal());
+    }
+
+    if (btnCancelarReset) {
+      btnCancelarReset.addEventListener('click', () => this.closeResetSenhaModal());
+    }
+
+    if (btnConfirmarReset) {
+      btnConfirmarReset.addEventListener('click', () => this.handleResetSenha());
     }
     
     console.log('✅ Botões do modal configurados');
   }
   
-  // MÉTODO DE RESET DE SENHA DIRETO - USANDO PADRÃO DO SISTEMA
+  // Abrir modal de reset de senha
+  openResetSenhaModal() {
+    if (!this.profissionalEditando) {
+      this.showError('Nenhum profissional selecionado para reset de senha');
+      return;
+    }
+
+    // Limpar campos
+    document.getElementById('novaSenha').value = '';
+    document.getElementById('confirmarSenha').value = '';
+
+    // Abrir modal
+    UIUtils.showModal('modalResetSenha');
+  }
+
+  // Fechar modal de reset de senha
+  closeResetSenhaModal() {
+    UIUtils.hideModal('modalResetSenha');
+  }
+
+  // Handle de reset de senha (novo fluxo)
+  async handleResetSenha() {
+    try {
+      const senha = document.getElementById('novaSenha').value;
+      const confirmarSenha = document.getElementById('confirmarSenha').value;
+
+      // Validação de campos
+      if (!senha || !confirmarSenha) {
+        UIUtils.showAlert('Campos obrigatórios não preenchidos', 'error');
+        return;
+      }
+
+      if (senha !== confirmarSenha) {
+        UIUtils.showAlert('As senhas não coincidem', 'error');
+        return;
+      }
+
+      if (senha.length < 6) {
+        UIUtils.showAlert('A senha deve ter pelo menos 6 caracteres', 'error');
+        return;
+      }
+
+      // Desabilitar botão durante processamento
+      const btnConfirmar = document.getElementById('btnConfirmarReset');
+      btnConfirmar.disabled = true;
+      btnConfirmar.innerHTML = '<span class="btn-icon">⏳</span> Atualizando...';
+
+      // Chamar novo método do DataManager
+      await window.dataManager.updateSenhaProfissional(
+        this.profissionalEditando.profile_id,
+        senha
+      );
+
+      // Sucesso
+      UIUtils.showAlert('Senha atualizada com sucesso', 'success');
+      this.closeResetSenhaModal();
+
+    } catch (error) {
+      console.error('❌ Erro ao resetar senha:', error);
+      UIUtils.showAlert('Erro ao atualizar senha', 'error');
+    } finally {
+      // Reabilitar botão
+      const btnConfirmar = document.getElementById('btnConfirmarReset');
+      btnConfirmar.disabled = false;
+      btnConfirmar.innerHTML = '<span class="btn-icon">🔑</span> Redefinir Senha';
+    }
+  }
+
+  // MÉTODO DE RESET DE SENHA DIRETO - USANDO PADRÃO DO SISTEMA (LEGADO)
   async handleResetSenhaDireto() {
     if (!this.profissionalEditando) {
       this.showError('Nenhum profissional selecionado para reset de senha');
