@@ -268,7 +268,7 @@ class ClientesPage {
             <button class="btn btn-sm btn-info" onclick="window.clientesPage.showHistorico(${cliente.id}, '${cliente.nome}')" title="Histórico do Cliente">
               <span class="btn-icon">📅</span>
             </button>
-            <button class="btn btn-sm btn-danger" onclick="window.clientesPage.confirmDelete('${cliente.nome}')" title="Excluir">
+            <button class="btn btn-sm btn-danger" onclick="window.pageManager.confirmDelete('${cliente.nome}')" title="Excluir">
               <span class="btn-icon">🗑️</span>
             </button>
           </div>

@@ -132,6 +132,38 @@ class DataManager {
     }
   }
 
+  async deleteCliente(id) {
+    try {
+      console.log('🗑️ Deletando cliente:', id);
+      
+      const { data, error } = await this.supabase
+        .from('clientes')
+        .delete()
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('❌ Erro ao excluir cliente:', error);
+        throw new Error(`Erro ao excluir cliente: ${error.message}`);
+      }
+      
+      console.log('✅ Cliente excluído com sucesso:', data);
+      
+      // Remover do cache local
+      this.clientes = this.clientes.filter(c => c.id !== id);
+      
+      // Limpar cache para forçar recarregamento
+      this.cacheSet('clientes', null);
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao excluir cliente:', error);
+      throw error;
+    }
+  }
+
   async loadServicos() {
     try {
       console.log('Carregando serviços...');
