@@ -392,6 +392,104 @@ class DataManager {
     }
   }
 
+  async addServico(dados) {
+    try {
+      console.log('➕ Adicionando serviço:', dados);
+      
+      const { data, error } = await this.supabase
+        .from('servicos')
+        .insert([dados])
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('❌ Erro ao inserir serviço:', error);
+        throw new Error(`Erro ao inserir serviço: ${error.message}`);
+      }
+      
+      console.log('✅ Serviço criado com sucesso:', data);
+      
+      // Adicionar ao cache local
+      this.servicos.push(data);
+      
+      // Limpar cache para forçar recarregamento
+      this.cacheSet('servicos', null);
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao criar serviço:', error);
+      throw error;
+    }
+  }
+
+  async updateServico(id, dados) {
+    try {
+      console.log('🔧 Atualizando serviço:', id, dados);
+      
+      const { data, error } = await this.supabase
+        .from('servicos')
+        .update(dados)
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('❌ Erro ao atualizar serviço:', error);
+        throw new Error(`Erro ao atualizar serviço: ${error.message}`);
+      }
+      
+      console.log('✅ Serviço atualizado com sucesso:', data);
+      
+      // Atualizar cache local
+      const index = this.servicos.findIndex(s => s.id === id);
+      if (index !== -1) {
+        this.servicos[index] = data;
+      }
+      
+      // Limpar cache para forçar recarregamento
+      this.cacheSet('servicos', null);
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar serviço:', error);
+      throw error;
+    }
+  }
+
+  async deleteServico(id) {
+    try {
+      console.log('🗑️ Deletando serviço:', id);
+      
+      const { data, error } = await this.supabase
+        .from('servicos')
+        .delete()
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('❌ Erro ao excluir serviço:', error);
+        throw new Error(`Erro ao excluir serviço: ${error.message}`);
+      }
+      
+      console.log('✅ Serviço excluído com sucesso:', data);
+      
+      // Remover do cache local
+      this.servicos = this.servicos.filter(s => s.id !== id);
+      
+      // Limpar cache para forçar recarregamento
+      this.cacheSet('servicos', null);
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao excluir serviço:', error);
+      throw error;
+    }
+  }
+
   async loadAgendamentos() {
     try {
       console.log("🔍 Carregando agendamentos...");
