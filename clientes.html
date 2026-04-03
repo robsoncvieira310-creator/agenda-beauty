@@ -98,6 +98,7 @@
                 <th>WhatsApp</th>
                 <th>Próx. Atendimento</th>
                 <th>Último Atendimento</th>
+                <th>Observações</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -146,6 +147,12 @@
             <div class="form-group">
               <label for="telefoneCliente">WhatsApp *</label>
               <input type="tel" id="telefoneCliente" class="form-control" maxlength="15" placeholder="(DDD) 00000-0000" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label for="observacoesCliente">Observações</label>
+              <textarea id="observacoesCliente" class="form-control" rows="3" placeholder="Observações sobre o cliente..."></textarea>
             </div>
           </div>
         </div>
@@ -380,11 +387,13 @@
       // Se DataManager já existe e tem dados, o evento já foi disparado
       if (window.dataManager && window.dataManager.clientes) {
         window.pageManager = new ClientesPage();
+        window.clientesPage = new ClientesPage(); // Adicionar instância para window.clientesPage
         window.pageManager.init();
       } else {
         // Registrar listener para o evento
         window.addEventListener('appReady', () => {
           window.pageManager = new ClientesPage();
+          window.clientesPage = new ClientesPage(); // Adicionar instância para window.clientesPage
           window.pageManager.init();
         });
       }
@@ -445,10 +454,20 @@
         } else {
           console.error('❌ Botão de logout não encontrado no HTML de clientes!');
         }
+        
+        // Garantir instância do clientesPage
+        if (!window.clientesPage) {
+          window.clientesPage = window.pageManager;
+        }
       } else {
         console.log('⏳ CLIENTES: appReady ainda não foi disparado, registrando listener...');
         window.addEventListener('appReady', () => {
           console.log('🚀 CLIENTES: appReady recebido, inicializando página...');
+          
+          // Garantir instância do clientesPage
+          if (!window.clientesPage) {
+            window.clientesPage = window.pageManager;
+          }
           
           // GARANTIR QUE O LOGOUT MANAGER FUNCIONE EM CLIENTES
           console.log('🔍 Verificando botão de logout em clientes...');

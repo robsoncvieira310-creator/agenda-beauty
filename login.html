@@ -348,7 +348,17 @@
           }
         } catch (error) {
           console.error('❌ LOGIN: Erro inesperado:', error);
-          this.showError('Ocorreu um erro inesperado. Tente novamente.');
+          
+          // Verificar se é erro de credenciais inválidas
+          if (error.message && (
+            error.message.includes('Invalid login credentials') ||
+            error.message.includes('invalid_credentials') ||
+            error.message.includes('Invalid credentials')
+          )) {
+            this.showError('Email ou senha incorretos.');
+          } else {
+            this.showError('Ocorreu um erro inesperado. Tente novamente.');
+          }
         } finally {
           this.setLoading(false);
         }

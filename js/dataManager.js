@@ -132,6 +132,41 @@ class DataManager {
     }
   }
 
+  async updateCliente(id, dados) {
+    try {
+      console.log('✏️ Atualizando cliente:', id, dados);
+      
+      const { data, error } = await this.supabase
+        .from('clientes')
+        .update(dados)
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('❌ Erro ao atualizar cliente:', error);
+        throw new Error(`Erro ao atualizar cliente: ${error.message}`);
+      }
+      
+      console.log('✅ Cliente atualizado com sucesso:', data);
+      
+      // Atualizar cache local
+      const index = this.clientes.findIndex(c => c.id === id);
+      if (index !== -1) {
+        this.clientes[index] = data;
+      }
+      
+      // Limpar cache para forçar recarregamento
+      this.cacheSet('clientes', null);
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar cliente:', error);
+      throw error;
+    }
+  }
+
   async deleteCliente(id) {
     try {
       console.log('🗑️ Deletando cliente:', id);

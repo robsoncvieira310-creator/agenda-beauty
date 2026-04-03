@@ -124,7 +124,26 @@ class UIUtils {
     alertDiv.className = `alert alert-${type}`;
     alertDiv.textContent = message;
     
-    document.body.appendChild(alertDiv);
+    // Verificar se existe um modal aberto
+    const modal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display:flex"]');
+    
+    if (modal) {
+      // Inserir no topo do modal-content
+      const modalContent = modal.querySelector('.modal-content');
+      if (modalContent) {
+        modalContent.prepend(alertDiv);
+      } else {
+        modal.prepend(alertDiv);
+      }
+    } else {
+      // Comportamento padrão (fora de modal)
+      const alertContainer = document.getElementById('alertContainer');
+      if (alertContainer) {
+        alertContainer.appendChild(alertDiv);
+      } else {
+        document.body.appendChild(alertDiv);
+      }
+    }
     
     setTimeout(() => {
       alertDiv.remove();

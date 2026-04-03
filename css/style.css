@@ -519,6 +519,7 @@ MODAL
   width:380px;
   box-shadow:0 10px 30px rgba(0,0,0,0.3);
   z-index:10000;
+  overflow-x: hidden;
 }
 
 .modal {
@@ -636,10 +637,13 @@ MODAL
 
 .modal-content select,
 .modal-content textarea,
-.modal-content input[type="datetime-local"]{
+.modal-content input[type="datetime-local"],
+.modal-content input[type="text"],
+.modal-content input[type="tel"]{
   width:100%;
   margin-top:5px;
   padding:6px;
+  box-sizing: border-box;
 }
 
 /* =====================================================

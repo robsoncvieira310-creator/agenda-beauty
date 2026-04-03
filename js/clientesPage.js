@@ -58,6 +58,21 @@ class ClientesPage {
         this.openNewClientModal();
       });
     }
+    
+    // Event listener para o campo de busca
+    const buscaCliente = document.getElementById('buscaCliente');
+    if (buscaCliente) {
+      buscaCliente.addEventListener('input', (e) => {
+        const termo = e.target.value;
+
+        if (!termo.trim()) {
+          this.renderClientTable(this.clientes);
+          return;
+        }
+
+        this.filtrarClientes(termo);
+      });
+    }
 
     // Event listeners para fechar modais
     this.setupModalListeners();
@@ -71,6 +86,14 @@ class ClientesPage {
         if (e.target === modalCliente) {
           this.hideModal('modalCliente');
         }
+      });
+    }
+
+    // Event listener para fechar modal de cliente
+    const btnFecharModal = document.getElementById('btnFecharModal');
+    if (btnFecharModal) {
+      btnFecharModal.addEventListener('click', () => {
+        this.hideModal('modalCliente');
       });
     }
 
@@ -115,6 +138,9 @@ class ClientesPage {
     // Limpar formulário
     this.clearForm('modalCliente');
     
+    // Resetar variável de edição
+    this.clienteEditando = null;
+    
     // Configurar modal
     document.getElementById('modalTitulo').textContent = 'Novo Cliente';
     document.getElementById('btnExcluir').style.display = 'none';
@@ -133,17 +159,19 @@ class ClientesPage {
       // Coletar dados do formulário (apenas campos existentes na tabela)
       const clienteData = {
         nome: document.getElementById('nomeCliente').value,
-        telefone: document.getElementById('telefoneCliente').value
+        telefone: document.getElementById('telefoneCliente').value,
+        observacoes: document.getElementById('observacoesCliente')?.value || ''
       };
 
       // Validar campos obrigatórios
-      if (!clienteData.nome.trim()) {
-        UIUtils.showAlert('Nome do cliente é obrigatório', 'error');
-        return;
-      }
-
-      if (!clienteData.telefone.trim()) {
-        UIUtils.showAlert('WhatsApp do cliente é obrigatório', 'error');
+      const telefoneNumerico = clienteData.telefone.replace(/\D/g, '');
+      
+      if (
+        !clienteData.nome.trim() ||
+        !clienteData.telefone.trim() ||
+        telefoneNumerico.length < 10
+      ) {
+        UIUtils.showAlert('Campos obrigatórios não preenchidos', 'error');
         return;
       }
 
@@ -215,18 +243,39 @@ class ClientesPage {
     this.clienteEditando = null;
   }
 
-  async renderClientTable() {
-    const tbody = document.getElementById('tabelaClientes');
-    tbody.innerHTML = '';
+  filtrarClientes(termo) {
+  const termoLower = termo.toLowerCase().trim();
+  const termoTelefone = termo.replace(/\D/g, '');
 
-    if (this.clientes.length === 0) {
+  const clientesFiltrados = this.clientes.filter(cliente => {
+    const nome = (cliente.nome || '').toLowerCase().trim();
+    const telefone = (cliente.telefone || '').replace(/\D/g, '');
+
+    const nomeMatch = nome.includes(termoLower);
+    const telefoneMatch = termoTelefone
+      ? telefone.includes(termoTelefone)
+      : false;
+
+    return nomeMatch || telefoneMatch;
+  });
+
+  this.renderClientTable(clientesFiltrados);
+}
+
+  async renderClientTable(clientes = this.clientes) {
+  const tbody = document.getElementById('tabelaClientes');
+
+  // LIMPAR APENAS AQUI
+  tbody.innerHTML = '';
+
+  if (clientes.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="5" style="text-align: center; padding: 40px;">
             <div style="color: #666;">
               <i class="fas fa-users" style="font-size: 48px; margin-bottom: 20px; display: block;"></i>
-              <h4>Nenhum cliente cadastrado</h4>
-              <p>Clique em "Novo Cliente" para começar</p>
+              <h4>Nenhum cliente encontrado</h4>
+              <p>Tente ajustar os filtros de busca</p>
             </div>
           </td>
         </tr>
@@ -235,7 +284,7 @@ class ClientesPage {
     }
 
     // Usar for...of em vez de forEach para esperar as promises assíncronas
-    for (const cliente of this.clientes) {
+    for (const cliente of clientes) {
       const tr = document.createElement('tr');
       
       // Gerar link da ficha de anamnese
@@ -255,6 +304,7 @@ class ClientesPage {
         <td>${cliente.telefone ? this.formatPhone(cliente.telefone) : '-'}</td>
         <td>${proximoAtendimento}</td>
         <td>${ultimoAtendimento}</td>
+        <td>${cliente.observacoes || '-'}</td>
         <td>
           <div class="table-actions">
             <button class="btn btn-sm btn-primary" onclick="window.clientesPage.openAnamnese(${cliente.id}, '${cliente.nome}')" title="Ficha de Anamnese">
@@ -282,7 +332,7 @@ class ClientesPage {
           return;
         }
         console.log('👆 Clicou na linha do cliente:', cliente.nome);
-        this.openAnamneseView(cliente.id, cliente.nome);
+        this.openEditCliente(cliente);
       });
       
       tbody.appendChild(tr);
@@ -292,6 +342,25 @@ class ClientesPage {
   formatPhone(phone) {
     if (!phone) return '';
     return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  }
+
+  openEditCliente(cliente) {
+    // Preencher campos do formulário
+    document.getElementById('nomeCliente').value = cliente.nome || '';
+    document.getElementById('telefoneCliente').value = cliente.telefone || '';
+    document.getElementById('observacoesCliente').value = cliente.observacoes || '';
+
+    // Marcar como edição
+    this.clienteEditando = cliente;
+
+    // Atualizar título do modal
+    const modalTitulo = document.getElementById('modalTitulo');
+    if (modalTitulo) {
+      modalTitulo.textContent = 'Editar Cliente';
+    }
+
+    // Abrir modal existente
+    this.showModal('modalCliente');
   }
 
   // Método para obter próximo atendimento
@@ -908,47 +977,139 @@ class ClientesPage {
   // Mostrar histórico do cliente
   async showHistorico(clienteId, clienteNome) {
     try {
-      // Verificar se elementos existem
-      const historicoSection = document.getElementById('historicoSection');
-      const listaSection = document.getElementById('listaSection');
-      
-      if (historicoSection && listaSection) {
-        // Mostrar seção de histórico
-        historicoSection.style.display = 'block';
-        listaSection.style.display = 'none';
-        
-        // Atualizar informações do cliente
-        const clienteInfo = document.getElementById('clienteInfo');
-        if (clienteInfo) {
-          clienteInfo.innerHTML = `
-            <h3>${clienteNome}</h3>
-            <p>Carregando histórico...</p>
-          `;
+      console.log('📋 Carregando histórico do cliente:', clienteId);
+
+      const agendamentos = await window.dataManager.getAgendamentos();
+
+      // Filtrar apenas agendamentos do cliente
+      let historico = agendamentos.filter(a => a.cliente_id === clienteId);
+
+      // Ordenar: próximos primeiro, depois passados (mais recente primeiro)
+      const agora = new Date();
+      historico.sort((a, b) => {
+        const dataA = new Date(a.data_inicio);
+        const dataB = new Date(b.data_inicio);
+
+        const aFuturo = dataA >= agora;
+        const bFuturo = dataB >= agora;
+
+        if (aFuturo && bFuturo) {
+          return dataA - dataB; // Mais próximo primeiro
         }
-        
-        // Carregar agendamentos do cliente
-        await this.carregarHistoricoAgendamentos(clienteId);
-        
-        // Atualizar informações do cliente após carregar
-        if (clienteInfo) {
-          clienteInfo.innerHTML = `
-            <h3>${clienteNome}</h3>
-            <p>Histórico de agendamentos</p>
-          `;
+
+        if (!aFuturo && !bFuturo) {
+          return dataB - dataA; // Mais recente primeiro
         }
-        
-        // Configurar botão fechar
-        const btnFecharHistorico = document.getElementById('btnFecharHistorico');
-        if (btnFecharHistorico) {
-          btnFecharHistorico.onclick = () => {
-            historicoSection.style.display = 'none';
-            listaSection.style.display = 'block';
-          };
-        }
-      }
+
+        return aFuturo ? -1 : 1; // Futuros antes de passados
+      });
+
+      this.renderHistoricoModal(historico, clienteNome);
+
     } catch (error) {
-      console.error('Erro ao mostrar histórico:', error);
-      UIUtils.showAlert('Erro ao carregar histórico: ' + error.message, 'error');
+      console.error('❌ Erro ao carregar histórico:', error);
+      UIUtils.showAlert('Erro ao carregar histórico', 'error');
+    }
+  }
+
+  renderHistoricoModal(historico, clienteNome) {
+    // Atualizar informações do cliente
+    const clienteInfo = document.getElementById('clienteInfo');
+    if (clienteInfo) {
+      clienteInfo.innerHTML = `
+        <h3>${clienteNome}</h3>
+        <p>Histórico de agendamentos</p>
+      `;
+    }
+
+    const tabelaHistorico = document.getElementById('tabelaHistorico');
+    if (!tabelaHistorico) return;
+
+    // Limpar antes de renderizar
+    tabelaHistorico.innerHTML = '';
+
+    if (!historico.length) {
+      tabelaHistorico.innerHTML = '<p>Nenhum agendamento encontrado</p>';
+    } else {
+      tabelaHistorico.innerHTML = `
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Serviço</th>
+              <th>Profissional</th>
+              <th>Lembrete</th>
+            </tr>
+          </thead>
+          <tbody id="historicoBody">
+          </tbody>
+        </table>
+      `;
+
+      const historicoBody = document.getElementById('historicoBody');
+      if (historicoBody) {
+        historico.forEach(item => {
+          const cliente = this.clientes.find(c => c.id === item.cliente_id);
+          const nomeCliente = cliente ? cliente.nome : 'Não encontrado';
+
+          const servico = window.dataManager.servicosPorId[item.servico_id];
+          const nomeServico = servico ? servico.nome : 'N/A';
+
+          const profissional = window.dataManager.profissionaisPorId[item.profissional_id];
+          const nomeProfissional = profissional ? profissional.nome : 'N/A';
+
+          const dataFormatada = new Date(item.data_inicio).toLocaleString('pt-BR');
+
+          // Calcular status do lembrete
+          const agora = new Date();
+          const dataAgendamento = new Date(item.data_inicio);
+          const diffMs = dataAgendamento - agora;
+          const diffHoras = diffMs / (1000 * 60 * 60);
+
+          let statusLembrete;
+          if (diffHoras <= 48) {
+            statusLembrete = 'enviado';
+          } else {
+            statusLembrete = 'pendente';
+          }
+
+          let badgeLembrete;
+          if (statusLembrete === 'enviado') {
+            badgeLembrete = '<span style="color: green;">📩 Enviado</span>';
+          } else {
+            badgeLembrete = '<span style="color: orange;">⏳ Pendente</span>';
+          }
+
+          const row = `
+            <tr>
+              <td>${dataFormatada}</td>
+              <td>${nomeServico}</td>
+              <td>${nomeProfissional}</td>
+              <td>${badgeLembrete}</td>
+            </tr>
+          `;
+
+          historicoBody.innerHTML += row;
+        });
+      }
+    }
+
+    // Mostrar seção de histórico
+    const historicoSection = document.getElementById('historicoSection');
+    const listaSection = document.getElementById('listaSection');
+    
+    if (historicoSection && listaSection) {
+      historicoSection.style.display = 'block';
+      listaSection.style.display = 'none';
+    }
+
+    // Configurar botão fechar
+    const btnFecharHistorico = document.getElementById('btnFecharHistorico');
+    if (btnFecharHistorico) {
+      btnFecharHistorico.onclick = () => {
+        historicoSection.style.display = 'none';
+        listaSection.style.display = 'block';
+      };
     }
   }
 
