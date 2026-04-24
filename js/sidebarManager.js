@@ -7,43 +7,94 @@
  * - Gerenciar animações e transições
  * - Manter estado da sidebar
  * - Comportamento similar ao Google Calendar
+ * 
+ * 🎯 FASE 2.6.2: Implementa LifecycleContract
  */
 
-class SidebarManager {
-  constructor() {
+class SidebarManager extends LifecycleContract {
+  constructor(context = null) {
+    super('SidebarManager');
+    
+    // 🎯 FASE 6: INSTRUMENTAÇÃO - Contar instanciações
+    console.count('[SidebarManager] constructor');
+    
+    // 🎯 FASE 3.0.1.1: INVARIANTE OBRIGATÓRIO - Contexto deve ser válido
+    if (!context || !context.authFSM) {
+      console.error('[INVARIANT][SidebarManager] Contexto inválido - authFSM requerido');
+    }
+    
+    // 🎯 FASE 2.6.2: STATE ONLY - Zero side-effects no constructor
     this.sidebar = null;
     this.menuToggle = null;
     this.isCollapsed = false;
-    
-    this.init();
+    this._boundToggle = null;
+    this._boundKeyHandler = null;
+    this._context = context; // Referência ao contexto de boot
   }
 
-  init() {
+  // ================================
+  // 🎯 FASE 2.6.2: LIFECYCLE IMPLEMENTATION
+  // ================================
+  
+  activate() {
+    if (this._lifecycleActive) return;
+    
+    console.log('[SidebarManager] activating...');
+    
     // Obter elementos do DOM
     this.sidebar = document.getElementById('sidebar');
 
     if (!this.sidebar) {
       console.error('SidebarManager: Elementos necessários não encontrados');
-      return;
+      return false;
     }
 
     // Criar botão dinamicamente
     this.createToggleButton();
 
-    // POSICIONAR BOTÃO INICIALMENTE - ESTAVA FALTANDO!
+    // POSICIONAR BOTÃO INICIALMENTE
     this.updateButtonPosition();
 
-    // Adicionar listener para tecla ESC
-    document.addEventListener('keydown', (e) => {
+    // Registrar listeners via LifecycleContract
+    this._boundKeyHandler = (e) => {
       if (e.key === 'Escape' && !this.isCollapsed) {
         this.toggle();
       }
-    });
+    };
+    this.addEventListener(document, 'keydown', this._boundKeyHandler);
 
-    // Restaurar estado salvo (depois de posicionar o botão)
+    // Restaurar estado salvo
     this.restoreState();
+    
+    // Marcar como ativo
+    this._lifecycleActive = true;
 
-    console.log('✅ SidebarManager inicializado com sucesso');
+    console.log('✅ SidebarManager activated');
+    return true;
+  }
+  
+  deactivate() {
+    if (!this._lifecycleActive) return;
+    
+    console.log('[SidebarManager] deactivating...');
+    
+    // Cleanup via LifecycleContract (unbindAll, clearAllTimers)
+    super.deactivate();
+    
+    // Remover botão do DOM
+    if (this.menuToggle?.parentNode) {
+      this.menuToggle.parentNode.removeChild(this.menuToggle);
+    }
+    
+    this.sidebar = null;
+    this.menuToggle = null;
+    
+    console.log('[SidebarManager] deactivated');
+  }
+  
+  destroy() {
+    console.log('[SidebarManager] destroying...');
+    super.destroy();
   }
 
   createToggleButton() {
@@ -55,10 +106,9 @@ class SidebarManager {
     
     this.menuToggle.innerHTML = '☰';
     
-    // Adicionar evento de clique
-    this.menuToggle.addEventListener('click', () => {
-      this.toggle();
-    });
+    // 🎯 FASE 2.6.2: Usar addEventListener do LifecycleContract para cleanup automático
+    this._boundToggle = () => this.toggle();
+    this.addEventListener(this.menuToggle, 'click', this._boundToggle);
   }
 
   handleResize() {
@@ -166,18 +216,10 @@ class SidebarManager {
   }
 }
 
-// Inicializar automaticamente
-let sidebarManager;
+// 🎯 FASE 3.0.1.1: MÓDULO PASSIVO - Nenhuma execução automática
+// Inicialização 100% controlada pelo CompositionRoot
+// ZERO listeners no parse
+// ZERO execução fora do boot pipeline
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    sidebarManager = new SidebarManager();
-    window.sidebarManager = sidebarManager;
-  });
-} else {
-  sidebarManager = new SidebarManager();
-  window.sidebarManager = sidebarManager;
-}
-
-// Exportar para uso global
+// Exportar classe para uso pelo CompositionRoot
 window.SidebarManager = SidebarManager;

@@ -33,7 +33,49 @@
           <span class="nav-icon">👩</span>
           <span class="nav-text">Profissionais</span>
         </a>
+        <a href="empresas.html" class="nav-item" id="nav-empresas">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-text">Empresas</span>
+        </a>
       </nav>
+
+      <!-- Verificação de role para Empresas -->
+      <script>
+        (function() {
+          function checkRoleAndHideEmpresas() {
+            try {
+              const authFSM = window.authFSM;
+              if (!authFSM || !authFSM.getState) {
+                console.log('[ROLE CHECK] authFSM não disponível - pulando verificação');
+                return;
+              }
+              
+              const state = authFSM.getState();
+              const user = state?.session?.user;
+              const role = user?.app_metadata?.role || user?.user_metadata?.role || user?.role;
+              
+              const empresasLink = document.getElementById('nav-empresas');
+              if (!empresasLink) return;
+              
+              if (role === 'admin') {
+                empresasLink.style.display = '';
+                console.log('[ROLE CHECK] Admin - mostrando Empresas');
+              } else {
+                empresasLink.style.display = 'none';
+                console.log('[ROLE CHECK] Não-admin - escondendo Empresas, role:', role);
+              }
+            } catch (e) {
+              console.log('[ROLE CHECK] Erro na verificação:', e.message);
+            }
+          }
+          
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkRoleAndHideEmpresas);
+          } else {
+            checkRoleAndHideEmpresas();
+          }
+        })();
+      </script>
       
       <!-- Botão de Logout -->
       <button id="logoutButton" class="btn btn-danger logout-btn">
@@ -59,21 +101,14 @@
       <div class="stats-section">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-icon"> </div>
+            <div class="stat-icon">👥</div>
             <div class="stat-content">
               <div class="stat-value" id="totalClientes">0</div>
               <div class="stat-label">Total de Clientes</div>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon"> </div>
-            <div class="stat-content">
-              <div class="stat-value" id="clientesAtivos">0</div>
-              <div class="stat-label">Clientes Ativos</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"> </div>
+            <div class="stat-icon">📅</div>
             <div class="stat-content">
               <div class="stat-value" id="agendamentosMes">0</div>
               <div class="stat-label">Agendamentos no Mês</div>
@@ -368,142 +403,308 @@
   <!-- Alert Container -->
   <div id="alertContainer" class="alert-container"></div>
 
-  <!-- Scripts -->
+  <!-- ========================================= -->
+  <!-- DEPENDÊNCIAS CRÍTICAS - ORDEM FIXA OBRIGATÓRIA -->
+  <!-- ========================================= -->
+
+  <!-- 1. Infraestrutura Core (sem dependências) -->
+  <script src="js/supabaseClient.js?v=20260319160000"></script>
+  <script src="js/fsm/trace.js"></script>
+  
+  <!-- ✅ FASE 1: EventLedger - Sistema central de registro de eventos -->
+  <script src="js/core/event-ledger.js"></script>
+  
+  <script src="js/fsm/session-bus.js"></script>
+  <script src="js/fsm/effect-runner.js"></script>
+  <script src="js/fsm/auth-fsm.js"></script>
+
+  <!-- 1.5. Auth Authorization (camada de autorização alinhada com RLS) -->
+  <script src="js/auth-authorization.js"></script>
+
+  <!-- 2. Auth Bootstrap (DEVE vir antes de Data/Services) -->
+  <script src="js/auth/index.js"></script>
+  <script src="js/auth-store.js"></script>
+  <script src="js/bootstrap-auth.js"></script>
+
+  <!-- 3. Data (depende de Auth estabilizado) -->
+  <script src="js/data/core/DataCore.js"></script>
+
+  <!-- 4. Utils -->
   <script src="js/utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabaseClient.js"></script>
-  <script src="js/authManager.js?v=20260319143200"></script>
-  <script src="js/firstLoginManager.js"></script>
-  <script src="js/dataManager.js?v=20260402180000"></script>
-  <script src="js/pageManager.js"></script>
-  <script src="js/logoutManager.js?v=20260319160000"></script>
-  <script src="js/sidebarManager.js?v=20260319153000"></script>
+
+  <!-- 5. Services (dependem de DataCore) -->
+  <script src="js/services/BaseService.js"></script>
+  <script src="js/services/ClienteService.js"></script>
+  <script src="js/services/ServicoService.js"></script>
+  <script src="js/services/ProfissionalService.js"></script>
+  <script src="js/services/EmpresaService.js"></script>
+  <script src="js/services/BloqueioService.js"></script>
+  <script src="js/services/AgendamentoService.js"></script>
+
+  <!-- 5.4. Boot Tracer (observability - DEVE vir primeiro) -->
+  <script src="js/core/boot-tracer.js"></script>
+
+  <!-- 5.5. Boot Kernel (fonte única de controle de execução - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/boot-kernel.js"></script>
+
+  <!-- 5.6. State Hydrator (unificação de estado - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/state-hydrator.js"></script>
+
+  <!-- 5.7. Boot Anomaly Detector (diagnóstico - non-blocking) -->
+  <script src="js/core/boot-anomaly-detector.js"></script>
+
+  <!-- 5.8. Boot Recovery Manager (resiliência - non-blocking) -->
+  <script src="js/core/boot-recovery-manager.js"></script>
+
+  <!-- ✅ FASE 3.0.1: Lifecycle Contract (DEVE vir antes dos Managers) -->
+  <script src="js/core/lifecycle-contract.js"></script>
+
+  <!-- 🎯 FASE 3.0.1.1: SidebarManager (passivo - carregado antes do CompositionRoot) -->
+  <script src="js/sidebarManager.js"></script>
+
+  <!-- 6. Composition Root (orquestra tudo) -->
+  <script src="js/composition-root.js"></script>
+
+  <!-- 7. Page Scripts -->
   <script src="js/clientesPage.js"></script>
-  <script src="js/appInit.js"></script>
-  
+
+  <!-- 8. UI Managers -->
+  <script src="js/logoutManager.js?v=20260319160000"></script>
+  <script src="js/menuManager.js"></script>
+
+  <script src="js/core/navigation-effect-runner.js"></script>
+  <!-- 🎯 FASE 3.0.1.1: SidebarManager REMOVIDO (duplicado - já carregado antes do CompositionRoot) -->
+
+  <!-- Bootstrap FSM UI + Carregamento de Página -->
   <script>
-    // INICIALIZAÇÃO NORMAL DE CLIENTES
-    setTimeout(() => {
-      // Se DataManager já existe e tem dados, o evento já foi disparado
-      if (window.dataManager && window.dataManager.clientes) {
-        window.pageManager = new ClientesPage();
-        window.clientesPage = new ClientesPage(); // Adicionar instância para window.clientesPage
-        window.pageManager.init();
-      } else {
-        // Registrar listener para o evento
-        window.addEventListener('appReady', () => {
-          window.pageManager = new ClientesPage();
-          window.clientesPage = new ClientesPage(); // Adicionar instância para window.clientesPage
-          window.pageManager.init();
-        });
-      }
-    }, 100);
-  </script>
-  
-  <script>
-    // ✅ VERIFICAR SESSÃO ANTES DE INICIAR PÁGINA
-    setTimeout(async () => {
-      console.log('🔍 CLIENTES: Verificando sessão antes de inicializar...');
+    // Usar window.* em vez de imports
+    const bootstrapApp = window.bootstrapApp;
+    const ClientesPage = window.ClientesPage;
+
+    // GUARD DE INTEGRIDADE DO BOOTSTRAP
+    window.__BOOTSTRAP_OK__ = false;
+    window.__BOOTSTRAP_FAILED__ = false;
+    window.__setBootstrapOk = () => { window.__BOOTSTRAP_OK__ = true; };
+
+    // ================================
+    // HARD VALIDATION CHECKPOINT (estático - igual index.html)
+    // ================================
+    (function () {
+      if (!window.supabaseClient) throw new Error('supabaseClient missing');
+      if (!window.AuthFSM) throw new Error('AuthFSM missing');
+      if (!window.DataCore) throw new Error('DataCore missing');
+      if (!window.BaseService) throw new Error('BaseService missing');
+
+      console.log('[BOOT CHECK] OK');
+    })();
+
+    async function waitForAuthStable() {
+      // 🔴 P0 CRITICAL: STATE-DRIVEN BOOT CONTRACT
+      // Primeiro tenta ler estado persistido diretamente
+      const kernel = window.__BOOT_KERNEL__;
+      const directContext = kernel?.getReadyContext?.();
       
-      // ✅ Usar AuthManager global protegido
-      if (!window.authManager) {
-        console.error('❌ CLIENTES: AuthManager não encontrado');
-        return;
+      if (directContext) {
+        console.log('[BOOT] Context from kernel readyState (instant)');
+        const { getAuthState } = directContext;
+        const state = getAuthState();
+        return { context: directContext, state };
       }
-      
-      // ✅ Verificar sessão atual
-      const session = await window.authManager.getCurrentSession();
-      if (!session) {
-        console.error('❌ CLIENTES: SEM SESSÃO - usuário não autenticado');
+
+      // Fallback: bootstrap normal
+      console.log('[BOOT] No persisted state, bootstrapping...');
+      const context = await bootstrapApp();
+      const { authFSM, getAuthState } = context;
+
+      // Verificar estado inicial
+      const initialState = getAuthState();
+      if (initialState.state !== 'SESSION_RESTORING') {
+        console.log('[BOOT] Auth state already stable:', initialState.state);
+        return { context, state: initialState };
+      }
+
+      // Aguardar estado estável via subscribe (reativo, sem waitForStableAuth)
+      return new Promise((resolve) => {
+        let resolved = false;
+
+        const checkState = () => {
+          if (resolved) return;
+          const state = getAuthState();
+          if (state.state !== 'SESSION_RESTORING') {
+            resolved = true;
+            console.log('[BOOT] Auth state stable via subscribe:', state.state);
+            resolve({ context, state });
+          }
+        };
+
+        // Verificar imediatamente
+        checkState();
+
+        // Inscrever para mudanças até estado estável
+        const handler = () => checkState();
+        authFSM.subscribe?.(handler);
+
+        // Timeout de segurança (5s)
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.warn('[BOOT] Timeout waiting for stable auth, returning current state');
+            resolve({ context, state: getAuthState() });
+          }
+        }, 5000);
+      });
+    }
+
+    async function bootstrapClientes() {
+      console.log('[BOOT]', 'clientes_bootstrap_start', Date.now());
+
+      // CORRETO: Aguarda estado estável, não lança erro
+      const { context, state } = await waitForAuthStable();
+      console.log('[BOOT]', 'clientes_auth_stable', state.status, Date.now());
+
+      // GUARD EXPLÍCITO: UNAUTHENTICATED → redirecionar
+      // FSM-only: state.state é a única fonte de verdade
+      if (state.state === 'UNAUTHENTICATED') {
+        console.log('[GUARD REDIRECT]', { reason: 'AUTH_REQUIRED', authState: state.state });
         window.location.href = 'login.html';
         return;
       }
-      
-      console.log('✅ CLIENTES: Sessão verificada, usuário:', session.user.email);
-      
-      // ✅ Verificar se appReady já foi disparado
-      if (window.dataManager && window.dataManager.clientes) {
-        console.log('🚀 CLIENTES: appReady já foi disparado, inicializando diretamente...');
-        
-        // GARANTIR QUE O LOGOUT MANAGER FUNCIONE EM CLIENTES
-        console.log('🔍 Verificando botão de logout em clientes...');
-        const logoutBtn = document.getElementById('logoutButton');
-        if (logoutBtn) {
-          console.log('✅ Botão de logout encontrado, garantindo inicialização do LogoutManager...');
-          console.log('🔍 DEBUG - Botão encontrado:', logoutBtn);
-          console.log('🔍 DEBUG - Classes do botão:', logoutBtn.className);
-          console.log('🔍 DEBUG - Parent do botão:', logoutBtn.parentElement);
-          
-          // Forçar criação do LogoutManager se não existir
-          if (!window.logoutManager) {
-            console.log('🔧 Criando LogoutManager manualmente em clientes...');
-            window.logoutManager = new LogoutManager();
-          }
-          
-          // Forçar visibilidade e posicionamento do botão
-          logoutBtn.style.display = 'flex';
-          logoutBtn.style.visibility = 'visible';
-          logoutBtn.style.opacity = '1';
-          logoutBtn.style.position = 'absolute';
-          logoutBtn.style.bottom = '20px';
-          logoutBtn.style.left = '20px';
-          logoutBtn.style.right = '20px';
-          logoutBtn.style.zIndex = '1000';
-          console.log('🔧 Forçando visibilidade e posicionamento do botão em clientes...');
-          
-        } else {
-          console.error('❌ Botão de logout não encontrado no HTML de clientes!');
-        }
-        
-        // Garantir instância do clientesPage
-        if (!window.clientesPage) {
-          window.clientesPage = window.pageManager;
-        }
-      } else {
-        console.log('⏳ CLIENTES: appReady ainda não foi disparado, registrando listener...');
-        window.addEventListener('appReady', () => {
-          console.log('🚀 CLIENTES: appReady recebido, inicializando página...');
-          
-          // Garantir instância do clientesPage
-          if (!window.clientesPage) {
-            window.clientesPage = window.pageManager;
-          }
-          
-          // GARANTIR QUE O LOGOUT MANAGER FUNCIONE EM CLIENTES
-          console.log('🔍 Verificando botão de logout em clientes...');
-          const logoutBtn = document.getElementById('logoutButton');
-          if (logoutBtn) {
-            console.log('✅ Botão de logout encontrado, garantindo inicialização do LogoutManager...');
-            console.log('🔍 DEBUG - Botão encontrado:', logoutBtn);
-            console.log('🔍 DEBUG - Classes do botão:', logoutBtn.className);
-            console.log('🔍 DEBUG - Parent do botão:', logoutBtn.parentElement);
-            
-            // Forçar criação do LogoutManager se não existir
-            if (!window.logoutManager) {
-              console.log('🔧 Criando LogoutManager manualmente em clientes...');
-              window.logoutManager = new LogoutManager();
-            }
-            
-            // Forçar visibilidade e posicionamento do botão
-            logoutBtn.style.display = 'flex';
-            logoutBtn.style.visibility = 'visible';
-            logoutBtn.style.opacity = '1';
-            logoutBtn.style.position = 'absolute';
-            logoutBtn.style.bottom = '20px';
-            logoutBtn.style.left = '20px';
-            logoutBtn.style.right = '20px';
-            logoutBtn.style.zIndex = '1000';
-            console.log('🔧 Forçando visibilidade e posicionamento do botão em clientes...');
-            
-          } else {
-            console.error('❌ Botão de logout não encontrado no HTML de clientes!');
-          }
-        });
+
+      // 🎯 FASE 3: GUARD FIRST_LOGIN_REQUIRED → redirecionar para troca de senha
+      if (state.state === 'FIRST_LOGIN_REQUIRED') {
+        console.log('[GUARD REDIRECT]', { reason: 'FIRST_LOGIN_REQUIRED', authState: state.state });
+        window.location.href = 'change-password.html';
+        return;
       }
-      
-      // LogoutManager cuidará do botão de logout automaticamente
-      console.log('✅ Clientes: LogoutManager gerenciará o botão de logout');
-    }, 200);
+
+      // GUARD EXPLÍCITO: AUTHENTICATED → continuar
+      // FSM-only: state.state é a única fonte de verdade
+      if (state.state === 'AUTHENTICATED') {
+        try {
+          console.log('[BOOT]', 'clientes_creating_pageManager', Date.now());
+          window.pageManager = new ClientesPage();
+          window.clientesPage = window.pageManager;
+          console.log('[BOOT]', 'clientes_pageManager_created', Date.now());
+
+          // 🎯 ATIVAÇÃO SIDEBAR (Opção A - Manual Controlada) - ANTES de initializePage
+          // Garante que o botão apareça mesmo se a página falhar
+          if (!window._sidebarManagerActivated &&
+              window.SidebarManager &&
+              document.getElementById('sidebar')) {
+            try {
+              const sidebarManager = new SidebarManager({ authFSM: window.authFSM });
+              sidebarManager.activate();
+              window._sidebarManagerActivated = true;
+              console.log('[BOOT] SidebarManager ativado (modo legado)');
+            } catch (e) {
+              console.warn('[BOOT] SidebarManager ativação falhou:', e.message);
+            }
+          }
+
+          console.log('[BOOT] AUTH READY');
+
+          // PAGE MANAGER HARD CONTRACT
+          if (!window.pageManager) {
+            throw new Error('[BOOTSTRAP FATAL] PageManager missing');
+          }
+          if (typeof window.pageManager.init === 'function') {
+            console.warn('[LEGACY CONTRACT DETECTED] init() ignored - migrating to initializePage');
+          }
+          if (typeof window.pageManager.initializePage !== 'function') {
+            throw new Error('[BOOTSTRAP FATAL] initializePage missing');
+          }
+          console.log('[BOOT]', 'clientes_calling_initializePage', Date.now());
+          await window.pageManager.initializePage();
+          console.log('[BOOT]', 'clientes_initializePage_complete', Date.now());
+          console.log('[PAGE MANAGER] initializePage contract OK');
+
+          // VALIDAÇÃO FINAL OBRIGATÓRIA
+          console.log('[BOOT] FINAL VALIDATION START');
+
+          if (typeof window.pageManager.initializePage !== 'function') {
+            throw new Error('[BOOTSTRAP FATAL] PageManager contract invalid');
+          }
+
+          // 🎯 NOTA: Não verificar window.supabase - o getter de supabaseClient.js
+          // lança erro fatal ao acessar window.supabase. Apenas verificamos supabaseClient.
+          if (!window.supabaseClient) {
+            console.warn('[BOOT] supabaseClient não disponível');
+          }
+
+          // Marcar bootstrap como OK
+          window.__setBootstrapOk();
+          console.log('[BOOT]', 'clientes_bootstrap_complete', Date.now());
+
+          // 🎯 SIDEBAR JÁ ATIVADO após criação do pageManager
+
+          // 🎯 INICIALIZAR NavigationEffectRunner para navegação FSM-driven
+          if (window.NavigationEffectRunner && window.authFSM) {
+            const navRunner = new NavigationEffectRunner(window.authFSM);
+            navRunner.init();
+            window.navigationEffectRunner = navRunner;
+            console.log('[BOOT] NavigationEffectRunner inicializado');
+          }
+
+          console.log('[BOOT] SYSTEM STABLE');
+
+        } catch (err) {
+          console.error('[CLIENTES BOOTSTRAP ERROR]', {
+            error: err.message,
+            stack: err.stack,
+            timestamp: Date.now()
+          });
+
+          // UI Error: não redirecionar, apenas marcar falha
+          const isUIError = err instanceof ReferenceError ||
+                           err instanceof TypeError ||
+                           err.message?.includes('undefined') ||
+                           err.message?.includes('is not defined') ||
+                           err.message?.includes('pageManager');
+
+          if (isUIError) {
+            window.__BOOTSTRAP_STATE__ = 'FAILED_UI';
+            window.__BOOTSTRAP_FAILED__ = true;
+            console.warn('[REDIRECT BLOCKED] UI error - NOT redirecting (user authenticated)');
+            return;
+          }
+
+          // Outros erros: logar mas não redirecionar (já está autenticado)
+          window.__BOOTSTRAP_FAILED__ = true;
+          console.warn('[BOOTSTRAP FAILED] Error but user authenticated - staying on page');
+        }
+
+        return;
+      }
+
+      // Estado inesperado - isso não deve acontecer se FSM estiver correta
+      console.error('[BOOTSTRAP FATAL] Unexpected auth state:', state.status);
+      window.__BOOTSTRAP_FAILED__ = true;
+    }
+
+    // ================================
+    // CHECKPOINT DE VALIDAÇÃO INICIAL
+    // ================================
+    // 🎯 NOTA: services e authFSM são criados DURANTE bootstrapApp()
+    // A validação completa ocorre dentro de bootstrapClientes() após SYSTEM STABLE
+    if (typeof window.bootstrapApp !== 'function') {
+      throw new Error('[BOOTSTRAP FATAL] bootstrapApp not available');
+    }
+
+    console.log('[BOOT CHECK - PRE-BOOT]', {
+      supabaseClient: !!window.supabaseClient,
+      dataCore: !!window.DataCore,
+      baseService: !!window.BaseService,
+      bootstrapApp: typeof window.bootstrapApp
+    });
+
+    try {
+      bootstrapClientes();
+    } catch (fatalError) {
+      console.error('[BOOTSTRAP EXCEPTION]', fatalError);
+      window.__BOOTSTRAP_STATE__ = 'FAILED_UI';
+      window.__BOOTSTRAP_FAILED__ = true;
+      console.warn('[REDIRECT BLOCKED] Fatal exception');
+    }
   </script>
   
   <style>

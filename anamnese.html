@@ -418,6 +418,31 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabaseClient.js?v=20260313134000"></script>
     <script>
+        // Função de validação local para anamnese
+        function validateFormFields(config) {
+            const { requiredFields, customMessage } = config;
+            const missing = [];
+            
+            requiredFields.forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                if (!field || !field.value.trim()) {
+                    missing.push(fieldId);
+                }
+            });
+            
+            if (missing.length > 0) {
+                // Criar mensagem de erro local
+                const errorMessage = document.getElementById('errorMessage');
+                if (errorMessage) {
+                    errorMessage.textContent = customMessage || 'Campos obrigatórios não preenchidos';
+                    errorMessage.style.display = 'block';
+                }
+                return false;
+            }
+            
+            return true;
+        }
+
         // Classe para gerenciar a ficha pública
         class PublicAnamnese {
             constructor() {
@@ -735,6 +760,13 @@
                 try {
                     this.showLoading(true);
                     this.hideMessages();
+
+                    // Validar campos obrigatórios com mensagem padrão
+                    const requiredFields = ['nome_completo'];
+                    if (!validateFormFields({ requiredFields })) {
+                        this.showLoading(false);
+                        return;
+                    }
 
                     // Validar autorização
                     const autorizacao = document.getElementById('autorizacao_procedimento');

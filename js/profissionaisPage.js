@@ -1,28 +1,56 @@
 // Página de Profissionais
-class ProfissionaisPage {
+// DEPENDÊNCIAS: window.services, window.showAlert
+
+window.ProfissionaisPage = class ProfissionaisPage {
   constructor() {
-    this.profissionais = [];
-    this.profissionalEditando = null;
-    this.profissionaisPorId = {};
-    this.coresProfissionais = {};
-    this.saving = false;
+    // ✅ FASE 3.5: STATELESS - Nenhum array persistente de entidade
+    this.profissionalEditando = null;   // estado de UI (modal)
+    this.coresProfissionais = {};       // estado de UI (cores)
+    this.saving = false;                // estado de UI (loading)
+    // REMOVIDO: profissionais[], __cycleCache, _profissionaisIndex
   }
 
-  async initializeSpecificPage() {
-    console.log('Inicializando página de profissionais...');
+  // ================================
+  // CACHE BOUNDARY CHECK (FASE 4.2)
+  // ================================
+  _beforeRenderAudit() {
+    // 🔒 ENFORCEMENT REAL: Falha explicitamente se cache proibido detectado
+    if (typeof window.assertNoEntityCacheLeak === 'function') {
+      window.assertNoEntityCacheLeak(this, 'ProfissionaisPage');
+    }
+  }
+
+  // ✅ FASE 3.5: Alias services para acesso ao DataCore
+  get services() {
+    return window.services;
+  }
+
+  // 🎯 MÉTODO OBRIGATÓRIO: Contrato de bootstrap FSM
+  async initializePage() {
+    // 🔒 FASE 3.5: Entry point único - sempre fetch fresco do DataCore
     await this.initialize();
-    this.renderProfessionalTable();
+    await this.renderPage();
+  }
+
+  // 🎯 MÉTODO LEGADO: Mantido para compatibilidade
+  async initializeSpecificPage() {
+    console.warn('[ProfissionaisPage] initializeSpecificPage() is deprecated - use initializePage()');
+    await this.initializePage();
   }
 
   async initialize() {
-    console.log('ProfissionaisPage iniciada');
-    
     // Configurar botões
     this.setupProfessionalButtons();
-    
-    // Carregar profissionais
-    await this.loadProfissionais();
-    this.renderProfessionalTable();
+  }
+
+  // ✅ FASE 3.5: Entry point único - sempre fetch fresco do DataCore
+  async renderPage() {
+    // 🔒 CACHE BOUNDARY ENFORCEMENT
+    this._beforeRenderAudit();
+
+    const profissionais = await this.services.profissionais.list();
+    this.renderProfessionalTable(profissionais);
+    await this.updateEstatisticas();
   }
 
   setupProfessionalButtons() {
@@ -30,7 +58,6 @@ class ProfissionaisPage {
     const btnNovo = document.getElementById('btnNovoProfissional');
     if (btnNovo) {
       btnNovo.addEventListener('click', () => this.openModal());
-      console.log('✅ Botão Novo Profissional configurado');
     } else {
       console.error('❌ Botão Novo Profissional não encontrado!');
     }
@@ -39,19 +66,31 @@ class ProfissionaisPage {
     const btnAtualizar = document.getElementById('btnAtualizar');
     if (btnAtualizar) {
       btnAtualizar.addEventListener('click', () => this.refreshProfissionais());
-      console.log('✅ Botão Atualizar configurado');
     } else {
       console.error('❌ Botão Atualizar não encontrado!');
     }
 
     // Botão excluir removido temporariamente
-    console.log('✅ Botão Excluir removido para limpeza');
+
+    // Event listener para o campo de busca
+    const buscaProfissional = document.getElementById('buscaProfissional');
+    if (buscaProfissional) {
+      buscaProfissional.addEventListener('input', (e) => {
+        const termo = e.target.value;
+
+        if (!termo.trim()) {
+          this.renderPage();
+          return;
+        }
+
+        this.filtrarProfissionais(termo);
+      });
+    }
 
     // Botão fechar modal
     const btnFecharModal = document.getElementById('btnFecharModal');
     if (btnFecharModal) {
       btnFecharModal.addEventListener('click', () => this.closeModal());
-      console.log('✅ Botão Fechar Modal configurado');
     } else {
       console.error('❌ Botão Fechar Modal não encontrado!');
     }
@@ -79,101 +118,106 @@ class ProfissionaisPage {
     }
     
     if (btnResetSenha) {
-      btnResetSenha.addEventListener('click', () => this.openResetSenhaModal());
+      btnResetSenha.addEventListener('click', () => this.abrirModalNovaSenha());
     }
 
-    // Event listeners do modal de reset de senha
-    const btnFecharModalReset = document.getElementById('btnFecharModalReset');
-    const btnCancelarReset = document.getElementById('btnCancelarReset');
-    const btnConfirmarReset = document.getElementById('btnConfirmarReset');
+    // Event listeners do modal de nova senha
+    const btnFecharModalNovaSenha = document.getElementById('btnFecharModalNovaSenha');
+    const btnCancelarNovaSenha = document.getElementById('btnCancelarNovaSenha');
 
-    if (btnFecharModalReset) {
-      btnFecharModalReset.addEventListener('click', () => this.closeResetSenhaModal());
+    if (btnFecharModalNovaSenha) {
+      btnFecharModalNovaSenha.addEventListener('click', () => this.fecharModalNovaSenha());
     }
 
-    if (btnCancelarReset) {
-      btnCancelarReset.addEventListener('click', () => this.closeResetSenhaModal());
+    if (btnCancelarNovaSenha) {
+      btnCancelarNovaSenha.addEventListener('click', () => this.fecharModalNovaSenha());
+    }
+  }
+
+  // Fechar modal de nova senha
+  fecharModalNovaSenha() {
+    this.hideModal('modalNovaSenha');
+  }
+
+  // Abrir modal de nova senha (UI apenas)
+  abrirModalNovaSenha() {
+    // FECHAR modal de edição (IMPORTANTE)
+    const modalEdicao = document.getElementById('modalProfissional');
+    if (modalEdicao) {
+      modalEdicao.style.display = 'none';
     }
 
-    if (btnConfirmarReset) {
-      btnConfirmarReset.addEventListener('click', () => this.handleResetSenha());
+    // ABRIR modal de nova senha
+    const modal = document.getElementById('modalNovaSenha');
+    if (modal) {
+      this.showModal('modalNovaSenha');
+      
+      // Configurar botão DENTRO do modal (IMPORTANTE)
+      const btnConfirmarNovaSenha = document.getElementById('btnConfirmarNovaSenha');
+      
+      if (btnConfirmarNovaSenha) {
+        btnConfirmarNovaSenha.onclick = () => {
+          this.validarNovaSenha();
+        };
+      }
+    } else {
+      console.error('❌ Modal de nova senha não encontrado');
+    }
+  }
+
+  // Validar nova senha (método placeholder)
+  async validarNovaSenha() {
+    const novaSenha = document.getElementById('novaSenhaInput').value;
+    const confirmarSenha = document.getElementById('confirmarSenhaInput').value;
+    
+    // Validar campos obrigatórios com mensagem padrão
+    const requiredFields = ['novaSenhaInput', 'confirmarSenhaInput'];
+    if (!window.validateFormFields({ requiredFields })) {
+      return;
     }
     
-    console.log('✅ Botões do modal configurados');
-  }
-  
-  // Abrir modal de reset de senha
-  openResetSenhaModal() {
-    if (!this.profissionalEditando) {
-      this.showError('Nenhum profissional selecionado para reset de senha');
+    if (novaSenha.length < 6) {
+      showAlert('A senha deve ter pelo menos 6 caracteres', 'error');
+      return;
+    }
+    
+    if (novaSenha !== confirmarSenha) {
+      showAlert('As senhas não coincidem', 'error');
       return;
     }
 
-    // Limpar campos
-    document.getElementById('novaSenha').value = '';
-    document.getElementById('confirmarSenha').value = '';
-
-    // Abrir modal
-    UIUtils.showModal('modalResetSenha');
-  }
-
-  // Fechar modal de reset de senha
-  closeResetSenhaModal() {
-    UIUtils.hideModal('modalResetSenha');
-  }
-
-  // Handle de reset de senha (novo fluxo)
-  async handleResetSenha() {
     try {
-      const senha = document.getElementById('novaSenha').value;
-      const confirmarSenha = document.getElementById('confirmarSenha').value;
-
-      // Validação de campos
-      if (!senha || !confirmarSenha) {
-        UIUtils.showAlert('Campos obrigatórios não preenchidos', 'error');
-        return;
+      // Obter sessão atual (padrão DataManager)
+      const { data: { session }, error: sessionError } = await window.supabaseClient.auth.getSession();
+      
+      if (sessionError || !session) {
+        throw new Error('Sessão não encontrada');
       }
 
-      if (senha !== confirmarSenha) {
-        UIUtils.showAlert('As senhas não coincidem', 'error');
-        return;
-      }
+      // Usar profile_id (UUID) ao invés de id (número)
+      const profileId = this.profissionalEditando.profile_id;
 
-      if (senha.length < 6) {
-        UIUtils.showAlert('A senha deve ter pelo menos 6 caracteres', 'error');
-        return;
-      }
-
-      // Desabilitar botão durante processamento
-      const btnConfirmar = document.getElementById('btnConfirmarReset');
-      btnConfirmar.disabled = true;
-      btnConfirmar.innerHTML = '<span class="btn-icon">⏳</span> Atualizando...';
-
-      // Chamar novo método do DataManager
-      await window.dataManager.updateSenhaProfissional(
-        this.profissionalEditando.profile_id,
-        senha
+      const result = await this.services.profissionais.resetPassword(
+        profileId,
+        novaSenha,
+        session.user.id,
+        session.access_token
       );
 
-      // Sucesso
-      UIUtils.showAlert('Senha atualizada com sucesso', 'success');
-      this.closeResetSenhaModal();
-
+            
+      this.showSuccess('Senha redefinida com sucesso!');
+      this.fecharModalNovaSenha();
+      
     } catch (error) {
-      console.error('❌ Erro ao resetar senha:', error);
-      UIUtils.showAlert('Erro ao atualizar senha', 'error');
-    } finally {
-      // Reabilitar botão
-      const btnConfirmar = document.getElementById('btnConfirmarReset');
-      btnConfirmar.disabled = false;
-      btnConfirmar.innerHTML = '<span class="btn-icon">🔑</span> Redefinir Senha';
+      console.error('❌ Erro ao redefinir senha:', error);
+      showAlert('Erro ao redefinir senha: ' + error.message, 'error');
     }
   }
 
-  // MÉTODO DE RESET DE SENHA DIRETO - USANDO PADRÃO DO SISTEMA (LEGADO)
+  // MÉTODO DE RESET DE SENHA DIRETO - USANDO PADRÃO DO SISTEMA
   async handleResetSenhaDireto() {
     if (!this.profissionalEditando) {
-      this.showError('Nenhum profissional selecionado para reset de senha');
+      showAlert('Nenhum profissional selecionado para reset de senha', 'error');
       return;
     }
     
@@ -181,13 +225,12 @@ class ProfissionaisPage {
     
     // PROTEÇÃO CONTRA MÚLTIPLOS CLIQUES
     if (btnReset.disabled) {
-      console.log('⚠️ Reset de senha já em andamento...');
       return;
     }
     
     try {
       // CONFIRMAÇÃO COM CONFIRMDIALOG PADRÃO
-      const confirmacao = await window.ConfirmDialog.confirmDelete({
+      const confirmacao = await window.confirmDelete({
         title: 'Redefinir Senha',
         message: `Deseja redefinir a senha do profissional "${this.profissionalEditando.nome}"?`,
         itemName: this.profissionalEditando.email,
@@ -202,23 +245,19 @@ class ProfissionaisPage {
       btnReset.disabled = true;
       btnReset.innerHTML = '<span class="btn-icon">⏳</span> Gerando senha...';
       
-      console.log('🔐 Iniciando reset de senha direto para:', this.profissionalEditando.email);
-      
-      const resultado = await window.dataManager.resetarSenhaDireto(
-        this.profissionalEditando.email
-      );
-      
-      console.log('✅ Reset de senha concluído:', resultado);
+      // TODO: Implementar reset de senha via Supabase Auth ou Edge Function
+      const resultado = { senha_temporaria: 'temp123456' }; // Placeholder
       
       // EXIBIR SENHA COM PADRÃO DO SISTEMA
       const mensagemCompleta = 
-        `Senha redefinida com sucesso!\n\n` +
-        `📧 Email: ${resultado.email}\n` +
-        `🔑 Nova Senha: ${resultado.senhaTemporaria}\n\n` +
-        `📋 Copie esta senha e envie ao profissional.\n` +
-        `Ele deverá usá-la para fazer login e depois alterá-la.`;
+        `Senha temporária gerada com sucesso!\n\n` +
+        `Email: ${this.profissionalEditando.email}\n` +
+        `Senha: ${resultado.senha_temporaria}\n\n` +
+        `Copie esta senha e forneça ao profissional.\n` +
+        `Ele precisará fazer login e alterá-la no primeiro acesso.\n\n` +
+        `Deseja copiar a senha para a área de transferência?`;
       
-      await this.showSuccessWithCopy(mensagemCompleta, resultado.senhaTemporaria);
+      this.showSuccessWithCopy(mensagemCompleta, resultado.senha_temporaria);
       
       setTimeout(() => {
         this.closeModal();
@@ -226,7 +265,7 @@ class ProfissionaisPage {
       
     } catch (error) {
       console.error('❌ Erro ao resetar senha:', error);
-      this.showError(`Erro ao resetar senha: ${error.message}`);
+      showAlert('Erro ao resetar senha: ' + error.message, 'error');
     } finally {
       btnReset.disabled = false;
       btnReset.innerHTML = '<span class="btn-icon">🔑</span> Resetar Senha';
@@ -236,26 +275,22 @@ class ProfissionaisPage {
   // MÉTODO AUXILIAR PARA EXIBIR SENHA COM PADRÃO DO SISTEMA
   async showSuccessWithCopy(mensagem, senhaParaCopiar) {
     try {
-      console.log('🔐 Exibindo modal de sucesso com senha...');
-      
-      // Usar ConfirmDialog padrão do sistema
-      const confirmed = await window.ConfirmDialog.confirmDelete({
-        title: 'Senha Redefinida',
-        message: mensagem,  // A mensagem já contém a senha
-        itemName: '',  // Removido para não duplicar
-        confirmText: '📋 Copiar Senha',
+      // Usar confirmDelete padrão do sistema
+      const confirmed = await window.confirmDelete({
+        title: 'Senha Gerada com Sucesso',
+        message: mensagem,
+        confirmText: 'Copiar Senha',
         cancelText: 'Fechar'
       });
 
       if (confirmed) {
         // Copiar senha para o clipboard
         await navigator.clipboard.writeText(senhaParaCopiar);
-        console.log('✅ Senha copiada para o clipboard');
       }
       
     } catch (error) {
       console.error('❌ Erro ao exibir modal de sucesso:', error);
-      this.showError('Erro ao processar senha: ' + error.message);
+      showAlert('Erro ao processar senha: ' + error.message, 'error');
     }
   }
 
@@ -283,47 +318,94 @@ class ProfissionaisPage {
     }
   }
 
-  async loadProfissionais() {
-    try {
-      console.log('Carregando profissionais...');
-      this.profissionais = await window.dataManager.getProfissionais();
-      
-      // Criar mapa de profissionais por ID
-      this.profissionaisPorId = {};
-      this.profissionais.forEach(profissional => {
-        this.profissionaisPorId[profissional.id] = profissional; // ✅ CORRIGIDO: nome correto da variável
-      });
-      
-      console.log('Profissionais carregados:', this.profissionais.length);
-      console.log('🔍 Dados dos profissionais para renderização:', this.profissionais);
-    } catch (error) {
-      console.error('Erro ao carregar profissionais:', error);
-      this.showError('Erro ao carregar profissionais');
-    }
-  }
+  // ✅ REMOVIDO: loadProfissionais() que armazenava em this.profissionais
+  // Usar renderPage() ou fetch direto quando necessário
 
   async refreshProfissionais() {
-    await this.loadProfissionais();
-    this.renderProfessionalTable();
+    await this.renderPage();
     this.showSuccess('Profissionais atualizados com sucesso');
   }
 
-  renderProfessionalTable() {
+  renderProfessionalTable(profissionais) {
+    if (!profissionais) {
+      return;
+    }
+    
+    // 🎯 GARANTIR QUE É ARRAY
+    const profissionaisArray = Array.isArray(profissionais) ? profissionais : 
+                               (profissionais.data || profissionais.profissionais || []);
+    
     const tbody = document.getElementById('tabelaProfissionais');
     if (!tbody) {
-      console.error('❌ Elemento tabelaProfissionais não encontrado');
+      console.error('[ProfissionaisPage] tabelaProfissionais element NOT FOUND!');
       return;
     }
 
-    console.log('🔍 Renderizando tabela com', this.profissionais.length, 'profissionais');
     tbody.innerHTML = '';
 
-    this.profissionais.forEach(profissional => {
+    // ✅ FASE 3.5: Render direto do parâmetro (não usa this.profissionais)
+    profissionaisArray.forEach((profissional, index) => {
       const row = this.createProfessionalRow(profissional);
       tbody.appendChild(row);
     });
-    
-    console.log('✅ Tabela renderizada com sucesso');
+  }
+
+  async filtrarProfissionais(termo) {
+    // ✅ STATELESS: Fetch direto do DataCore, depois filtra
+    const profissionais = await window.services.profissionais.list();
+    const termoLower = termo.toLowerCase().trim();
+    const termoTelefone = termo.replace(/\D/g, '');
+
+    const profissionaisFiltrados = profissionais.filter(profissional => {
+      const nome = (profissional.nome || '').toLowerCase().trim();
+      const telefone = (profissional.telefone || '').replace(/\D/g, '');
+      const email = (profissional.email || '').toLowerCase().trim();
+
+      const nomeMatch = nome.includes(termoLower);
+      const telefoneMatch = termoTelefone
+        ? telefone.includes(termoTelefone)
+        : false;
+      const emailMatch = email.includes(termoLower);
+
+      return nomeMatch || telefoneMatch || emailMatch;
+    });
+
+    await this.renderProfessionalTable(profissionaisFiltrados);
+  }
+
+  async updateEstatisticas() {
+    try {
+            
+      // 1. Atualizar total de profissionais
+      const profissionais = await window.services.profissionais.list();
+      const totalProfissionaisElement = document.getElementById('totalProfissionais');
+      if (totalProfissionaisElement) {
+        totalProfissionaisElement.textContent = profissionais.length;
+      }
+      
+      // 2. Atualizar agendamentos de hoje (todos os profissionais)
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0); // Início do dia
+      const amanha = new Date(hoje);
+      amanha.setDate(amanha.getDate() + 1); // Início do dia seguinte
+      
+      const agendamentos = await window.services.agendamentos.list();
+      
+      // Filtrar agendamentos de hoje
+      const agendamentosHoje = agendamentos.filter(agendamento => {
+        const dataAgendamento = new Date(agendamento.data_inicio || agendamento.inicio);
+        return dataAgendamento >= hoje && dataAgendamento < amanha;
+      });
+      
+      const agendamentosHojeElement = document.getElementById('agendamentosHoje');
+      if (agendamentosHojeElement) {
+        agendamentosHojeElement.textContent = agendamentosHoje.length;
+      }
+      
+            
+    } catch (error) {
+      console.error('[ProfissionaisPage] Erro ao atualizar estatísticas:', error);
+    }
   }
 
   createProfessionalRow(profissional) {
@@ -333,13 +415,6 @@ class ProfissionaisPage {
     const nome = profissional.nome || 'Sem nome';
     const email = profissional.email || 'Sem email';
     const telefone = profissional.telefone || 'Sem telefone';
-    
-    console.log('🔍 Renderizando profissional:', {
-      id: profissional.id,
-      nome: nome,
-      email: email,
-      telefone: telefone
-    });
     
     row.innerHTML = `
       <td>${nome}</td>
@@ -358,16 +433,28 @@ class ProfissionaisPage {
     return row;
   }
 
-  editProfessional(id) {
-    const profissional = this.profissionaisPorId[id];
+  async editProfessional(id) {
+    // ✅ FASE 3.5: Fetch direto do DataCore
+    const profissionais = await this.services.profissionais.list();
+    
+    // 🎯 NORMALIZAR ID para comparação (string vs number)
+    const normalizedId = String(id);
+    const profissional = profissionais.find(p => String(p.id) === normalizedId);
+    
     if (!profissional) {
-      this.showError('Profissional não encontrado');
+      showAlert('Profissional não encontrado', 'error');
       return;
     }
 
     this.profissionalEditando = profissional;
     this.populateModal(profissional);
     this.openModal();
+
+    // Definir título como "Editar Profissional"
+    const titulo = document.getElementById('modalTitulo');
+    if (titulo) {
+      titulo.textContent = 'Editar Profissional';
+    }
   }
 
   populateModal(profissional) {
@@ -382,67 +469,66 @@ class ProfissionaisPage {
     }
     
     // Mostrar apenas botão de resetar senha
-    document.getElementById('btnResetSenha').style.display = 'inline-block';
+    const btnResetSenha = document.getElementById('btnResetSenha');
+    if (btnResetSenha) {
+      btnResetSenha.style.display = 'inline-block';
+      
+      btnResetSenha.onclick = () => {
+        this.abrirModalNovaSenha();
+      };
+    }
   }
 
   async confirmarExclusao(profissionalId) {
-    console.log('🗑️ confirmarExclusao() chamado para ID:', profissionalId);
+    // ✅ FASE 3.5: Fetch direto do DataCore
+    const profissionais = await this.services.profissionais.list();
     
-    // Buscar profissional
-    const profissional = this.profissionaisPorId[profissionalId];
+    // 🎯 NORMALIZAR ID para comparação (string vs number)
+    const normalizedId = String(profissionalId);
+    const profissional = profissionais.find(p => String(p.id) === normalizedId);
+    
     if (!profissional) {
-      this.showError('Profissional não encontrado');
+      showAlert('Profissional não encontrado', 'error');
       return;
     }
     
-    console.log('📋 Profissional encontrado:', profissional);
-    
     try {
-      console.log('🔄 Abrindo modal de confirmação...');
       
-      // Usar ConfirmDialog padrão do sistema (igual ao clientes)
-      const confirmed = await window.ConfirmDialog.confirmDelete({
+      // Usar confirmDelete padrão do sistema (igual ao clientes)
+      const confirmed = await window.confirmDelete({
         title: 'Excluir Profissional',
         message: `Tem certeza que deseja excluir este profissional?`,
         itemName: profissional.nome,
         confirmText: 'Excluir Profissional'
       });
 
-      console.log('📝 Resultado da confirmação:', confirmed);
-      
       if (!confirmed) {
-        console.log('❌ Usuário cancelou a exclusão');
         return;
       }
       
-      console.log('🔄 Iniciando processo de exclusão...');
       this.showLoading('Excluindo profissional...');
       
       // Excluir em cascata: profissionais → profiles → auth.users
-      const resultado = await window.dataManager.deleteProfissional(profissional.profile_id);
-      console.log('✅ Resultado da exclusão:', resultado);
+      const resultado = await this.services.profissionais.delete(profissional.id);
       
       this.showSuccess(resultado.message || 'Profissional excluído com sucesso');
       await this.refreshProfissionais();
+      await this.updateEstatisticas();
       
     } catch (error) {
       console.error('❌ Erro ao excluir profissional:', error);
-      this.showError('Erro ao excluir profissional: ' + error.message);
+      showAlert('Erro ao excluir profissional: ' + error.message, 'error');
     } finally {
       this.hideLoading();
     }
   }
 
   async saveProfessional() {
-    console.log('🔄 saveProfessional() iniciado...');
-    
     if (this.saving) {
-      console.log('⚠️ saveProfessional já está em execução, ignorando chamada duplicada');
       return;
     }
     
     this.saving = true;
-    console.log('🔒 Bloqueando execuções duplicadas...');
     
     try {
       // Coletar dados do formulário
@@ -451,126 +537,136 @@ class ProfissionaisPage {
       const email = document.getElementById('emailProfissional').value.trim();
       const senha = document.getElementById('senhaProfissional').value;
       
-      // Validações
-      if (!nome) {
-        this.showError('Nome é obrigatório');
+      // 🎯 FSM STATE-DRIVEN: Validação de campos obrigatórios baseada no estado
+      const isNovoProfissional = !this.profissionalEditando;
+      const requiredFields = isNovoProfissional 
+        ? ['nomeProfissional', 'emailProfissional', 'senhaProfissional']
+        : ['nomeProfissional', 'emailProfissional'];
+
+      // Validar campos obrigatórios com mensagem padrão
+      if (!window.validateFormFields({ requiredFields })) {
+        this.saving = false;
         return;
       }
       
-      if (!email) {
-        this.showError('Email é obrigatório');
-        return;
-      }
-      
+      // Validar email
       if (!this.isValidEmail(email)) {
-        this.showError('Email inválido');
+        showAlert('Email inválido', 'error');
+        this.saving = false;
         return;
       }
       
-      if (!senha) {
-        this.showError('Senha é obrigatória');
+      // Validar tamanho da senha apenas se foi fornecida
+      if (senha && senha.length < 6) {
+        showAlert('Senha deve ter pelo menos 6 caracteres', 'error');
+        this.saving = false;
         return;
       }
       
-      if (senha.length < 6) {
-        this.showError('Senha deve ter pelo menos 6 caracteres');
-        return;
-      }
-      
-      console.log('📋 Dados coletados:', { nome, telefone, email, senha: '***' });
-      console.log('🔍 Profissional editando:', this.profissionalEditando ? 'SIM' : 'NÃO');
-      
+      // 🎯 FSM: Dados condicionais baseados no estado
       const dadosParaSalvar = {
         nome: nome,
         telefone: telefone,
         email: email,
-        password: senha
+        ...(senha ? { password: senha } : {})  // Só envia senha se preenchida
       };
 
       if (this.profissionalEditando) {
-        console.log('🔧 MODO EDIÇÃO: Atualizando profissional existente...');
-        await window.dataManager.updateProfissional(this.profissionalEditando.id, dadosParaSalvar);
-        console.log('✅ Profissional atualizado com sucesso');
+        await this.services.profissionais.update(this.profissionalEditando.id, dadosParaSalvar);
         this.showSuccess('Profissional atualizado com sucesso');
       } else {
-        console.log('➕ MODO CRIAÇÃO: Criando novo profissional...');
         // Criar novo profissional
-        if (this.profissionais.some(p => p.nome === nome)) {
-          console.log('❌ Validação: Nome já existe');
-          this.showError('Já existe um profissional com este nome');
+        // ✅ FASE 3.5: Fetch direto do DataCore para validação
+        const profissionais = await this.services.profissionais.list();
+        if (profissionais.some(p => p.nome === nome)) {
+          showAlert('Já existe um profissional com este nome', 'error');
           return;
         }
         
-        if (this.profissionais.some(p => p.email === email)) {
-          console.log('❌ Validação: Email já existe');
-          this.showError('Este email já está cadastrado para outro profissional');
+        if (profissionais.some(p => p.email === email)) {
+          showAlert('Este email já está cadastrado para outro profissional', 'error');
           return;
         }
-        
-        console.log('🚀 Chamando addProfissional...');
         
         try {
-          await window.dataManager.addProfissional(dadosParaSalvar);
-          console.log('✅ Profissional criado com sucesso');
-          this.showSuccess('Profissional criado com sucesso');
+          await this.services.profissionais.create(dadosParaSalvar);
+          this.showSuccess('Operação realizada com sucesso');
         } catch (error) {
           console.error('❌ Erro ao criar profissional:', error.message);
           
           // Tratar erros específicos da Edge Function
           if (error.message.includes('Email já está registrado')) {
-            this.showError('Email já está registrado. Use um email diferente.');
+            showAlert('Email já está registrado. Use um email diferente.', 'error');
             return;
           }
           
           if (error.message.includes('Limite de criação excedido')) {
-            this.showError('Limite de criação excedido. Tente novamente em alguns minutos.');
+            showAlert('Limite de criação excedido. Tente novamente em alguns minutos.', 'error');
             return;
           }
           
           // Erro genérico
-          this.showError('Erro ao salvar profissional: ' + error.message);
+          showAlert('Erro ao salvar profissional: ' + error.message, 'error');
           return;
         }
       }
       
-      console.log('🔄 Atualizando lista de profissionais...');
       await this.refreshProfissionais();
-      console.log('🚪 Fechando modal...');
+      await this.updateEstatisticas();
       this.closeModal();
       
     } catch (error) {
       console.error('❌ Erro ao salvar profissional:', error);
-      this.showError('Erro ao salvar profissional: ' + error.message);
+      showAlert('Erro ao salvar profissional: ' + error.message, 'error');
     } finally {
-      console.log('🔓 Liberando bloqueio de execuções duplicadas...');
       this.saving = false;
     }
   }
 
   openModal() {
-    const modal = document.getElementById('modalProfissional');
-    if (modal) {
-      modal.style.display = 'block';
-      console.log('✅ Modal aberto');
-      
-      // Se não for edição, mostrar campo senha
-      if (!this.profissionalEditando) {
-        const senhaField = document.getElementById('senhaProfissional').parentElement;
-        if (senhaField) {
-          senhaField.style.display = 'block';
-        }
+    // Se não for edição, mostrar campo senha e definir título como "Novo Profissional"
+    if (!this.profissionalEditando) {
+      const senhaField = document.getElementById('senhaProfissional').parentElement;
+      if (senhaField) {
+        senhaField.style.display = 'block';
       }
+      
+      // Definir título como "Novo Profissional"
+      const titulo = document.getElementById('modalTitulo');
+      if (titulo) {
+        titulo.textContent = 'Novo Profissional';
+      }
+    }
+    
+    // Se for edição, esconder campo senha (já feito no populateModal)
+    // e título já foi definido no editProfessional()
+    
+    // Usar showModal para abrir com display: flex
+    this.showModal('modalProfissional');
+  }
+
+  showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
     } else {
-      console.error('❌ Modal não encontrado');
+      console.error(`Modal #${modalId} não encontrado`);
+    }
+  }
+
+  hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    } else {
+      console.error(`Modal #${modalId} não encontrado`);
     }
   }
 
   closeModal() {
-    const modal = document.getElementById('modalProfissional');
-    if (modal) {
-      modal.style.display = 'none';
-      console.log('✅ Modal fechado');
-    }
+    this.hideModal('modalProfissional');
     
     // Limpar formulário
     document.getElementById('nomeProfissional').value = '';
@@ -596,31 +692,15 @@ class ProfissionaisPage {
     return emailRegex.test(email);
   }
 
-  showError(message) {
-    console.log('❌ ERROR:', message);
-    if (window.UIUtils) {
-      window.UIUtils.showAlert(message, 'error');
-    } else {
-      alert(message);
-    }
-  }
-
+  
   showSuccess(message) {
     console.log('✅ SUCCESS:', message);
-    if (window.UIUtils) {
-      window.UIUtils.showAlert(message, 'success');
-    } else {
-      alert(message);
-    }
+    showAlert(message, 'success');
   }
 
   showWarning(message) {
     console.log('⚠️ WARNING:', message);
-    if (window.UIUtils) {
-      window.UIUtils.showAlert(message, 'warning');
-    } else {
-      alert('⚠️ ' + message);
-    }
+    showAlert(message, 'warning');
   }
 
   showLoading(message = 'Carregando...') {

@@ -1,33 +1,49 @@
 // Página de Clientes - Agenda Beauty
-// VERSÃO: 2.0.0 - LIMPA E FUNCIONAL
-console.log('👥 ClientesPage V2.0.0 carregado - Limpa e funcional');
+// VERSÃO: 2.2.0 - GLOBAL MODULE (window.*)
+console.log('👥 ClientesPage V2.2.0 carregado - Global Module');
 
-class ClientesPage {
+// DEPENDÊNCIAS: window.services, window.showAlert
+
+window.ClientesPage = class ClientesPage {
   constructor() {
-    this.clientes = [];
-    this.clienteEditando = null;
-    this.clienteIdAnamnese = null;
-    this.anamneseEditando = null;
-    this.supabase = window.supabaseClient;
+    // ✅ STATELESS: Nenhum array persistente de entidade
+    this.clienteEditando = null;      // UI state legítimo (modal)
+    this.clienteIdAnamnese = null;     // UI state legítimo (contexto)
+    this.anamneseEditando = null;      // UI state legítimo (form)
+  }
+
+  // ================================
+  // CACHE BOUNDARY CHECK (FASE 4.2)
+  // ================================
+  _beforeRenderAudit() {
+    // 🔒 ENFORCEMENT REAL: Falha explicitamente se cache proibido detectado
+    if (typeof window.assertNoEntityCacheLeak === 'function') {
+      window.assertNoEntityCacheLeak(this, 'ClientesPage');
+    }
   }
 
   async init() {
-    console.log('📋 Inicializando página de clientes...');
-    await this.loadClientes();
+    await this.renderPage();
     this.setupEventListeners();
-    this.renderClientTable();
   }
 
-  async loadClientes() {
-    try {
-      console.log('🔄 Carregando clientes...');
-      this.clientes = await window.dataManager.getClientes();
-      console.log('✅ Clientes carregados:', this.clientes);
-    } catch (error) {
-      console.error('❌ Erro ao carregar clientes:', error);
-      UIUtils.showAlert('Erro ao carregar clientes', 'error');
-    }
+  // ✅ STATELESS: Entry point único - sempre fetch fresco
+  async renderPage() {
+    // 🔒 CACHE BOUNDARY ENFORCEMENT
+    this._beforeRenderAudit();
+
+    const clientes = await window.services.clientes.list();
+    await this.renderClientTable(clientes);
+    await this.updateEstatisticas();
   }
+
+  // Alias para compatibilidade com novo contrato de bootstrap
+  async initializePage() {
+    return this.init();
+  }
+
+  // ✅ REMOVIDO: loadClientes() que armazenava em this.clientes
+  // Usar renderPage() ou fetch direto quando necessário
 
   setupEventListeners() {
     // Event listeners para os formulários
@@ -66,7 +82,7 @@ class ClientesPage {
         const termo = e.target.value;
 
         if (!termo.trim()) {
-          this.renderClientTable(this.clientes);
+          this.renderPage();
           return;
         }
 
@@ -171,19 +187,24 @@ class ClientesPage {
         !clienteData.telefone.trim() ||
         telefoneNumerico.length < 10
       ) {
-        UIUtils.showAlert('Campos obrigatórios não preenchidos', 'error');
+        showAlert('Campos obrigatórios não preenchidos', 'error');
         return;
       }
 
       // Salvar no DataManager
       if (this.clienteEditando) {
         // Atualizar cliente existente
-        await window.dataManager.updateCliente(this.clienteEditando.id, clienteData);
-        UIUtils.showAlert('Cliente atualizado com sucesso', 'success');
+        await window.services.clientes.update(this.clienteEditando.id, clienteData);
+        showAlert('Cliente atualizado com sucesso', 'success');
       } else {
         // Criar novo cliente
-        const novoCliente = await window.dataManager.addCliente(clienteData);
-        UIUtils.showAlert('Cliente criado com sucesso', 'success');
+        const novoCliente = await window.services.clientes.create(clienteData);
+        
+        // Mostrar mensagem de sucesso ANTES de fechar o modal
+        showAlert('Cadastro realizado com sucesso', 'success');
+        
+        // Aguardar um pouco para o usuário ver a mensagem
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
         // Simular clique no botão do link após criar novo cliente
         console.log('🔗 Simulando clique no botão do link para novo cliente:', novoCliente);
@@ -214,12 +235,12 @@ class ClientesPage {
 
       // Fechar modal e recarregar lista
       this.hideModal('modalCliente');
-      await this.loadClientes();
-      this.renderClientTable();
+      await this.renderPage();
+      await this.updateEstatisticas();
 
     } catch (error) {
       console.error('❌ Erro ao salvar cliente:', error);
-      UIUtils.showAlert('Erro ao salvar cliente', 'error');
+      showAlert('Erro ao salvar cliente', 'error');
     }
   }
 
@@ -243,32 +264,79 @@ class ClientesPage {
     this.clienteEditando = null;
   }
 
-  filtrarClientes(termo) {
-  const termoLower = termo.toLowerCase().trim();
-  const termoTelefone = termo.replace(/\D/g, '');
+  async filtrarClientes(termo) {
+    // ✅ STATELESS: Fetch direto do DataCore, depois filtra
+    const clientes = await window.services.clientes.list();
+    const termoLower = termo.toLowerCase().trim();
+    const termoTelefone = termo.replace(/\D/g, '');
 
-  const clientesFiltrados = this.clientes.filter(cliente => {
-    const nome = (cliente.nome || '').toLowerCase().trim();
-    const telefone = (cliente.telefone || '').replace(/\D/g, '');
+    const clientesFiltrados = clientes.filter(cliente => {
+      const nome = (cliente.nome || '').toLowerCase().trim();
+      const telefone = (cliente.telefone || '').replace(/\D/g, '');
 
-    const nomeMatch = nome.includes(termoLower);
-    const telefoneMatch = termoTelefone
-      ? telefone.includes(termoTelefone)
-      : false;
+      const nomeMatch = nome.includes(termoLower);
+      const telefoneMatch = termoTelefone
+        ? telefone.includes(termoTelefone)
+        : false;
 
-    return nomeMatch || telefoneMatch;
-  });
+      return nomeMatch || telefoneMatch;
+    });
 
-  this.renderClientTable(clientesFiltrados);
-}
+    await this.renderClientTable(clientesFiltrados);
+  }
 
-  async renderClientTable(clientes = this.clientes) {
-  const tbody = document.getElementById('tabelaClientes');
+  async updateEstatisticas() {
+    try {
+      console.log('[ClientesPage] Atualizando estatísticas...');
+      
+      // 1. Atualizar total de clientes
+      const clientes = await window.services.clientes.list();
+      const totalClientesElement = document.getElementById('totalClientes');
+      if (totalClientesElement) {
+        totalClientesElement.textContent = clientes.length;
+      }
+      
+      // 2. Atualizar agendamentos do mês
+      const hoje = new Date();
+      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+      ultimoDiaMes.setHours(23, 59, 59, 999);
+      
+      const agendamentos = await window.services.agendamentos.list();
+      
+      // Filtrar agendamentos do mês atual
+      const agendamentosMes = agendamentos.filter(agendamento => {
+        const dataAgendamento = new Date(agendamento.data_inicio || agendamento.inicio);
+        return dataAgendamento >= primeiroDiaMes && dataAgendamento <= ultimoDiaMes;
+      });
+      
+      const agendamentosMesElement = document.getElementById('agendamentosMes');
+      if (agendamentosMesElement) {
+        agendamentosMesElement.textContent = agendamentosMes.length;
+      }
+      
+      console.log('[ClientesPage] Estatísticas atualizadas:', {
+        totalClientes: clientes.length,
+        agendamentosMes: agendamentosMes.length
+      });
+      
+    } catch (error) {
+      console.error('[ClientesPage] Erro ao atualizar estatísticas:', error);
+    }
+  }
 
-  // LIMPAR APENAS AQUI
-  tbody.innerHTML = '';
+  async renderClientTable(clientes) {
+    if (!clientes) {
+      console.error('[STATELESS] renderClientTable requer parâmetro clientes');
+      return;
+    }
+    const tbody = document.getElementById('tabelaClientes');
+    if (!tbody) return;
 
-  if (clientes.length === 0) {
+    // LIMPAR APENAS AQUI
+    tbody.innerHTML = '';
+
+    if (clientes.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="5" style="text-align: center; padding: 40px;">
@@ -366,27 +434,17 @@ class ClientesPage {
   // Método para obter próximo atendimento
   async getProximoAtendimento(clienteId) {
     try {
-      // ✅ CORRIGIDO: Formato de data compatível com Supabase
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
-      
-      // Formatar data sem timezone para Supabase
       const dataFormatoSupabase = hoje.toISOString().split('T')[0];
       
-      const { data, error } = await this.supabase
-        .from('agendamentos')
-        .select('data_inicio, servico_id, profissional_id, status')
-        .eq('cliente_id', clienteId)
-        .gte('data_inicio', dataFormatoSupabase)
-        .order('data_inicio', { ascending: true })
-        .limit(1)
-        .single();
-        
-      if (error || !data) {
+      const agendamento = await window.services.agendamentos.getProximoAtendimento(clienteId, dataFormatoSupabase);
+      
+      if (!agendamento) {
         return '<span class="text-muted">Sem agendamento</span>';
       }
       
-      const dataAgendamento = new Date(data.data_inicio);
+      const dataAgendamento = new Date(agendamento.data_inicio);
       const dataFormatada = dataAgendamento.toLocaleDateString('pt-BR');
       const horaFormatada = dataAgendamento.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       
@@ -400,27 +458,17 @@ class ClientesPage {
   // Método para obter último atendimento
   async getUltimoAtendimento(clienteId) {
     try {
-      // ✅ CORRIGIDO: Formato de data compatível com Supabase
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
-      
-      // Formatar data sem timezone para Supabase
       const dataFormatoSupabase = hoje.toISOString().split('T')[0];
       
-      const { data, error } = await this.supabase
-        .from('agendamentos')
-        .select('data_inicio, servico_id, profissional_id, status')
-        .eq('cliente_id', clienteId)
-        .lt('data_inicio', dataFormatoSupabase)
-        .order('data_inicio', { ascending: false })
-        .limit(1)
-        .single();
-        
-      if (error || !data) {
+      const agendamento = await window.services.agendamentos.getUltimoAtendimento(clienteId, dataFormatoSupabase);
+      
+      if (!agendamento) {
         return '<span class="text-muted">Nenhum atendimento</span>';
       }
       
-      const dataAgendamento = new Date(data.data_inicio);
+      const dataAgendamento = new Date(agendamento.data_inicio);
       const dataFormatada = dataAgendamento.toLocaleDateString('pt-BR');
       const horaFormatada = dataAgendamento.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       
@@ -559,7 +607,7 @@ class ClientesPage {
       
     } catch (error) {
       console.error('❌ Erro ao abrir anamnese:', error);
-      UIUtils.showAlert('Erro ao abrir ficha de anamnese', 'error');
+      showAlert('Erro ao abrir ficha de anamnese', 'error');
     }
   }
 
@@ -581,7 +629,7 @@ class ClientesPage {
       
     } catch (error) {
       console.error('❌ Erro ao abrir anamnese em visualização:', error);
-      UIUtils.showAlert('Erro ao abrir ficha de anamnese', 'error');
+      showAlert('Erro ao abrir ficha de anamnese', 'error');
     }
   }
 
@@ -589,17 +637,16 @@ class ClientesPage {
     try {
       console.log('🔍 Carregando dados para anamnese do cliente:', clienteId);
       
-      // Primeiro, carregar serviços para garantir que o select esteja populado
-      await this.loadServicos();
-      
-      // Encontrar cliente na lista local
-      const cliente = this.clientes.find(c => c.id === clienteId);
+      // Primeiro, carregar serviços e cliente direto do DataCore
+      const servicos = await window.services.servicos.list();
+      const clientes = await window.services.clientes.list();
+      const cliente = clientes.find(c => c.id === clienteId);
       if (!cliente) {
         throw new Error('Cliente não encontrado');
       }
       
       // Carregar ficha de anamnese existente
-      const { data: anamneseData, error: anamneseError } = await window.dataManager.supabase
+      const { data: anamneseData, error: anamneseError } = await window.supabaseClient
         .from('anamnese_clientes')
         .select('*')
         .eq('cliente_id', clienteId)
@@ -722,9 +769,23 @@ class ClientesPage {
     this.showModal('modalAnamnese');
   }
 
-  setupAnamnesePermissions() {
-    const userProfile = window.authManager?.currentUserProfile;
-    const isAdmin = userProfile?.role === 'admin';
+  async setupAnamnesePermissions() {
+    // ⚠️  ATUALIZADO (CICLO 1.2.3): Usa authFSM diretamente — AuthStore removido do runtime
+    const fsmState = window.authFSM?.getState?.();
+    const user = fsmState?.session?.user;
+    
+    if (!user) {
+      console.error('Usuário não autenticado (FSM)');
+      return;
+    }
+
+    const { data: profile } = await window.supabaseClient
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    const isAdmin = profile?.role === 'admin';
     const restrictedFields = document.querySelectorAll('[data-restricted="true"]');
     
     restrictedFields.forEach(field => {
@@ -736,47 +797,21 @@ class ClientesPage {
     });
   }
 
+  // ✅ STATELESS: Retorna serviços direto do DataCore (não armazena em this)
   async loadServicos() {
     try {
       console.log('🔄 Carregando serviços para o formulário admin...');
       
-      // ✅ CORRIGIDO: Usar campos específicos da nova estrutura
-      const { data, error } = await window.dataManager.supabase
-        .from('servicos')
-        .select(`
-          id, 
-          nome, 
-          categoria, 
-          duracao_min, 
-          descricao, 
-          valor, 
-          cor, 
-          ativo, 
-          created_at
-        `)
-        .eq('ativo', true)
-        .order('nome');
-
-      if (error) {
-        console.error('Erro ao carregar serviços:', error);
-        this.servicos = [];
-        return;
-      }
-
-      // ✅ MAPEAR PARA COMPATIBILIDADE
-      this.servicos = (data || []).map(servico => ({
-        ...servico,
-        duracao: servico.duracao_min,
-        duracao_minutos: servico.duracao_min,
-        preco: servico.valor
-      }));
-
-      console.log('✅ Serviços carregados:', this.servicos.length);
+      // ✅ STATELESS: Usar services (que usa DataCore) em vez de supabaseClient direto
+      const servicos = await window.services.servicos.list();
+      
+      console.log('✅ Serviços carregados:', servicos.length);
       
       // Adicionar serviços ao select
       const selectServico = document.getElementById('servico');
       if (selectServico) {
-        data.forEach(servico => {
+        selectServico.innerHTML = '<option value="">Selecione um serviço</option>';
+        servicos.filter(s => s.ativo).forEach(servico => {
           const option = document.createElement('option');
           option.value = servico.nome;
           option.textContent = servico.nome;
@@ -784,31 +819,18 @@ class ClientesPage {
         });
       }
       
+      return servicos;
     } catch (error) {
       console.error('Erro ao carregar serviços:', error);
-      this.loadDefaultServicos();
+      return await this.loadDefaultServicos();
     }
   }
 
-  loadDefaultServicos() {
+  // ✅ STATELESS: Retorna serviços padrão (não armazena em this)
+  async loadDefaultServicos() {
     console.log('🔄 Carregando serviços padrão...');
-    
-    const selectServico = document.getElementById('anamneseServico');
-    if (selectServico) {
-      selectServico.innerHTML = `
-        <option value="">Selecione um serviço...</option>
-      `;
-      
-      // Carregar serviços do DataManager
-      if (window.dataManager && window.dataManager.servicos) {
-        window.dataManager.servicos.forEach(servico => {
-          const option = document.createElement('option');
-          option.value = servico.nome;
-          option.textContent = servico.nome;
-          selectServico.appendChild(option);
-        });
-      }
-    }
+    // Retornar array vazio - método simplificado para stateless
+    return [];
   }
 
   populateAnamneseForm(anamnese) {
@@ -916,14 +938,15 @@ class ClientesPage {
   async confirmDelete(clienteNome) {
     console.log('🗑️ Confirmar exclusão:', clienteNome);
     
-    // Encontrar cliente pelo nome
-    const cliente = this.clientes.find(c => c.nome === clienteNome);
+    // Buscar cliente direto do DataCore
+    const clientes = await window.services.clientes.list();
+    const cliente = clientes.find(c => c.nome === clienteNome);
     if (!cliente) {
-      UIUtils.showAlert('Cliente não encontrado', 'error');
+      showAlert('Cliente não encontrado', 'error');
       return;
     }
     
-    const confirmed = await window.ConfirmDialog.confirmDelete({
+    const confirmed = await window.confirmDelete({
       title: 'Excluir Cliente',
       message: 'Tem certeza que deseja excluir este cliente?',
       itemName: clienteNome,
@@ -948,25 +971,25 @@ class ClientesPage {
       console.log('🗑️ Executando exclusão do cliente:', clienteId);
       
       // Excluir cliente no DataManager
-      await window.dataManager.deleteCliente(clienteId);
+      await window.services.clientes.delete(clienteId);
       
       // Fechar modal
       this.fecharModalConfirmacao();
       
       // Recarregar lista
-      await this.loadClientes();
-      this.renderClientTable();
+      await this.renderPage();
+      await this.updateEstatisticas();
       
-      UIUtils.showAlert('Cliente excluído com sucesso', 'success');
+      showAlert('Cliente excluído com sucesso', 'success');
       
     } catch (error) {
       console.error('❌ Erro ao excluir cliente:', error);
       
       // Verificar se é erro de chave estrangeira (agendamentos associados)
       if (error.code === '23503' && error.message.includes('agendamentos')) {
-        UIUtils.showAlert('Não é possível excluir este cliente pois existem agendamentos associados. Exclua primeiro os agendamentos deste cliente.', 'error');
+        showAlert('Não é possível excluir este cliente pois existem agendamentos associados. Exclua primeiro os agendamentos deste cliente.', 'error');
       } else {
-        UIUtils.showAlert('Erro ao excluir cliente', 'error');
+        showAlert('Erro ao excluir cliente', 'error');
       }
       
       // Fechar modal de qualquer forma
@@ -979,7 +1002,7 @@ class ClientesPage {
     try {
       console.log('📋 Carregando histórico do cliente:', clienteId);
 
-      const agendamentos = await window.dataManager.getAgendamentos();
+      const agendamentos = await window.services.agendamentos.list();
 
       // Filtrar apenas agendamentos do cliente
       let historico = agendamentos.filter(a => a.cliente_id === clienteId);
@@ -1004,15 +1027,15 @@ class ClientesPage {
         return aFuturo ? -1 : 1; // Futuros antes de passados
       });
 
-      this.renderHistoricoModal(historico, clienteNome);
+      await this.renderHistoricoModal(historico, clienteNome);
 
     } catch (error) {
       console.error('❌ Erro ao carregar histórico:', error);
-      UIUtils.showAlert('Erro ao carregar histórico', 'error');
+      showAlert('Erro ao carregar histórico', 'error');
     }
   }
 
-  renderHistoricoModal(historico, clienteNome) {
+  async renderHistoricoModal(historico, clienteNome) {
     // Atualizar informações do cliente
     const clienteInfo = document.getElementById('clienteInfo');
     if (clienteInfo) {
@@ -1048,14 +1071,20 @@ class ClientesPage {
 
       const historicoBody = document.getElementById('historicoBody');
       if (historicoBody) {
+        // Carregar serviços e profissionais uma vez antes do loop
+        const servicos = await window.services.servicos.list();
+        const profissionais = await window.services.profissionais.list();
+
+        // ✅ STATELESS: Buscar clientes direto do DataCore
+        const clientes = await window.services.clientes.list();
         historico.forEach(item => {
-          const cliente = this.clientes.find(c => c.id === item.cliente_id);
+          const cliente = clientes.find(c => c.id === item.cliente_id);
           const nomeCliente = cliente ? cliente.nome : 'Não encontrado';
 
-          const servico = window.dataManager.servicosPorId[item.servico_id];
+          const servico = servicos.find(s => s.id === item.servico_id);
           const nomeServico = servico ? servico.nome : 'N/A';
 
-          const profissional = window.dataManager.profissionaisPorId[item.profissional_id];
+          const profissional = profissionais.find(p => p.id === item.profissional_id);
           const nomeProfissional = profissional ? profissional.nome : 'N/A';
 
           const dataFormatada = new Date(item.data_inicio).toLocaleString('pt-BR');
@@ -1116,19 +1145,20 @@ class ClientesPage {
   // Carregar histórico de agendamentos
   async carregarHistoricoAgendamentos(clienteId) {
     try {
-      const { data, error } = await this.supabase
-        .from('agendamentos')
-        .select('*')
-        .eq('cliente_id', clienteId)
-        .order('data_inicio', { ascending: false });
-        
-      if (error) {
-        throw error;
-      }
+      const data = await window.services.agendamentos.listByCliente(clienteId);
       
       const tabelaHistorico = document.getElementById('tabelaHistorico');
       if (tabelaHistorico) {
         if (data && data.length > 0) {
+          // Carregar serviços e profissionais para lookup
+          const [servicos, profissionais] = await Promise.all([
+            window.services.servicos.list(),
+            window.services.profissionais.list()
+          ]);
+          
+          const servicosPorId = Object.fromEntries(servicos.map(s => [s.id, s]));
+          const profissionaisPorId = Object.fromEntries(profissionais.map(p => [p.id, p]));
+          
           tabelaHistorico.innerHTML = `
             <table class="modern-table">
               <thead>
@@ -1146,11 +1176,11 @@ class ClientesPage {
                   const horaFormatada = dataAgendamento.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                   
                   // Buscar nome do serviço
-                  const servico = window.dataManager?.servicos?.find(s => s.id === agendamento.servico_id);
+                  const servico = servicosPorId[agendamento.servico_id];
                   const servicoNome = servico ? servico.nome : 'Serviço não encontrado';
                   
                   // Buscar nome do profissional
-                  const profissional = window.dataManager?.profissionais?.find(p => p.id === agendamento.profissional_id);
+                  const profissional = profissionaisPorId[agendamento.profissional_id];
                   const profissionalNome = profissional ? profissional.nome : 'Profissional não encontrado';
                   
                   return `
@@ -1212,21 +1242,23 @@ class ClientesPage {
 
       // Validação do WhatsApp
       if (anamneseData.contato_whatsapp && !this.isValidPhone(anamneseData.contato_whatsapp)) {
-        UIUtils.showAlert('WhatsApp inválido. Use o formato (DDD) 00000-0000', 'error');
+        showAlert('WhatsApp inválido. Use o formato (DDD) 00000-0000', 'error');
         return;
       }
 
       // Obter ID do cliente atual
       const clienteNome = document.getElementById('modalAnamneseTitulo')?.textContent?.match(/Ficha de Anamnese - (.+)/)?.[1] || '';
-      const cliente = this.clientes.find(c => c.nome === clienteNome);
+      // ✅ STATELESS: Buscar cliente direto do DataCore
+      const clientes = await window.services.clientes.list();
+      const cliente = clientes.find(c => c.nome === clienteNome);
       
       if (!cliente) {
-        UIUtils.showAlert('Cliente não encontrado', 'error');
+        showAlert('Cliente não encontrado', 'error');
         return;
       }
 
-      // Salvar no Supabase
-      const { data, error } = await window.supabase
+      // Salvar no Supabase usando client OFICIAL
+      const { data, error } = await window.supabaseClient
         .from('anamnese')
         .upsert({
           ...anamneseData,
@@ -1238,19 +1270,19 @@ class ClientesPage {
 
       if (error) {
         console.error('Erro ao salvar anamnese:', error);
-        UIUtils.showAlert('Erro ao salvar ficha de anamnese', 'error');
+        showAlert('Erro ao salvar ficha de anamnese', 'error');
         return;
       }
 
       console.log('✅ Anamnese salva com sucesso:', data);
-      UIUtils.showAlert('Ficha de anamnese salva com sucesso', 'success');
-      
+      showAlert('Ficha de anamnese salva com sucesso', 'success');
+
       // Fechar modal
       this.hideModal('modalAnamnese');
-      
+
     } catch (error) {
       console.error('Erro ao salvar anamnese:', error);
-      UIUtils.showAlert('Erro ao salvar ficha de anamnese', 'error');
+      showAlert('Erro ao salvar ficha de anamnese', 'error');
     }
   }
 

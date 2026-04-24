@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
 
 // CORS headers para permitir chamadas do frontend
 const corsHeaders = {
@@ -8,197 +8,165 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // 1. CORS + METHOD
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Método não permitido' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
   try {
-    // Verificar método HTTP
-    if (req.method !== 'POST') {
+    // 2. EXTRAIR JWT
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization')
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ error: 'Método não permitido' }),
-        { 
-          status: 405, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Token ausente' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Parse body da requisição
-    const body = await req.json()
-    const { user_id, email } = body
+    const token = authHeader.replace('Bearer ', '')
 
-    // Validações obrigatórias
-    if (!user_id || !email) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'user_id e email são obrigatórios',
-          details: 'Forneça user_id (UUID) e email (string) no corpo da requisição'
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
+    // 3. CLIENTES
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
-    // Validar formato do user_id (UUID)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-    if (!uuidRegex.test(user_id)) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'user_id inválido',
-          details: 'O user_id deve ser um UUID válido'
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
 
-    console.log('🔐 Iniciando reset de senha para user_id:', user_id)
-    console.log('📧 Email:', email)
-
-    // Criar cliente Supabase com SERVICE_ROLE_KEY (apenas no backend)
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    const supabaseUser = createClient(SUPABASE_URL, ANON_KEY, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
+      },
+      global: {
+        headers: { Authorization: `Bearer ${token}` }
       }
     })
 
-    // 1. Verificar se o usuário existe no auth.users
-    console.log('🔍 Verificando existência do usuário...')
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      per_page: 1000
+    // 4. VALIDAR USUÁRIO AUTENTICADO
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser()
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Token inválido' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 5. VALIDAR ROLE ADMIN
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return new Response(
+        JSON.stringify({ error: 'Perfil não encontrado' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (profile.role !== 'admin') {
+      return new Response(
+        JSON.stringify({ error: 'Acesso negado: requer role admin' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 6. VALIDAR INPUT
+    const body = await req.json()
+    const { user_id, new_password } = body
+
+    if (!user_id || !new_password) {
+      return new Response(
+        JSON.stringify({ error: 'user_id e new_password são obrigatórios' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+    if (!uuidRegex.test(user_id)) {
+      return new Response(
+        JSON.stringify({ error: 'user_id inválido' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (new_password.length < 8) {
+      return new Response(
+        JSON.stringify({ error: 'Senha deve ter no mínimo 8 caracteres' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 7. VALIDAR EXISTÊNCIA DO USUÁRIO
+    const { data: userData, error: userFetchError } = await supabaseAdmin.auth.admin.getUserById(user_id)
+
+    if (userFetchError || !userData) {
+      return new Response(
+        JSON.stringify({ error: 'Usuário não encontrado' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 8. ATUALIZAR SENHA (CRÍTICO)
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
+      password: new_password
     })
-
-    if (listError) {
-      console.error('❌ Erro ao listar usuários:', listError)
-      throw new Error('Erro ao verificar usuários no sistema')
-    }
-
-    const userExists = users.find(u => u.id === user_id)
-    if (!userExists) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Usuário não encontrado',
-          details: 'Nenhum usuário encontrado com o user_id fornecido'
-        }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // 2. Verificar se o email corresponde ao usuário
-    if (userExists.email !== email) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Email não corresponde ao usuário',
-          details: 'O email fornecido não corresponde ao email do usuário'
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    console.log('✅ Usuário verificado:', userExists.email)
-
-    // 3. Gerar senha temporária segura
-    const senhaTemporaria = gerarSenhaTemporaria(6, 8)
-    console.log('🔑 Senha temporária gerada')
-
-    // 4. Atualizar senha usando Admin API
-    console.log('🔄 Atualizando senha no Auth...')
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      user_id,
-      { 
-        password: senhaTemporaria,
-        email_confirm: true // Garantir que email está confirmado
-      }
-    )
 
     if (updateError) {
-      console.error('❌ Erro ao atualizar senha:', updateError)
-      throw new Error('Erro ao atualizar senha do usuário')
+      return new Response(
+        JSON.stringify({ error: 'Erro ao atualizar senha', details: updateError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    console.log('✅ Senha atualizada com sucesso')
-
-    // 5. Atualizar profile - first_login_completed = false
-    console.log('🔄 Atualizando profile...')
-    const { error: profileError } = await supabaseAdmin
+    // 9. MARCAR FIRST LOGIN
+    const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .update({ first_login_completed: false })
       .eq('id', user_id)
 
-    if (profileError) {
-      console.warn('⚠️ Erro ao atualizar profile:', profileError)
-      // Não falhar o processo principal se isso falhar
-    } else {
-      console.log('✅ Profile atualizado com sucesso')
+    if (profileUpdateError) {
+      return new Response(
+        JSON.stringify({ error: 'Erro ao atualizar perfil', details: profileUpdateError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // 6. Retornar sucesso (senha temporária incluída)
-    const resultado = {
-      success: true,
-      message: 'Senha redefinida com sucesso!',
-      user_id: user_id,
-      email: email,
-      senha_temporaria: senhaTemporaria, // Apenas para exibição ao admin
+    // 10. LOGGING RESTRITO (SEM VAZAMENTO)
+    console.log('[RESET PASSWORD]', {
+      admin: user.id,
+      target: user_id,
       timestamp: new Date().toISOString()
-    }
+    })
 
-    console.log('🎉 Reset de senha concluído com sucesso')
-
+    // 11. RESPONSE FINAL (SEM VAZAMENTO)
     return new Response(
-      JSON.stringify(resultado),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({
+        success: true,
+        message: 'Senha atualizada com sucesso',
+        user_id
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('❌ Erro no processamento:', error)
-    
+    console.error('[RESET PASSWORD] Erro:', error)
     return new Response(
-      JSON.stringify({ 
-        error: 'Erro interno do servidor',
-        details: error.message
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: 'Erro interno do servidor' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
-
-// Função para gerar senha temporária segura
-function gerarSenhaTemporaria(min = 6, max = 8): string {
-  const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
-  const tamanho = Math.floor(Math.random() * (max - min + 1)) + min
-  let senha = ''
-  
-  for (let i = 0; i < tamanho; i++) {
-    senha += caracteres.charAt(Math.floor(Math.random() * caracteres.length))
-  }
-  
-  // Garantir que tenha pelo menos um número
-  if (!/\d/.test(senha)) {
-    senha = senha.slice(0, -1) + Math.floor(Math.random() * 10)
-  }
-  
-  return senha
-}

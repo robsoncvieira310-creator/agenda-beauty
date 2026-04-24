@@ -1,9 +1,11 @@
 // Gerenciamento do calendário FullCalendar
-// VERSÃO: 8.3.0 - CONFLITO COM TRIGGER RESOLVIDO
-// CACHE-BREAKER: 20260313250000&t=1710255600000
-console.log('🗓️ CalendarManager V8.3.0 carregado - Conflito com trigger resolvido');
+// VERSÃO: 8.5.0 - GLOBAL MODULE (window.*)
+// CACHE-BREAKER: 20260313250000
+console.log('🗓️ CalendarManager V8.5.0 carregado - Global Module');
 
-class CalendarManager {
+// DEPENDÊNCIAS: window.services, window.showAlert
+
+window.CalendarManager = class CalendarManager {
   constructor(calendarId) {
     this.calendar = null;
     this.calendarId = calendarId;
@@ -53,13 +55,8 @@ class CalendarManager {
 
   // Método para obter cor baseada no serviço (nova lógica)
   getCorPorServico(nomeServico, servicoId) {
-    // Primeiro, tentar obter cor personalizada do serviço pelo ID
-    if (servicoId && dataManager.servicosPorId && dataManager.servicosPorId[servicoId]) {
-      const servico = dataManager.servicosPorId[servicoId];
-      if (servico.cor) {
-        return servico.cor;
-      }
-    }
+    // TODO: Implementar lookup de serviço via service
+    // Por enquanto, usar cores padrão por categoria
     
     // Cores padrão por categoria de serviço
     const coresPadrao = {
@@ -86,22 +83,37 @@ class CalendarManager {
   getNomeCliente(clienteId) {
     if (!clienteId) return 'Cliente não informado';
     
-    const cliente = dataManager.clientesPorId[clienteId];
-    return cliente ? cliente.nome : `Cliente ${clienteId}`;
+    // Usar dados carregados para lookup de cliente
+    if (this.clientes && this.clientes.length > 0) {
+      const cliente = this.clientes.find(c => c.id === clienteId);
+      return cliente ? cliente.nome : `Cliente ${clienteId}`;
+    }
+    
+    return `Cliente ${clienteId}`;
   }
   
   getNomeServico(servicoId) {
     if (!servicoId) return 'Serviço não informado';
     
-    const servico = dataManager.servicosPorId[servicoId];
-    return servico ? servico.nome : `Serviço ${servicoId}`;
+    // Usar dados carregados para lookup de serviço
+    if (this.servicos && this.servicos.length > 0) {
+      const servico = this.servicos.find(s => s.id === servicoId);
+      return servico ? servico.nome : `Serviço ${servicoId}`;
+    }
+    
+    return `Serviço ${servicoId}`;
   }
   
   getNomeProfissional(profissionalId) {
     if (!profissionalId) return 'Profissional não informado';
     
-    const profissional = dataManager.profissionaisPorId[profissionalId];
-    return profissional ? profissional.nome : 'Sem nome';
+    // Usar dados carregados para lookup de profissional
+    if (this.profissionais && this.profissionais.length > 0) {
+      const profissional = this.profissionais.find(p => p.id === profissionalId);
+      return profissional ? profissional.nome : 'Sem nome';
+    }
+    
+    return 'Sem nome';
   }
 
   async initialize() {
@@ -111,47 +123,37 @@ class CalendarManager {
       this.setupEventHandlers();
       
       // CORREÇÃO CRÍTICA: Adicionar eventos após criar o calendário
-      console.log("🔍 DEBUG - Calendário criado, adicionando eventos...");
       this.adicionarEventosAoCalendario();
       
     } catch (error) {
       console.error('Erro ao inicializar calendário:', error);
-      UIUtils.showAlert('Erro ao carregar calendário', 'error');
+      showAlert('Erro ao carregar calendário', 'error');
     }
   }
 
   async loadInitialData() {
-    console.log("🔄 Carregando dados iniciais do calendário...");
     
     // CORREÇÃO: Carregar clientes, serviços e profissionais PRIMEIRO
     const [clientes, servicos, profissionais] = await Promise.all([
-      dataManager.getClientes(),
-      dataManager.getServicos(),
-      dataManager.getProfissionais()
+      window.services.clientes.list(),
+      window.services.servicos.list(),
+      window.services.profissionais.list(),
     ]);
     
-    console.log("✅ Dados de referência carregados:", { clientes, servicos, profissionais });
+        
+    // Armazenar dados de referência para lookup posterior
+    this.clientes = clientes;
+    this.servicos = servicos;
+    this.profissionais = profissionais;
     
     // AGORA carregar agendamentos e bloqueios
     const [agendamentos, bloqueios] = await Promise.all([
-      dataManager.loadAgendamentos(),
-      dataManager.loadBloqueios()
+      window.services.agendamentos.list(),
+      window.services.bloqueios.list()
     ]);
 
-    console.log("✅ Todos os dados carregados:", { clientes, servicos, profissionais, agendamentos, bloqueios });
-    
-    // DEBUG: Verificar estrutura dos agendamentos
-    console.log("🔍 DEBUG - Estrutura dos agendamentos:", agendamentos);
-    if (agendamentos && agendamentos.length > 0) {
-      console.log("🔍 DEBUG - Primeiro agendamento:", agendamentos[0]);
-      console.log("🔍 DEBUG - Campos do agendamento:", Object.keys(agendamentos[0]));
-    }
-    
+        
     this.eventos = this.processarEventos(agendamentos, bloqueios);
-    
-    // DEBUG: Verificar eventos processados
-    console.log("🔍 DEBUG - Eventos processados:", this.eventos);
-    console.log("🔍 DEBUG - Quantidade de eventos:", this.eventos.length);
     
     // CORREÇÃO: Adicionar eventos ao calendário após processar
     // NÃO chamar aqui - será chamado no initialize() após createCalendar()
@@ -160,15 +162,12 @@ class CalendarManager {
   // CORREÇÃO: Método separado para adicionar eventos
   adicionarEventosAoCalendario() {
     try {
-      console.log("🔍 DEBUG - Adicionando eventos ao calendário...");
-      
       // Remover eventos existentes
       this.calendar.removeAllEvents();
       
       // Adicionar novos eventos
       let eventosAdicionados = 0;
       this.eventos.forEach(evento => {
-        console.log("🔍 DEBUG - Adicionando evento:", evento);
         
         const eventoCompleto = {
           ...evento,
@@ -181,9 +180,6 @@ class CalendarManager {
         this.calendar.addEvent(eventoCompleto);
         eventosAdicionados++;
       });
-      
-      console.log("🔍 DEBUG - Eventos adicionados:", eventosAdicionados);
-      console.log("🔍 DEBUG - Eventos no calendário:", this.calendar.getEvents());
       
       // Forçar renderização
       this.calendar.render();
@@ -312,13 +308,6 @@ class CalendarManager {
     this.calendar.render();
     
     // CORREÇÃO: Verificar e habilitar drag & drop
-    console.log("🔍 DEBUG - Verificando suporte a drag & drop");
-    console.log("🔍 DEBUG - Configurações do calendário:", {
-      editable: this.calendar.getOption('editable'),
-      eventStartEditable: this.calendar.getOption('eventStartEditable'),
-      eventDurationEditable: this.calendar.getOption('eventDurationEditable'),
-      droppable: this.calendar.getOption('droppable')
-    });
     
     // Inicializar melhorias após renderizar
     if (window.CalendarEnhancements) {
@@ -327,25 +316,17 @@ class CalendarManager {
   }
 
   processarEventos(agendamentos, bloqueios) {
-    console.log("🔍 DEBUG - processarEventos iniciado");
-    console.log("🔍 DEBUG - agendamentos recebidos:", agendamentos);
-    console.log("🔍 DEBUG - bloqueios recebidos:", bloqueios);
-    
     const eventosAg = agendamentos.map(a => {
-      console.log("🔍 DEBUG - Processando agendamento:", a);
       
       // CORREÇÃO: Mapear campos corretos do banco
       const cliente = this.getNomeCliente(a.cliente_id);
       const servico = this.getNomeServico(a.servico_id);
       const profissional = this.getNomeProfissional(a.profissional_id);
       
-      console.log("🔍 DEBUG - Nomes resolvidos:", { cliente, servico, profissional });
-      
       // NOVA LÓGICA: Cor baseada no serviço (personalizada ou padrão)
       const corServico = this.getCorPorServico(servico, a.servico_id);
-      const corStatus = dataManager.gerarCorPorStatus(a.status, corServico);
-      
-      console.log("🔍 DEBUG - Cores geradas:", { corServico, corStatus });
+      // TODO: Mover gerarCorPorStatus para utils
+      const corStatus = corServico;
       
       const evento = {
         id: String(a.id),
@@ -377,11 +358,8 @@ class CalendarManager {
         display: 'block'
       };
       
-      console.log("🔍 DEBUG - Evento criado:", evento);
       return evento;
     });
-
-    console.log("🔍 DEBUG - Eventos de agendamento criados:", eventosAg);
 
     const eventosBlq = [];
     
@@ -408,7 +386,8 @@ class CalendarManager {
       };
 
       if (b.profissional_id) {
-        const prof = dataManager.profissionaisPorId[b.profissional_id];
+        // TODO: Implementar lookup de profissional
+        const prof = null;
         if (prof) {
           eventosBlq.push({
             id: `b-${b.id}-${prof.id}`,
@@ -473,15 +452,15 @@ class CalendarManager {
     
     const modalData = {
       tipo: 'agendamento',
-      inicio: DateUtils.toInputDateTimeValue(info.start),
-      fim: DateUtils.toInputDateTimeValue(info.end),
+      inicio: window.toInputDateTimeValue(info.start),
+      fim: window.toInputDateTimeValue(info.end),
       profissional: null // Simplificar - não usar recursos
     };
 
     this.abrirModalAgendamento(modalData);
   }
 
-  handleEventClick(info) {
+  async handleEventClick(info) {
     const ev = info.event;
     const tipo = ev.extendedProps && ev.extendedProps.tipo;
 
@@ -500,12 +479,13 @@ class CalendarManager {
       const modalData = {
         ...ev.extendedProps,               // Primeiro os dados do evento
         tipo: 'edicao',                    // DEPOIS sobrescreve com 'edicao'
-        inicio: DateUtils.toInputDateTimeValue(ev.start),
-        fim: DateUtils.toInputDateTimeValue(ev.end)
+        inicio: window.toInputDateTimeValue(ev.start),
+        fim: window.toInputDateTimeValue(ev.end)
       };
       
       // CORREÇÃO: Adicionar IDs que estão no agendamento original
-      const agendamentoOriginal = dataManager.agendamentos.find(a => a.id == modalData.realId);
+      const agendamentos = await window.services.agendamentos.list();
+      const agendamentoOriginal = agendamentos.find(a => a.id == modalData.realId);
       if (agendamentoOriginal) {
         console.log('🔍 Agendamento original encontrado:', agendamentoOriginal);
         modalData.cliente_id = agendamentoOriginal.cliente_id;
@@ -550,7 +530,7 @@ class CalendarManager {
     if (tipo === "bloqueio") {
       console.log('🚫 Bloqueio detectado, revertendo...');
       info.revert();
-      UIUtils.showAlert('Edite bloqueios pelo modal', 'warning');
+      showAlert('Edite bloqueios pelo modal', 'warning');
       return;
     }
 
@@ -580,18 +560,17 @@ class CalendarManager {
         endLocal: new Date(ev.end.getTime() - ev.end.getTimezoneOffset() * 60000).toISOString().slice(0, 19)
       });
 
-      await dataManager.updateAgendamento(ev.id, dadosAtualizacao);
+      await window.services.agendamentos.update(ev.id, dadosAtualizacao);
 
-      // Limpar cache para forçar recarregamento
-      dataManager.cache.agendamentos = null;
+      // Cache é gerenciado automaticamente pelo DataCore
 
       await this.refreshEvents();
-      UIUtils.showAlert('Agendamento movido com sucesso', 'success');
+      showAlert('Agendamento movido com sucesso', 'success');
       console.log('✅ Agendamento movido com sucesso');
     } catch (error) {
       console.error('❌ Erro ao mover agendamento:', error);
       info.revert();
-      UIUtils.showAlert('Erro ao mover agendamento: ' + error.message, 'error');
+      showAlert('Erro ao mover agendamento: ' + error.message, 'error');
     }
   }
 
@@ -620,7 +599,7 @@ class CalendarManager {
     if (tipo === "bloqueio") {
       console.log('🚫 Bloqueio detectado, revertendo...');
       info.revert();
-      UIUtils.showAlert('Edite bloqueios pelo modal', 'warning');
+      showAlert('Edite bloqueios pelo modal', 'warning');
       return;
     }
 
@@ -650,18 +629,17 @@ class CalendarManager {
         endLocal: new Date(ev.end.getTime() - ev.end.getTimezoneOffset() * 60000).toISOString().slice(0, 19)
       });
 
-      await dataManager.updateAgendamento(ev.id, dadosAtualizacao);
+      await window.services.agendamentos.update(ev.id, dadosAtualizacao);
 
-      // Limpar cache para forçar recarregamento
-      dataManager.cache.agendamentos = null;
+      // Cache é gerenciado automaticamente pelo DataCore
 
       await this.refreshEvents();
-      UIUtils.showAlert('Duração atualizada com sucesso', 'success');
+      showAlert('Duração atualizada com sucesso', 'success');
       console.log('✅ Duração do agendamento atualizada com sucesso');
     } catch (error) {
       console.error('❌ Erro ao redimensionar agendamento:', error);
       info.revert();
-      UIUtils.showAlert('Erro ao redimensionar agendamento: ' + error.message, 'error');
+      showAlert('Erro ao redimensionar agendamento: ' + error.message, 'error');
     }
   }
 
@@ -690,7 +668,6 @@ class CalendarManager {
 
   async refreshEvents() {
     try {
-      console.log("🔍 DEBUG - refreshEvents iniciado");
       await this.loadInitialData();
       
       // CORREÇÃO: Usar o novo método para adicionar eventos
@@ -698,7 +675,7 @@ class CalendarManager {
       
     } catch (error) {
       console.error('Erro ao atualizar eventos:', error);
-      UIUtils.showAlert('Erro ao atualizar calendário', 'error');
+      showAlert('Erro ao atualizar calendário', 'error');
     }
   }
 

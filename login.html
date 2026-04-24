@@ -231,196 +231,259 @@
       </form>
       
       <div class="login-footer">
-        <p>Agenda Beauty V1.3 - Sistema Profissional</p>
+        <p>Agenda Beauty V2.0 - Sistema Profissional</p>
         <p><a href="login-profissional.html" style="color: var(--primary-gold); text-decoration: none;">👩 Login de Profissional</a></p>
       </div>
     </div>
   </div>
   
-  <!-- Scripts -->
-  <script src="js/utils.js"></script>
+  <!-- Supabase CDN (global) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabaseClient.js"></script>
-  <script src="js/authManager.js?v=20260319143200"></script>
-  <script src="js/firstLoginManager.js"></script>
-  <script src="js/dataManager.js"></script>
-  <script src="js/pageManager.js"></script>
-  <script src="js/menuManager.js"></script>
-  <script src="js/appInit.js"></script>
+
+  <!-- ========================================= -->
+  <!-- DEPENDÊNCIAS CRÍTICAS - ORDEM FIXA OBRIGATÓRIA -->
+  <!-- ========================================= -->
+
+  <!-- 1. Infraestrutura Core (sem dependências) -->
+  <script src="js/supabaseClient.js?v=20260319180000"></script>
+  <script src="js/fsm/trace.js"></script>
   
+  <!-- ✅ FASE 1: EventLedger - Sistema central de registro de eventos -->
+  <script src="js/core/event-ledger.js"></script>
+  
+  <script src="js/fsm/session-bus.js"></script>
+  <script src="js/fsm/effect-runner.js?v=20260319190000"></script>
+  <script src="js/fsm/auth-fsm.js?v=20260319161000"></script>
+
+  <!-- 2. Auth Bootstrap (DEVE vir antes de Data/Services) -->
+  <script src="js/auth/index.js"></script>
+  <script src="js/auth-store.js"></script>
+  <script src="js/bootstrap-auth.js"></script>
+
+  <!-- 3. Data (depende de Auth estabilizado) -->
+  <script src="js/data/core/DataCore.js"></script>
+
+  <!-- 4. Utils -->
+  <script src="js/utils.js"></script>
+
+  <!-- 5. Services (dependem de DataCore) -->
+  <script src="js/services/BaseService.js"></script>
+  <script src="js/services/ClienteService.js"></script>
+  <script src="js/services/ServicoService.js"></script>
+  <script src="js/services/ProfissionalService.js"></script>
+  <script src="js/services/EmpresaService.js"></script>
+  <script src="js/services/BloqueioService.js"></script>
+  <script src="js/services/AgendamentoService.js"></script>
+
+  <!-- 5.4. Boot Tracer (observability - DEVE vir primeiro) -->
+  <script src="js/core/boot-tracer.js"></script>
+
+  <!-- 5.5. Boot Kernel (fonte única de controle de execução - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/boot-kernel.js"></script>
+
+  <!-- 🔴 GARANTIA DE ORDEM DE EXECUÇÃO: Kernel deve estar inicializado antes de qualquer consumidor -->
   <script>
-    // TESTE DE DIAGNÓSTICO - Verificar se Supabase está disponível
-    console.log("🔍 LOGIN: SUPABASE CLIENT:", window.supabase);
-    
-    if (!window.supabase) {
-      console.error("❌ LOGIN: Supabase client não encontrado!");
-      alert("Erro: Supabase não está disponível. Verifique o console.");
-    } else {
-      console.log("✅ LOGIN: Supabase client disponível");
-    }
-    
-    // Classe LoginManager para gerenciar a página de login
-    class LoginManager {
-      constructor() {
-        this.form = document.getElementById('loginForm');
-        this.emailInput = document.getElementById('email');
-        this.passwordInput = document.getElementById('password');
-        this.btnLogin = document.getElementById('btnLogin');
-        this.btnText = document.getElementById('btnText');
-        this.alertContainer = document.getElementById('alertContainer');
-        
-        this.initializeEventListeners();
-        this.checkExistingSession();
-      }
-      
-      initializeEventListeners() {
-        // Submit do formulário
-        this.form.addEventListener('submit', (e) => {
-          e.preventDefault();
-          this.handleLogin();
-        });
-        
-        // Enter nos campos
-        this.emailInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            this.passwordInput.focus();
-          }
-        });
-        
-        this.passwordInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            this.handleLogin();
-          }
-        });
-      }
-      
-      async checkExistingSession() {
-        console.log('🔍 LOGIN: Verificando sessão existente...');
-        
-        try {
-          const result = await window.authManager.initialize();
-          
-          if (result.authenticated) {
-            console.log('✅ LOGIN: Sessão existente encontrada, redirecionando...');
-            this.showSuccess('Sessão recuperada com sucesso!');
-            setTimeout(() => {
-              window.location.href = 'index.html';
-            }, 1000);
-          }
-        } catch (error) {
-          console.error('❌ LOGIN: Erro ao verificar sessão:', error);
-        }
-      }
-      
-      async handleLogin() {
-        const email = this.emailInput.value.trim();
-        const password = this.passwordInput.value;
-        
-        // Validação básica
-        if (!email || !password) {
-          this.showError('Por favor, preencha todos os campos.');
-          return;
-        }
-        
-        if (!this.validateEmail(email)) {
-          this.showError('Por favor, digite um email válido.');
-          return;
-        }
-        
-        this.setLoading(true);
-        this.clearAlerts();
-        
-        try {
-          console.log('🔐 LOGIN: Tentando autenticar usuário...');
-          
-          const result = await window.authManager.login(email, password);
-          
-          if (result.success) {
-            console.log('✅ LOGIN: Autenticação bem-sucedida!');
-            this.showSuccess('Login realizado com sucesso! Redirecionando...');
-            
-            setTimeout(() => {
-              window.location.href = 'index.html';
-            }, 1500);
-          } else {
-            console.error('❌ LOGIN: Falha na autenticação:', result.error);
-            this.showError(result.error || 'Falha ao realizar login. Verifique suas credenciais.');
-          }
-        } catch (error) {
-          console.error('❌ LOGIN: Erro inesperado:', error);
-          
-          // Verificar se é erro de credenciais inválidas
-          if (error.message && (
-            error.message.includes('Invalid login credentials') ||
-            error.message.includes('invalid_credentials') ||
-            error.message.includes('Invalid credentials')
-          )) {
-            this.showError('Email ou senha incorretos.');
-          } else {
-            this.showError('Ocorreu um erro inesperado. Tente novamente.');
-          }
-        } finally {
-          this.setLoading(false);
-        }
-      }
-      
-      validateEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(email);
-      }
-      
-      setLoading(loading) {
-        if (loading) {
-          this.btnLogin.classList.add('loading');
-          this.btnLogin.disabled = true;
-          this.btnText.textContent = '';
-        } else {
-          this.btnLogin.classList.remove('loading');
-          this.btnLogin.disabled = false;
-          this.btnText.textContent = 'Entrar';
-        }
-      }
-      
-      showError(message) {
-        this.clearAlerts();
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'login-error';
-        alertDiv.textContent = message;
-        this.alertContainer.appendChild(alertDiv);
-        
-        // Auto-remover após 5 segundos
-        setTimeout(() => {
-          if (alertDiv.parentNode) {
-            alertDiv.parentNode.removeChild(alertDiv);
-          }
-        }, 5000);
-      }
-      
-      showSuccess(message) {
-        this.clearAlerts();
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'login-success';
-        alertDiv.textContent = message;
-        this.alertContainer.appendChild(alertDiv);
-        
-        // Auto-remover após 3 segundos
-        setTimeout(() => {
-          if (alertDiv.parentNode) {
-            alertDiv.parentNode.removeChild(alertDiv);
-          }
-        }, 3000);
-      }
-      
-      clearAlerts() {
-        this.alertContainer.innerHTML = '';
-      }
-    }
-    
-    // Inicializar quando o DOM estiver pronto
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('🚀 LOGIN: Página de login carregada');
-      window.loginManager = new LoginManager();
+    console.assert(window.__BOOT_KERNEL__, "[KERNEL][FATAL] Kernel not initialized before consumers");
+    console.assert(window.__KERNEL__, "[KERNEL][FATAL] __KERNEL__ alias not set");
+    console.assert(window.kernel, "[KERNEL][FATAL] kernel alias not set");
+    console.assert(
+      window.__BOOT_KERNEL__ === window.__KERNEL__ && window.__KERNEL__ === window.kernel,
+      "[KERNEL][FATAL] Kernel aliases are not consistent"
+    );
+    console.log("[KERNEL ORDER CHECK] Kernel initialized before consumers: OK", {
+      __BOOT_KERNEL__: !!window.__BOOT_KERNEL__,
+      __KERNEL__: !!window.__KERNEL__,
+      kernel: !!window.kernel,
+      allRefsMatch: window.__BOOT_KERNEL__ === window.__KERNEL__ && window.__KERNEL__ === window.kernel
     });
   </script>
+
+  <!-- 5.6. State Hydrator (unificação de estado - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/state-hydrator.js"></script>
+
+  <!-- 5.7. Boot Anomaly Detector (diagnóstico - non-blocking) -->
+  <script src="js/core/boot-anomaly-detector.js"></script>
+
+  <!-- 5.8. Boot Recovery Manager (resiliência - non-blocking) -->
+  <script src="js/core/boot-recovery-manager.js"></script>
+
+  <!-- 5.9. Navigation Effect Runner (navegação FSM-driven - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/navigation-effect-runner.js"></script>
+
+  <!-- 🎯 FASE 3.0.1.1: Lifecycle Contract (DEVE vir antes dos Managers) -->
+  <script src="js/core/lifecycle-contract.js"></script>
+
+  <!-- 🎯 FASE 3.0.1.1: SidebarManager (passivo - carregado antes do CompositionRoot) -->
+  <script src="js/sidebarManager.js"></script>
+
+  <!-- 6. Composition Root (orquestra tudo) -->
+  <script src="js/composition-root.js"></script>
+
+  <!-- 🔴 AUTO-BOOTSTRAP: Iniciar boot automaticamente após carregar composition-root -->
+  <script>
+    (function autoBootstrap() {
+      console.log('[AUTO-BOOTSTRAP] Verificando condições para iniciar...');
+
+      // Verificar se bootstrapApp está disponível
+      if (typeof window.bootstrapApp !== 'function') {
+        console.error('[AUTO-BOOTSTRAP] bootstrapApp não disponível');
+        return;
+      }
+
+      const kernel = window.__BOOT_KERNEL__ || window.__KERNEL__ || window.kernel;
+      if (!kernel) {
+        console.error('[AUTO-BOOTSTRAP] Kernel não disponível');
+        return;
+      }
+
+      // Verificar se já está rodando ou pronto
+      if (kernel.isRunning()) {
+        console.log('[AUTO-BOOTSTRAP] Kernel já está rodando, skip');
+        return;
+      }
+
+      if (kernel.isReady()) {
+        console.log('[AUTO-BOOTSTRAP] Kernel já está pronto, skip');
+        return;
+      }
+
+      // Iniciar bootstrap!
+      console.log('[AUTO-BOOTSTRAP] Iniciando bootstrap...');
+      window.bootstrapApp().then(context => {
+        console.log('[AUTO-BOOTSTRAP] Bootstrap completado com sucesso', {
+          hasContext: !!context,
+          isReady: context?.isReady?.()
+        });
+      }).catch(err => {
+        console.error('[AUTO-BOOTSTRAP] Bootstrap falhou:', err.message);
+      });
+    })();
+  </script>
+
+  <!-- 7. Login UI -->
+  <script src="js/ui/login/LoginView.js?v=20260319162000"></script>
+
+  <!-- 8. Inicialização do Login -->
+  <script>
+    // 🔴 STATE-DRIVEN BOOT: Função determinística de espera (SEM polling infinito)
+    function waitForKernelReady(kernel, maxWaitMs = 5000) {
+      return new Promise((resolve, reject) => {
+        // Verificação imediata - kernel já READY?
+        if (kernel.state === 'READY' || kernel.readyState?.isReady) {
+          console.log('[waitForKernelReady] Kernel já READY (immediate)');
+          return resolve(kernel);
+        }
+
+        const startTime = Date.now();
+        const checkInterval = 10; // ms
+
+        const check = setInterval(() => {
+          // Verificar timeout
+          if (Date.now() - startTime > maxWaitMs) {
+            clearInterval(check);
+            reject(new Error(`[waitForKernelReady] Timeout após ${maxWaitMs}ms`));
+            return;
+          }
+
+          // Verificar READY state
+          if (kernel.state === 'READY' || kernel.readyState?.isReady) {
+            clearInterval(check);
+            console.log('[waitForKernelReady] Kernel READY detectado');
+            resolve(kernel);
+          }
+        }, checkInterval);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      console.log('[LOGIN INIT] DOMContentLoaded - inicializando...');
+
+      // � STATE-DRIVEN: Leitura síncrona direta do kernel
+      const kernel =
+        window.__BOOT_KERNEL__ ||
+        window.__KERNEL__ ||
+        window.kernel;
+
+      if (!kernel) {
+        throw new Error('[FATAL] Kernel not available');
+      }
+
+      console.log('[LOGIN INIT] Kernel resolvido:', {
+        state: kernel.state,
+        isReady: kernel.isReady?.(),
+        readyState: kernel.readyState?.isReady
+      });
+
+      // 🔴 STATE-DRIVEN: Verificar READY ou aguardar determinístico
+      if (kernel.state !== 'READY' && !kernel.readyState?.isReady) {
+        console.warn('[LOGIN] Kernel not ready yet - aguardando...');
+        try {
+          await waitForKernelReady(kernel, 5000);
+        } catch (err) {
+          console.error('[LOGIN] Falha aguardando kernel:', err.message);
+          return;
+        }
+      }
+
+      // 🔴 STATE-DRIVEN: Obter contexto DIRETO do kernel (sem callback)
+      const context = kernel.getReadyContext?.();
+
+      if (!context) {
+        console.error('[LOGIN] Contexto não disponível mesmo com kernel READY');
+        return;
+      }
+
+      console.log('[LOGIN INIT] Contexto obtido via leitura direta:', {
+        hasContext: !!context,
+        hasAuthFSM: !!context.authFSM,
+        hasGetState: !!context.getAuthState,
+        isReady: context.isReady?.()
+      });
+
+      const { authFSM, getAuthState } = context;
+
+      if (!authFSM) {
+        console.error('[LOGIN] authFSM não disponível no contexto');
+        return;
+      }
+
+      // Criar adaptador para LoginView - repassa FSM sem interpretação
+      const authAdapter = {
+        getDerivedState: () => {
+          const state = getAuthState?.() || authFSM.getState?.();
+          return {
+            isAuthenticated: state?.state === 'AUTHENTICATED',
+            isLoading: false,
+            hasError: !!state?.error,
+            error: state?.error?.message
+          };
+        },
+        subscribe: (fn) => {
+          return authFSM.subscribe?.(fn) || (() => {});
+        }
+      };
+
+      // Inicializar LoginView
+      window.loginView = new LoginView(authFSM, authAdapter);
+      console.log('[LOGIN INIT] LoginView criado com sucesso! (state-driven)');
+      
+      // 🎯 VERIFICAR SE SESSÃO EXPIROU (redirecionado do DataCore)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('error') === 'session_expired') {
+        const alertContainer = document.getElementById('alertContainer');
+        if (alertContainer) {
+          alertContainer.innerHTML = `
+            <div class="login-error">
+              ⚠️ Sua sessão expirou. Por favor, faça login novamente.
+            </div>
+          `;
+        }
+        // Limpar URL parameter
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    });
+  </script>
+
+  <!-- NOTA: main.js removido - login.html controla seu próprio bootstrap -->
 </body>
 </html>

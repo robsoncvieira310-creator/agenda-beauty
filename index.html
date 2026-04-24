@@ -36,8 +36,50 @@
           <span class="nav-icon">👩</span>
           <span class="nav-text">Profissionais</span>
         </a>
+        <a href="empresas.html" class="nav-item" id="nav-empresas">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-text">Empresas</span>
+        </a>
       </nav>
-      
+
+      <!-- Verificação de role para Empresas -->
+      <script>
+        (function() {
+          function checkRoleAndHideEmpresas() {
+            try {
+              const authFSM = window.authFSM;
+              if (!authFSM || !authFSM.getState) {
+                console.log('[ROLE CHECK] authFSM não disponível - pulando verificação');
+                return;
+              }
+              
+              const state = authFSM.getState();
+              const user = state?.session?.user;
+              const role = user?.app_metadata?.role || user?.user_metadata?.role || user?.role;
+              
+              const empresasLink = document.getElementById('nav-empresas');
+              if (!empresasLink) return;
+              
+              if (role === 'admin') {
+                empresasLink.style.display = '';
+                console.log('[ROLE CHECK] Admin - mostrando Empresas');
+              } else {
+                empresasLink.style.display = 'none';
+                console.log('[ROLE CHECK] Não-admin - escondendo Empresas, role:', role);
+              }
+            } catch (e) {
+              console.log('[ROLE CHECK] Erro na verificação:', e.message);
+            }
+          }
+          
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkRoleAndHideEmpresas);
+          } else {
+            checkRoleAndHideEmpresas();
+          }
+        })();
+      </script>
+
       <!-- Botão de Logout -->
       <button id="logoutButton" class="btn btn-danger logout-btn">
         🚪 Sair
@@ -129,173 +171,506 @@
         </div>
       </div>
 
-      <!-- Ações Rápidas -->
-      <div class="quick-actions">
-        <h2>⚡ Ações Rápidas</h2>
-        <div class="actions-grid">
-          <button onclick="window.location.href='agenda.html'" class="action-btn">
-            <span class="action-icon">📅</span>
-            <span class="action-text">Novo Agendamento</span>
-          </button>
-          <button onclick="window.location.href='clientes.html'" class="action-btn">
-            <span class="action-icon">👤</span>
-            <span class="action-text">Novo Cliente</span>
-          </button>
-          <button onclick="window.location.href='servicos.html'" class="action-btn">
-            <span class="action-icon">💇</span>
-            <span class="action-text">Novo Serviço</span>
-          </button>
-          <button onclick="window.location.href='profissionais.html'" class="action-btn">
-            <span class="action-icon">👩</span>
-            <span class="action-text">Novo Profissional</span>
-          </button>
+      <!-- Próximo Agendamento -->
+      <div class="next-appointment">
+        <h2>🕐 Próximo Agendamento</h2>
+        <div class="stats-grid">
+          <div class="appointment-card" id="nextAppointmentCard">
+            <div class="appointment-loading">
+              <div class="loading-spinner">⟳</div>
+              <span>Carregando próximo agendamento...</span>
+            </div>
+          </div>
         </div>
       </div>
-    </main>
+
+          </main>
   </div>
 
-  <!-- Scripts -->
-  <script src="js/utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabaseClient.js"></script>
-  <script src="js/authManager.js?v=20260319143200"></script>
-  <script src="js/firstLoginManager.js"></script>
-  <script src="js/dataManager.js?v=20260402180000"></script>
-  <script src="js/pageManager.js"></script>
-  <script src="js/logoutManager.js?v=20260319160000"></script>
-  <script src="js/sidebarManager.js?v=20260319153000"></script>
-  <script src="js/appInit.js"></script>
-  
-  <script>
-    // INICIALIZAÇÃO NORMAL
-    setTimeout(() => {
-      // Se DataManager já existe e tem dados, o evento já foi disparado
-      if (window.dataManager && window.dataManager.clientes) {
-        carregarEstatisticas();
-      } else {
-        // Registrar listener para o evento
-        window.addEventListener('appReady', () => {
-          carregarEstatisticas();
-        });
-      }
-    }, 100);
+  <!-- ========================================= -->
+  <!-- DEPENDÊNCIAS CRÍTICAS - ORDEM FIXA OBRIGATÓRIA -->
+  <!-- ========================================= -->
 
-    function carregarEstatisticas() {
+  <!-- 1. Infraestrutura Core (sem dependências) -->
+  <script src="js/supabaseClient.js?v=20260319180000"></script>
+  <script src="js/fsm/trace.js"></script>
+  
+  <!-- ✅ FASE 1: EventLedger - Sistema central de registro de eventos (DEVE vir antes de SessionBus e AuthFSM) -->
+  <script src="js/core/event-ledger.js"></script>
+  
+  <script src="js/fsm/session-bus.js"></script>
+  <script src="js/fsm/effect-runner.js?v=20260319190000"></script>
+  <script src="js/fsm/auth-fsm.js"></script>
+
+  <!-- 1.5. Auth Authorization (camada de autorização alinhada com RLS) -->
+  <script src="js/auth-authorization.js"></script>
+
+  <!-- 2. Auth Bootstrap (DEVE vir antes de Data/Services) -->
+  <script src="js/auth/index.js"></script>
+  <script src="js/auth-store.js"></script>
+  <script src="js/bootstrap-auth.js"></script>
+
+  <!-- 3. Data (depende de Auth estabilizado) -->
+  <script src="js/data/core/DataCore.js"></script>
+
+  <!-- 4. Services (dependem de DataCore) -->
+  <script src="js/services/BaseService.js"></script>
+  <script src="js/services/ClienteService.js"></script>
+  <script src="js/services/ServicoService.js"></script>
+  <script src="js/services/ProfissionalService.js"></script>
+  <script src="js/services/EmpresaService.js"></script>
+  <script src="js/services/BloqueioService.js"></script>
+  <script src="js/services/AgendamentoService.js"></script>
+
+  <!-- 5.4. Boot Tracer (observability - DEVE vir primeiro) -->
+  <script src="js/core/boot-tracer.js"></script>
+
+  <!-- 5.5. Boot Kernel (fonte única de controle de execução - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/boot-kernel.js"></script>
+
+  <!-- 5.6. State Hydrator (unificação de estado - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/state-hydrator.js"></script>
+
+  <!-- 5.7. Boot Anomaly Detector (diagnóstico - non-blocking) -->
+  <script src="js/core/boot-anomaly-detector.js"></script>
+
+  <!-- 5.8. Boot Recovery Manager (resiliência - non-blocking) -->
+  <script src="js/core/boot-recovery-manager.js"></script>
+
+  <!-- 🎯 FASE 2: Execution Authority Layer (EAL) - ÚNICA autoridade de execução -->
+  <script src="js/core/execution-authority-layer.js"></script>
+
+  <!-- ✅ FASE 3.0.1: Lifecycle Contract (DEVE vir antes dos Managers) -->
+  <script src="js/core/lifecycle-contract.js"></script>
+
+  <!-- 🎯 FASE 3.0.1.1: SidebarManager (passivo - carregado antes do CompositionRoot) -->
+  <script src="js/sidebarManager.js"></script>
+
+  <!-- 6. Composition Root (orquestra tudo) -->
+  <script src="js/composition-root.js"></script>
+  <!-- NOTA: main.js removido - index.html controla seu próprio bootstrap via bootstrapIndex() -->
+
+  <!-- 6. UI Managers -->
+  <script src="js/utils.js"></script>
+  <script src="js/logoutManager.js?v=20260319160000"></script>
+  <script src="js/menuManager.js"></script>
+
+  <script src="js/core/navigation-effect-runner.js"></script>
+  <!-- 🎯 FASE 3.0.1.1: SidebarManager REMOVIDO (duplicado - já carregado antes do CompositionRoot) -->
+
+  <!-- Bootstrap do Index -->
+  <script>
+    // ============================================================
+    // BOOTSTRAP INDEX - Orquestração via CompositionRoot
+    // FSM única: AuthFSM (js/fsm/auth-fsm.js)
+    // ============================================================
+
+    // Guard de integridade
+    window.__BOOTSTRAP_OK__ = false;
+    window.__setBootstrapOk = () => { window.__BOOTSTRAP_OK__ = true; };
+
+    // ================================
+    // HARD VALIDATION CHECKPOINT
+    // ================================
+    (function () {
+      if (!window.supabaseClient) throw new Error('supabaseClient missing');
+      if (!window.AuthFSM) throw new Error('AuthFSM missing');
+      if (!window.DataCore) throw new Error('DataCore missing');
+      if (!window.BaseService) throw new Error('BaseService missing');
+
+      console.log('[BOOT CHECK] OK');
+    })();
+
+    async function waitForAuthStable() {
+      // 🔴 P0 CRITICAL: STATE-DRIVEN BOOT CONTRACT
+      // Primeiro tenta ler estado persistido diretamente
+      const kernel = window.__BOOT_KERNEL__;
+      const directContext = kernel?.getReadyContext?.();
+      
+      if (directContext) {
+        console.log('[BOOT] Context from kernel readyState (instant)');
+        const { getAuthState } = directContext;
+        const state = getAuthState();
+        return { context: directContext, state };
+      }
+
+      // Fallback: bootstrap normal
+      console.log('[BOOT] No persisted state, bootstrapping...');
+      const context = await bootstrapApp();
+      const { authFSM, getAuthState } = context;
+
+      // Verificar estado inicial
+      const initialState = getAuthState();
+      if (initialState.state !== 'SESSION_RESTORING') {
+        console.log('[BOOT] Auth state already stable:', initialState.state);
+        return { context, state: initialState };
+      }
+
+      // Aguardar estado estável via subscribe (reativo, sem waitForStableAuth)
+      return new Promise((resolve) => {
+        let resolved = false;
+
+        const checkState = () => {
+          if (resolved) return;
+          const state = getAuthState();
+          if (state.state !== 'SESSION_RESTORING') {
+            resolved = true;
+            console.log('[BOOT] Auth state stable via subscribe:', state.state);
+            resolve({ context, state });
+          }
+        };
+
+        // Verificar imediatamente
+        checkState();
+
+        // Inscrever para mudanças até estado estável
+        const handler = () => checkState();
+        authFSM.subscribe?.(handler);
+
+        // Timeout de segurança (5s)
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.warn('[BOOT] Timeout waiting for stable auth, returning current state');
+            resolve({ context, state: getAuthState() });
+          }
+        }, 5000);
+
+        // Inscrever para mudanças até estado estável
+        authFSM.subscribe?.(handler);
+      });
+    }
+
+    async function carregarProximoAgendamento() {
       try {
+        // Obter role do usuário logado
+        const state = window.authFSM?.getState?.();
+        const user = state?.session?.user;
+        const role = user?.app_metadata?.role || user?.user_metadata?.role || 'unknown';
+        const userId = user?.id;
+        
+        const agora = new Date();
+        const [agendamentos, clientes, servicos, profissionais] = await Promise.all([
+          window.services.agendamentos.list(),
+          window.services.clientes.list(),
+          window.services.servicos.list(),
+          window.services.profissionais.list()
+        ]);
+
+        // Obter profissional logado (se role for profissional)
+        let profissionalLogado = null;
+        if (role === 'profissional' && userId) {
+          profissionalLogado = profissionais.find(p => p.user_id === userId);
+          console.log('[INDEX] Profissional logado:', profissionalLogado?.nome);
+        }
+
+        // Filtrar agendamentos futuros (a partir de agora)
+        const agendamentosFuturos = agendamentos
+          .filter(a => {
+            const dataAg = new Date(a.inicio || a.data_inicio);
+            return dataAg > agora;
+          })
+          .sort((a, b) => {
+            const dataA = new Date(a.inicio || a.data_inicio);
+            const dataB = new Date(b.inicio || b.data_inicio);
+            return dataA - dataB;
+          });
+
+        
+        let agendamentosParaExibir = [];
+        let titulo = '🕐 Próximo Agendamento';
+
+        // Lógica condicional baseada no role
+        if (role === 'profissional' && profissionalLogado) {
+          // Mostrar apenas próximo agendamento do profissional logado
+          agendamentosParaExibir = agendamentosFuturos
+            .filter(a => a.profissional_id === profissionalLogado.id)
+            .slice(0, 1);
+          titulo = '🕐 Seu Próximo Agendamento';
+        } else if (role === 'adm_empresa') {
+          // Mostrar próximos agendamentos de cada profissional
+          const proximosPorProfissional = {};
+          
+          agendamentosFuturos.forEach(agendamento => {
+            if (!proximosPorProfissional[agendamento.profissional_id]) {
+              proximosPorProfissional[agendamento.profissional_id] = agendamento;
+            }
+          });
+          
+          agendamentosParaExibir = Object.values(proximosPorProfissional)
+            .sort((a, b) => {
+              const dataA = new Date(a.inicio || a.data_inicio);
+              const dataB = new Date(b.inicio || b.data_inicio);
+              return dataA - dataB;
+            });
+          
+          titulo = '🕐 Próximos Agendamentos por Profissional';
+        } else {
+          // Role admin ou outros: manter comportamento atual
+          agendamentosParaExibir = agendamentosFuturos.slice(0, 1);
+          titulo = '🕐 Próximo Agendamento';
+        }
+
+        // Atualizar título da seção
+        const nextAppointmentSection = document.querySelector('.next-appointment h2');
+        if (nextAppointmentSection) {
+          nextAppointmentSection.textContent = titulo;
+        }
+
+        const nextAppointmentCard = document.getElementById('nextAppointmentCard');
+        
+        if (agendamentosParaExibir.length === 0) {
+          // Nenhum agendamento futuro
+          nextAppointmentCard.innerHTML = `
+            <div class="appointment-empty">
+              <div class="empty-icon">📅</div>
+              <div class="empty-text">
+                ${role === 'profissional' ? 'Você não tem agendamentos futuros' : 'Nenhum agendamento futuro encontrado'}
+              </div>
+            </div>
+          `;
+        } else {
+          // Exibir agendamentos
+          if (role === 'adm_empresa') {
+            // Layout para múltiplos agendamentos lado a lado
+            nextAppointmentCard.innerHTML = `
+              <div class="appointments-grid">
+                ${agendamentosParaExibir.map(agendamento => {
+                  const dataInicio = new Date(agendamento.inicio || agendamento.data_inicio);
+                  const cliente = clientes.find(c => c.id === agendamento.cliente_id);
+                  const servico = servicos.find(s => s.id === agendamento.servico_id);
+                  const profissional = profissionais.find(p => p.id === agendamento.profissional_id);
+                  
+                  const hora = dataInicio.toLocaleTimeString('pt-BR', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  });
+                  const data = dataInicio.toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit'
+                  });
+                  
+                  return `
+                    <div class="appointment-item">
+                      <div class="appointment-content">
+                        <div class="appointment-time-block">
+                          <div class="appointment-time">${hora}</div>
+                          <div class="appointment-date">${data}</div>
+                        </div>
+                        <div class="appointment-details">
+                          <div class="appointment-client">${cliente?.nome || 'Cliente não informado'}</div>
+                          <div class="appointment-service">${servico?.nome || 'Serviço não informado'}</div>
+                          <div class="appointment-professional">${profissional?.nome || 'Profissional não informado'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `;
+          } else {
+            // Layout para agendamento único
+            const proximoAgendamento = agendamentosParaExibir[0];
+            const dataInicio = new Date(proximoAgendamento.inicio || proximoAgendamento.data_inicio);
+            
+            const cliente = clientes.find(c => c.id === proximoAgendamento.cliente_id);
+            const servico = servicos.find(s => s.id === proximoAgendamento.servico_id);
+            const profissional = profissionais.find(p => p.id === proximoAgendamento.profissional_id);
+            
+            const hora = dataInicio.toLocaleTimeString('pt-BR', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+            const data = dataInicio.toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit'
+            });
+            
+            nextAppointmentCard.innerHTML = `
+              <div class="appointment-content">
+                <div class="appointment-time-block">
+                  <div class="appointment-time">${hora}</div>
+                  <div class="appointment-date">${data}</div>
+                </div>
+                <div class="appointment-details">
+                  <div class="appointment-client">${cliente?.nome || 'Cliente não informado'}</div>
+                  <div class="appointment-service">${servico?.nome || 'Serviço não informado'}</div>
+                  <div class="appointment-professional">com ${profissional?.nome || 'Profissional não informado'}</div>
+                </div>
+              </div>
+            `;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar próximo agendamento:', error);
+        const nextAppointmentCard = document.getElementById('nextAppointmentCard');
+        nextAppointmentCard.innerHTML = `
+          <div class="appointment-empty">
+            <div class="empty-icon">⚠️</div>
+            <div class="empty-text">Erro ao carregar agendamentos</div>
+          </div>
+        `;
+      }
+    }
+
+    async function carregarEstatisticas() {
+      try {
+        
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
         const amanha = new Date(hoje);
         amanha.setDate(amanha.getDate() + 1);
 
-        const agendamentosHoje = window.dataManager.agendamentos.filter(a => {
-          const dataAg = new Date(a.inicio);
+        const [agendamentos, clientes, profissionais, servicos] = await Promise.all([
+          window.services.agendamentos.list(),
+          window.services.clientes.list(),
+          window.services.profissionais.list(),
+          window.services.servicos.list()
+        ]);
+
+        const agendamentosHoje = agendamentos.filter(a => {
+          const dataAg = new Date(a.inicio || a.data_inicio);
           return dataAg >= hoje && dataAg < amanha;
         });
 
         document.getElementById('totalAgendamentosHoje').textContent = agendamentosHoje.length;
-        document.getElementById('totalClientes').textContent = window.dataManager.clientes.length;
-        document.getElementById('totalProfissionais').textContent = window.dataManager.profissionais.length;
-        document.getElementById('totalServicos').textContent = window.dataManager.servicos.length;
+        document.getElementById('totalClientes').textContent = clientes.length;
+        document.getElementById('totalProfissionais').textContent = profissionais.length;
+        document.getElementById('totalServicos').textContent = servicos.length;
       } catch (error) {
         console.error('Erro ao carregar estatísticas:', error);
       }
     }
-  </script>
-  
-  <script>
-    // ✅ VERIFICAR SESSÃO ANTES DE INICIAR PÁGINA
-    setTimeout(async () => {
-      console.log('🔍 INDEX: Verificando sessão antes de inicializar...');
-      
-      // ✅ Usar AuthManager global protegido
-      if (!window.authManager) {
-        console.error('❌ INDEX: AuthManager não encontrado');
-        return;
-      }
-      
-      // ✅ Verificar sessão atual
-      const session = await window.authManager.getCurrentSession();
-      if (!session) {
-        console.error('❌ INDEX: SEM SESSÃO - usuário não autenticado');
+
+    async function bootstrapIndex() {
+      console.log('[BOOT]', 'index_bootstrap_start', Date.now());
+
+      // CORRETO: Aguarda estado estável, não lança erro
+      const { context, state } = await waitForAuthStable();
+
+      // Log de estado
+      console.log('[BOOT] Auth state:', {
+        state: state.state,
+        isAuthenticated: state.isAuthenticated,
+        hasSession: !!state.session,
+        userId: state.session?.user?.id
+      });
+
+      // GUARD EXPLÍCITO: UNAUTHENTICATED → redirecionar
+      // FSM-only: state.state é a única fonte de verdade
+      if (state.state === 'UNAUTHENTICATED') {
+        console.log('[GUARD REDIRECT]', { reason: 'AUTH_REQUIRED', authState: state.state });
         window.location.href = 'login.html';
         return;
       }
-      
-      console.log('✅ INDEX: Sessão verificada, usuário:', session.user.email);
-      
-      // ✅ Verificar se appReady já foi disparado
-      if (window.dataManager && window.dataManager.clientes) {
-        console.log('🚀 INDEX: appReady já foi disparado, inicializando diretamente...');
-        
-        // GARANTIR QUE O LOGOUT MANAGER FUNCIONE EM INDEX
-        console.log('🔍 Verificando botão de logout em index...');
-        const logoutBtn = document.getElementById('logoutButton');
-        if (logoutBtn) {
-          console.log('✅ Botão de logout encontrado, garantindo inicialização do LogoutManager...');
-          console.log('🔍 DEBUG - Botão encontrado:', logoutBtn);
-          console.log('🔍 DEBUG - Classes do botão:', logoutBtn.className);
-          console.log('🔍 DEBUG - Parent do botão:', logoutBtn.parentElement);
-          
-          // Forçar criação do LogoutManager se não existir
-          if (!window.logoutManager) {
-            console.log('🔧 Criando LogoutManager manualmente em index...');
-            window.logoutManager = new LogoutManager();
-          }
-          
-          // Forçar visibilidade e posicionamento do botão
-          logoutBtn.style.display = 'flex';
-          logoutBtn.style.visibility = 'visible';
-          logoutBtn.style.opacity = '1';
-          logoutBtn.style.position = 'absolute';
-          logoutBtn.style.bottom = '20px';
-          logoutBtn.style.left = '20px';
-          logoutBtn.style.right = '20px';
-          logoutBtn.style.zIndex = '1000';
-          console.log('🔧 Forçando visibilidade e posicionamento do botão em index...');
-          
-        } else {
-          console.error('❌ Botão de logout não encontrado no HTML de index!');
-        }
-      } else {
-        console.log('⏳ INDEX: appReady ainda não foi disparado, registrando listener...');
-        window.addEventListener('appReady', () => {
-          console.log('🚀 INDEX: appReady recebido, inicializando página...');
-          
-          // GARANTIR QUE O LOGOUT MANAGER FUNCIONE EM INDEX
-          console.log('🔍 Verificando botão de logout em index...');
-          const logoutBtn = document.getElementById('logoutButton');
-          if (logoutBtn) {
-            console.log('✅ Botão de logout encontrado, garantindo inicialização do LogoutManager...');
-            console.log('🔍 DEBUG - Botão encontrado:', logoutBtn);
-            console.log('🔍 DEBUG - Classes do botão:', logoutBtn.className);
-            console.log('🔍 DEBUG - Parent do botão:', logoutBtn.parentElement);
-            
-            // Forçar criação do LogoutManager se não existir
-            if (!window.logoutManager) {
-              console.log('🔧 Criando LogoutManager manualmente em index...');
-              window.logoutManager = new LogoutManager();
-            }
-            
-            // Forçar visibilidade e posicionamento do botão
-            logoutBtn.style.display = 'flex';
-            logoutBtn.style.visibility = 'visible';
-            logoutBtn.style.opacity = '1';
-            logoutBtn.style.position = 'absolute';
-            logoutBtn.style.bottom = '20px';
-            logoutBtn.style.left = '20px';
-            logoutBtn.style.right = '20px';
-            logoutBtn.style.zIndex = '1000';
-            console.log('🔧 Forçando visibilidade e posicionamento do botão em index...');
-            
-          } else {
-            console.error('❌ Botão de logout não encontrado no HTML de index!');
-          }
-        });
+
+      // 🎯 FASE 3: GUARD FIRST_LOGIN_REQUIRED → redirecionar para troca de senha
+      if (state.state === 'FIRST_LOGIN_REQUIRED') {
+        console.log('[GUARD REDIRECT]', { reason: 'FIRST_LOGIN_REQUIRED', authState: state.state });
+        window.location.href = 'change-password.html';
+        return;
       }
-      
-      // LogoutManager cuidará do botão de logout automaticamente
-      console.log('✅ Index: LogoutManager gerenciará o botão de logout');
-    }, 200);
+
+      // GUARD EXPLÍCITO: AUTHENTICATED → continuar
+      // FSM-only: state.state é a única fonte de verdade
+      if (state.state === 'AUTHENTICATED') {
+        try {
+          // 🎯 ATIVAÇÃO SIDEBAR (Opção A - Manual Controlada) - ANTES das operações pesadas
+          // SidebarManager removido do pipeline SEC - ativação manual em páginas legadas
+          // Guard: Só ativa uma vez, só em páginas com sidebar hardcoded
+          if (!window._sidebarManagerActivated &&
+              window.SidebarManager &&
+              document.getElementById('sidebar')) {
+            try {
+              const sidebarManager = new SidebarManager({ authFSM: window.authFSM });
+              sidebarManager.activate();
+              window._sidebarManagerActivated = true;
+              console.log('[BOOT] SidebarManager ativado (modo legado)');
+            } catch (e) {
+              console.warn('[BOOT] SidebarManager ativação falhou:', e.message);
+            }
+          }
+
+          // PAGE MANAGER HARD CONTRACT (se existir PageManager)
+          if (window.pageManager) {
+            if (typeof window.pageManager.init === 'function') {
+              console.warn('[LEGACY CONTRACT DETECTED] init() ignored - migrating to initializePage');
+            }
+            if (typeof window.pageManager.initializePage !== 'function') {
+              throw new Error('[BOOTSTRAP FATAL] initializePage missing');
+            }
+          }
+
+          console.log('[BOOT]', 'index_loading_stats', Date.now());
+          await carregarEstatisticas();
+          await carregarProximoAgendamento();
+          console.log('[BOOT]', 'index_stats_complete', Date.now());
+          console.log('[PAGE MANAGER] initializePage contract OK');
+
+          // VALIDAÇÃO FINAL
+          console.log('[BOOT] FINAL VALIDATION START');
+
+          if (window.pageManager && typeof window.pageManager.initializePage !== 'function') {
+            throw new Error('[BOOTSTRAP FATAL] PageManager contract invalid');
+          }
+
+          // Marcar bootstrap como OK
+          window.__setBootstrapOk();
+          console.log('[BOOT]', 'index_bootstrap_complete', Date.now());
+
+          // 🎯 SIDEBAR JÁ ATIVADO no início do boot
+
+          // 🎯 INICIALIZAR NavigationEffectRunner para navegação FSM-driven
+          if (window.NavigationEffectRunner && window.authFSM) {
+            const navRunner = new NavigationEffectRunner(window.authFSM);
+            navRunner.init();
+            window.navigationEffectRunner = navRunner;
+            console.log('[BOOT] NavigationEffectRunner inicializado');
+          }
+
+          console.log('[BOOT] SYSTEM STABLE');
+
+        } catch (err) {
+          console.error('[INDEX BOOTSTRAP ERROR]', {
+            error: err.message,
+            stack: err.stack,
+            timestamp: Date.now()
+          });
+
+          console.warn('[BOOTSTRAP FAILED] Error but user authenticated - staying on page');
+        }
+
+        return;
+      }
+
+      // Estado inesperado
+      console.error('[BOOTSTRAP FATAL] Unexpected auth state:', state.state);
+    }
+
+    // ================================
+    // EXECUÇÃO CONTROLADA
+    // ================================
+    if (typeof window.bootstrapApp !== 'function') {
+      throw new Error('[BOOTSTRAP FATAL] bootstrapApp not available');
+    }
+
+    // ================================
+    // CHECKPOINT DE VALIDAÇÃO FINAL
+    // ================================
+    console.log('[BOOT CHECK]', {
+      supabaseClient: !!window.supabaseClient,
+      dataCore: !!window.DataCore,
+      baseService: !!window.BaseService,
+      services: !!window.services,
+      bootstrapApp: typeof window.bootstrapApp
+    });
+
+    try {
+      bootstrapIndex();
+    } catch (fatalError) {
+      console.error('[BOOTSTRAP EXCEPTION]', fatalError);
+      console.warn('[REDIRECT BLOCKED] Fatal exception');
+    }
   </script>
 </body>
 </html>

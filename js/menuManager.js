@@ -33,18 +33,29 @@ class MenuManager {
   setup() {
     console.log('🔐 MENU_MANAGER: Configurando menu...');
     
-    // Aguardar AuthManager estar disponível
-    if (typeof window.authManager === 'undefined') {
-      console.log('⏳ MENU_MANAGER: Aguardando AuthManager...');
+    // Aguardar AuthFSM estar disponível (única fonte de verdade)
+    if (typeof window.authFSM === 'undefined') {
+      console.log('⏳ MENU_MANAGER: Aguardando AuthFSM...');
       setTimeout(() => this.setup(), 100);
       return;
     }
     
-    // Aguardar profile do usuário estar disponível
-    this.waitForUserProfile().then(() => {
-      this.updateMenu();
-      // LogoutManager cuidará do botão de logout
-      console.log('✅ MENU_MANAGER: LogoutManager gerenciará o botão de logout');
+    // Extrair profile diretamente da FSM
+    const fsmState = window.authFSM.getState?.();
+    if (fsmState?.session?.user?.user_metadata) {
+      window.currentUserProfile = fsmState.session.user.user_metadata;
+    }
+    
+    // Atualizar menu imediatamente
+    this.updateMenu();
+    console.log('✅ MENU_MANAGER: Menu configurado');
+    
+    // Subscribe para atualizações de auth
+    window.authFSM.subscribe?.((state) => {
+      if (state?.session?.user?.user_metadata) {
+        window.currentUserProfile = state.session.user.user_metadata;
+        this.updateMenu();
+      }
     });
   }
 
@@ -106,6 +117,27 @@ class MenuManager {
       
       nav.appendChild(navItem);
     });
+
+    // 🏢 ADICIONAR EMPRESAS SÓ PARA ADMIN
+    if (role === 'admin') {
+      const empresasItem = document.createElement('a');
+      empresasItem.href = 'empresas.html';
+      empresasItem.className = 'nav-item';
+      empresasItem.id = 'nav-empresas';
+      
+      const currentPage = window.location.pathname.split('/').pop();
+      if (empresasItem.href === currentPage) {
+        empresasItem.classList.add('active');
+      }
+      
+      empresasItem.innerHTML = `
+        <span class="nav-icon">🏢</span>
+        <span class="nav-text">Empresas</span>
+      `;
+      
+      nav.appendChild(empresasItem);
+      console.log('✅ MENU_MANAGER: Empresas adicionado para admin');
+    }
 
     // Adicionar separador antes do logout
     const separator = document.createElement('div');

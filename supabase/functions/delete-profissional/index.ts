@@ -62,9 +62,9 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single()
 
-    if (!profile || profile.role !== "admin") {
+    if (!profile || (profile.role !== "admin" && profile.role !== "adm_empresa")) {
       return new Response(
-        JSON.stringify({ error: "Apenas admin" }),
+        JSON.stringify({ error: "Apenas admin ou admin de empresa" }),
         { status: 403, headers: corsHeaders }
       )
     }

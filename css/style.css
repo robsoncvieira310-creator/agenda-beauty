@@ -91,14 +91,56 @@ body{
 }
 
 /* Estilo para filtros ativos */
-.filter-select.has-filter {
-  border-color: var(--primary-gold);
-  background-color: rgba(212, 175, 55, 0.05);
-}
-
+.filter-select.has-filter,
 .filter-input.has-filter {
   border-color: var(--primary-gold);
   background-color: rgba(212, 175, 55, 0.05);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+}
+
+/* Estilo para busca geral */
+#filtroGeral {
+  background: linear-gradient(135deg, #fff 0%, rgba(212, 175, 55, 0.05) 100%);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: all 0.3s ease;
+}
+
+#filtroGeral:focus {
+  border-color: var(--primary-gold);
+  background: linear-gradient(135deg, #fff 0%, rgba(212, 175, 55, 0.1) 100%);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+/* Melhorias para selects com busca */
+.filter-select {
+  position: relative;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+.filter-select:focus {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23d4af37' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+
+/* Indicadores visuais para filtros */
+.filter-group label::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ddd;
+  margin-left: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.has-filter ~ label::after {
+  background: var(--primary-gold);
+  box-shadow: 0 0 4px rgba(212, 175, 55, 0.4);
 }
 
 /* NOVA IMPLEMENTAÇÃO V1.2 - INDICADORES DE CARREGAMENTO */
@@ -263,6 +305,99 @@ body{
   gap:12px;
   color: var(--primary-gold);
   text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Estilo para autocomplete estilo Google */
+.autocomplete-container {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: none;
+}
+
+.autocomplete-dropdown.show {
+  display: block;
+}
+
+.autocomplete-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+  background-color: rgba(212, 175, 55, 0.1);
+}
+
+.autocomplete-item.selected {
+  background-color: rgba(212, 175, 55, 0.2);
+}
+
+.autocomplete-item .highlight {
+  font-weight: 600;
+  color: var(--primary-gold);
+}
+
+.autocomplete-item .type {
+  font-size: 12px;
+  color: var(--text-light);
+  background: rgba(212, 175, 55, 0.1);
+  padding: 2px 6px;
+  border-radius: 12px;
+  margin-left: auto;
+}
+
+.autocomplete-no-results {
+  padding: 12px;
+  color: var(--text-light);
+  font-size: 14px;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Loading no autocomplete */
+.autocomplete-loading {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.autocomplete-loading::after {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(212, 175, 55, 0.3);
+  border-radius: 50%;
+  border-top-color: var(--primary-gold);
+  animation: spin 1s ease-in-out infinite;
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
 /* =====================================================
@@ -639,7 +774,9 @@ MODAL
 .modal-content textarea,
 .modal-content input[type="datetime-local"],
 .modal-content input[type="text"],
-.modal-content input[type="tel"]{
+.modal-content input[type="tel"],
+.modal-content input[type="email"],
+.modal-content input[type="password"]{
   width:100%;
   margin-top:5px;
   padding:6px;
@@ -800,11 +937,6 @@ MODAL ESPECÍFICO PARA PROFISSIONAIS - EVITAR CONFLITOS
   box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
   z-index: 10000 !important;
   border: 1px solid rgba(212, 175, 55, 0.3) !important;
-  position: relative !important;
-  left: 50% !important;
-  top: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  margin: 0 !important;
 }
 
 /* =====================================================
@@ -985,6 +1117,31 @@ ALERTAS CUSTOMIZADAS
   background:#3b82f6;
   color:white;
   border-left:4px solid #2563eb;
+}
+
+/* Alertas com ícones */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.alert-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.alert-content h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.alert-content p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 @keyframes slideIn{
@@ -1245,58 +1402,161 @@ DASHBOARD COMPONENTS
   margin-top:4px;
 }
 
-.quick-actions{
+.next-appointment{
   margin-bottom:30px;
 }
 
-.quick-actions h2{
+.next-appointment h2{
   margin:0 0 20px 0;
   color:#1f2937;
   font-size:18px;
 }
 
-.actions-grid{
+.next-appointment .stats-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
-  gap:12px;
+  grid-template-columns:1fr;
+  gap:16px;
 }
 
-.action-btn{
+.appointment-card{
   background:white;
-  border:2px solid #e5e7eb;
   border-radius:8px;
-  padding:16px;
-  cursor:pointer;
+  padding:20px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.1);
+  display:flex;
+  align-items:center;
   transition:all 0.2s ease;
+  border-left:4px solid #3b82f6;
+}
+
+.appointment-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+}
+
+.appointment-loading{
   display:flex;
   align-items:center;
   gap:12px;
+  color:#6b7280;
   font-size:14px;
-  color:#374151;
-  text-align:left;
+  width:100%;
+  justify-content:center;
 }
 
-.action-btn:hover{
-  border-color:#3b82f6;
-  background:#f8fafc;
-  transform:translateY(-2px);
-  box-shadow:0 4px 12px rgba(59, 130, 246, 0.15);
-}
-
-.action-icon{
+.loading-spinner{
   font-size:20px;
-  width:32px;
-  height:32px;
+  animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+  from{ transform: rotate(0deg); }
+  to{ transform: rotate(360deg); }
+}
+
+.appointment-content{
   display:flex;
   align-items:center;
-  justify-content:center;
-  background:#f3f4f6;
-  border-radius:50%;
+  gap:20px;
+  width:100%;
 }
 
-.action-text{
+.appointment-time-block{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  min-width:80px;
+}
+
+.appointment-time{
+  background:#3b82f6;
+  color:white;
+  padding:8px 12px;
+  border-radius:6px;
+  font-weight:600;
+  font-size:16px;
+  text-align:center;
+  line-height:1;
+}
+
+.appointment-date{
+  font-size:12px;
+  color:#6b7280;
+  margin-top:4px;
+  text-align:center;
+}
+
+.appointment-details{
   flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.appointment-client{
+  font-size:16px;
+  font-weight:600;
+  color:#1f2937;
+}
+
+.appointment-service{
+  font-size:14px;
+  color:#6b7280;
+}
+
+.appointment-professional{
+  font-size:13px;
+  color:#3b82f6;
   font-weight:500;
+}
+
+.appointment-empty{
+  text-align:center;
+  color:#6b7280;
+  font-size:14px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+}
+
+.appointment-empty .empty-icon{
+  font-size:32px;
+  opacity:0.5;
+}
+
+.appointments-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, 300px);
+  gap:16px;
+  width:100%;
+  justify-content:start;
+}
+
+.appointments-grid .appointment-card{
+  border-left:4px solid #3b82f6;
+}
+
+.appointments-grid .appointment-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+}
+
+.appointment-item{
+  background:white;
+  border-radius:8px;
+  padding:20px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.1);
+  display:flex;
+  align-items:center;
+  transition:all 0.2s ease;
+  border-left:4px solid #3b82f6;
+}
+
+.appointment-item:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
 }
 
 .calendar-container{

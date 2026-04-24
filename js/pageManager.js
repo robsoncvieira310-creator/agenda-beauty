@@ -1,23 +1,92 @@
 // Gerenciamento comum de páginas
-class PageManager {
+// DEPENDÊNCIAS: window.services, window.showAlert, window.showLoading, window.hideLoading
+// 🎯 FASE 2.6.2: Implementa LifecycleContract
+
+window.PageManager = class PageManager extends LifecycleContract {
   constructor() {
+    super('PageManager');
+    
+    // 🔒 SINGLETON PROTECTION
+    if (window.__PAGE_MANAGER_SINGLETON__) {
+      throw new Error('[BOOTSTRAP FATAL] Duplicate PageManager instance');
+    }
+    window.__PAGE_MANAGER_SINGLETON__ = true;
+
+    // 🎯 FASE 2.6.2: STATE ONLY - Zero side-effects no constructor
     this.currentPage = '';
-    this.setupEventListeners();
+    this._domReady = false;
+    
+    console.log('[PageManager] constructed (PASSIVE MODE)');
   }
 
-  setupEventListeners() {
-    // Configurar navegação
-    document.addEventListener('DOMContentLoaded', () => {
-      this.initializePage();
-    });
+  // ================================
+  // 🎯 FASE 2.6.2: LIFECYCLE IMPLEMENTATION
+  // ================================
+  
+  activate() {
+    if (this._lifecycleActive) return;
     
-    // Configurar modais após DOM estar pronto
-    document.addEventListener('DOMContentLoaded', () => {
+    console.log('[PageManager] activating...');
+    
+    // 🎯 FASE 2.6.2: Verificar se DOM já está pronto ou aguardar
+    if (document.readyState === 'loading') {
+      // Aguardar DOMContentLoaded
+      this.addEventListener(document, 'DOMContentLoaded', () => {
+        this._domReady = true;
+        this.initializePage();
+        this.setupModals();
+      });
+    } else {
+      // DOM já está pronto
+      this._domReady = true;
+      this.initializePage();
       this.setupModals();
-    });
+    }
+    
+    this._lifecycleActive = true;
+    console.log('[PageManager] activated');
+    return true;
   }
+  
+  deactivate() {
+    if (!this._lifecycleActive) return;
+    
+    console.log('[PageManager] deactivating...');
+    
+    // Cleanup via LifecycleContract
+    super.deactivate();
+    
+    this.currentPage = '';
+    this._domReady = false;
+    
+    console.log('[PageManager] deactivated');
+  }
+  
+  destroy() {
+    console.log('[PageManager] destroying...');
+    
+    // Remover singleton flag
+    window.__PAGE_MANAGER_SINGLETON__ = false;
+    
+    super.destroy();
+  }
+  
+  // 🎯 DEPRECATED: setupEventListeners removido - usar activate()
 
   async initializePage() {
+    // 🔒 PIPE CHECK: PageManager só executa em READY stage
+    const pipeState = window.__BOOTSTRAP_PIPE?.getState();
+    if (pipeState?.stage !== 'READY') {
+      throw new Error('[BOOTSTRAP FATAL] Invalid state transition or missing state flag');
+    }
+
+    console.log('[PAGE]', 'initializePage_start', Date.now());
+    console.log('[CHECK]', 'services_at_init', {
+      exists: !!window.services,
+      servicos: !!window.services?.servicos,
+      clientes: !!window.services?.clientes,
+      profissionais: !!window.services?.profissionais
+    });
     try {
       console.log('🚀 Inicializando página...');
       
@@ -31,26 +100,45 @@ class PageManager {
       await this.initializeSpecificPage();
       
       console.log('✅ Página inicializada com sucesso');
+      console.log('[PAGE]', 'initializePage_end', Date.now());
     } catch (error) {
       console.error('❌ Erro ao inicializar página:', error);
+      console.log('[CHECK]', 'services_at_error', {
+        exists: !!window.services,
+        error: error.message,
+        stack: error.stack
+      });
       this.showError('Erro ao carregar página. Recarregue.');
     }
   }
 
   async loadBaseData() {
     console.log("📊 Carregando dados base...");
+    console.log('[CHECK]', 'services_at_loadBaseData', {
+      exists: !!window.services,
+      servicos: !!window.services?.servicos,
+      clientes: !!window.services?.clientes,
+      profissionais: !!window.services?.profissionais
+    });
     // Carregar dados necessários para todas as páginas
     const promises = [];
-    
+
     // Todas as páginas precisam de clientes, serviços e profissionais
     console.log("🔍 Adicionando loadServicos() às promises...");
-    promises.push(dataManager.loadServicos());
-    promises.push(dataManager.loadClientes());
-    promises.push(dataManager.loadProfissionais());
+    if (!window.services || !window.services.servicos) {
+      console.log('[CHECK]', 'services_undefined_at_loadBaseData', {
+        services_type: typeof window.services,
+        services_value: window.services
+      });
+      throw new Error('services not available at loadBaseData');
+    }
+    promises.push(window.services.servicos.list());
+    promises.push(window.services.clientes.list());
+    promises.push(window.services.profissionais.list());
     
     // Páginas específicas podem precisar de mais dados
     if (this.needsAgendamentos()) {
-      promises.push(dataManager.loadAgendamentos());
+      promises.push(window.services.agendamentos.list());
     }
     
     await Promise.all(promises);
@@ -64,11 +152,11 @@ class PageManager {
       btnAtualizar.addEventListener('click', () => this.refreshData());
     }
 
-    // Configurar busca (se existir)
-    const buscaInput = document.querySelector('input[id*="busca"]');
-    if (buscaInput) {
-      buscaInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
-    }
+    // REMOVIDO: Sistema antigo de busca conflitando com autocomplete da agenda
+    // const buscaInput = document.querySelector('input[id*="busca"]');
+    // if (buscaInput) {
+    //   buscaInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
+    // }
   }
 
   setupModals() {
@@ -99,18 +187,18 @@ class PageManager {
 
   async refreshData() {
     const btn = document.getElementById('btnAtualizar');
-    if (btn) UIUtils.showLoading(btn);
-    
+    if (btn) showLoading(btn);
+
     try {
       await this.loadBaseData();
       await this.renderPage();
       await this.updateStatistics();
-      UIUtils.showAlert('Dados atualizados com sucesso', 'success');
+      showAlert('Dados atualizados com sucesso', 'success');
     } catch (error) {
       console.error('Erro ao atualizar dados:', error);
-      UIUtils.showAlert('Erro ao atualizar dados', 'error');
+      showAlert('Erro ao atualizar dados', 'error');
     } finally {
-      if (btn) UIUtils.hideLoading(btn);
+      if (btn) hideLoading(btn);
     }
   }
 
@@ -153,15 +241,15 @@ class PageManager {
   }
 
   showError(message) {
-    UIUtils.showAlert(message, 'error');
+    showAlert(message, 'error');
   }
 
   showSuccess(message) {
-    UIUtils.showAlert(message, 'success');
+    showAlert(message, 'success');
   }
 
   showWarning(message) {
-    UIUtils.showAlert(message, 'warning');
+    showAlert(message, 'warning');
   }
 
   // Validação de formulários

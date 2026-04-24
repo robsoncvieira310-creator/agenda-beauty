@@ -1,54 +1,68 @@
 // Lógica específica da página de serviços
-class ServicosPage extends PageManager {
+// DEPENDÊNCIAS: window.services, window.PageManager, window.showAlert, window.showLoading, window.hideLoading, window.confirmDelete
+
+window.ServicosPage = class ServicosPage extends window.PageManager {
   constructor() {
     super();
-    console.log("🚀 ServicosPage iniciada");
     this.currentPage = 'servicos';
-    this.servicos = [];
-    this.servicoEditando = null;
-    
-    // VERSÃO ORIGINAL
-    // this.init();
-    
-    // NOVA IMPLEMENTAÇÃO V1.2 - EVENTO appReady
-    document.addEventListener('appReady', () => {
-      console.log('🚀 appReady recebido em ServicosPage');
-      this.init();
-    });
+
+    // ✅ FASE 3.5: PURE DATACORE READ MODEL - NENHUM cache local
+    this.servicoEditando = null;  // único estado persistente (UI modal)
+    // REMOVIDO: __snapshot, getServicosSnapshot, invalidateSnapshot
+
+    // ✅ FASE 2: Proteção contra multi-entry mantida
+    this.__initialized = false;
+    this.__initializing = false;
   }
 
-  async init() {
-    console.log("🔄 Inicializando página de serviços");
-    await this.loadServicos();
-    this.setupColorPicker();
-    this.setupServiceButtons();
+  // ================================
+  // CACHE BOUNDARY CHECK (FASE 4.2)
+  // ================================
+  _beforeRenderAudit() {
+    // 🔒 ENFORCEMENT REAL: Falha explicitamente se cache proibido detectado
+    if (typeof window.assertNoEntityCacheLeak === 'function') {
+      window.assertNoEntityCacheLeak(this, 'ServicosPage');
+    }
   }
 
-  // NOVA IMPLEMENTAÇÃO V1.2 - MÉTODO initializeSpecificPage() PARA COMPATIBILIDADE
+  // ✅ FASE 3.5: NENHUM método de cache - fetch direto do DataCore sempre
+
+  // ✅ FASE 2: Único ponto de inicialização via bootstrap
   async initializeSpecificPage() {
-    console.log("📋 Inicializando página de serviços (V1.2)");
-    
-    // Configurar botões específicos
-    this.setupServiceButtons();
-    
-    // Renderizar tabela inicial
-    await this.renderPage();
-    
-    // Carregar estatísticas
-    await this.updateStatistics();
-  }
+    // ✅ FASE 2: Proteção contra execução duplicada
+    if (this.__initialized) {
+      return;
+    }
+    if (this.__initializing) {
+      while (this.__initializing) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+      return;
+    }
 
-  async loadServicos() {
-    console.log("🔍 Carregando serviços do Supabase...");
+    this.__initializing = true;
+
     try {
-      this.servicos = await window.dataManager.loadServicos();
-      console.log("✅ Serviços encontrados:", this.servicos);
-      this.renderServiceTable();
-      await this.updateStatistics();
+      // ✅ FASE 2: Configurar UI primeiro (independente de dados)
+      this.setupServiceButtons();
+      this.setupColorPicker();
+
+      // ✅ FASE 2: Único fetch via DataCore authority
+      await this.renderPage();
+
+      // 🔒 CACHE BOUNDARY ENFORCEMENT (post-render verification)
+      this._beforeRenderAudit();
+
+      // ✅ FASE 2: Só marcar como inicializado após sucesso COMPLETO
+      this.__initialized = true;
+      
     } catch (error) {
-      console.error("❌ Erro ao carregar serviços:", error);
-      this.servicos = [];
-      this.renderServiceTable();
+      console.error('❌ Erro na inicialização, realizando rollback:', error);
+      this.__initialized = false;
+      throw error;
+
+    } finally {
+      this.__initializing = false;
     }
   }
 
@@ -80,84 +94,45 @@ class ServicosPage extends PageManager {
     if (btnFecharModal) {
       btnFecharModal.addEventListener('click', () => this.closeModal());
     }
-    
-    console.log('✅ Botões de serviços configurados');
   }
 
   async renderPage() {
-    console.log('📋 renderPage() - Carregando serviços...');
-    
+    // 🔒 CACHE BOUNDARY ENFORCEMENT
+    this._beforeRenderAudit();
+
     try {
-      // FORÇAR LIMPEZA DO CACHE ANTES DE CARREGAR
-      if (window.dataManager && window.dataManager.cache) {
-        window.dataManager.cache.servicos = null;
-        console.log('🗑️ Cache de serviços limpo antes do carregamento');
-      }
-      
-      console.log('🔍 Forçando carregamento direto do Supabase...');
-      
-      try {
-        this.servicos = await window.dataManager.loadServicos();  // Força carregamento
-        console.log("✅ Serviços carregados:", this.servicos);
-        console.log("📊 Quantidade de serviços:", this.servicos.length);
-      } catch (loadError) {
-        console.error("❌ Erro específico no loadServicos():", loadError);
-        throw loadError;
-      }
-      
-      // NOVA IMPLEMENTAÇÃO V1.2 - VERIFICAR ESTRUTURA DOS DADOS
-      if (this.servicos.length > 0) {
-        console.log("🔍 Estrutura do primeiro serviço:", this.servicos[0]);
-        console.log("🔍 Campos disponíveis:", Object.keys(this.servicos[0]));
-      }
-      
-      // Configurar botões (importante!)
-      console.log("🔧 Configurando botões de serviços...");
-      this.setupServiceButtons();
-      console.log("✅ setupServiceButtons() chamado");
-      
-      // Configurar seletor de cores
-      console.log("🎨 Configurando seletor de cores...");
-      this.setupColorPicker();
-      console.log("✅ setupColorPicker() chamado");
-      
-      console.log("🎨 Iniciando renderização da tabela...");
-      this.renderServiceTable();
-      console.log("✅ renderServiceTable() concluído");
+      // ✅ FASE 3.5: FETCH DIRETO - nenhum cache intermediário
+      const servicos = await window.services.servicos.list();
+
+      this.renderServiceTable(servicos);
+      this.updateStatistics(servicos);
+
     } catch (error) {
       console.error("❌ Erro ao carregar serviços em renderPage():", error);
-      console.error("❌ Stack trace:", error.stack);
-      this.servicos = [];
-      this.renderServiceTable();
+      this.renderServiceTable([]);
+      this.updateStatistics([]);
     }
   }
 
-  renderServiceTable() {
-    console.log("🎨 renderServiceTable() - Renderizando tabela...");
-    console.log("📋 Serviços disponíveis para renderizar:", this.servicos);
-    
+  renderServiceTable(servicos = []) {
+        
     const tbody = document.getElementById('tabelaServicos');
     if (!tbody) {
       console.error('❌ Tabela de serviços não encontrada');
       return;
     }
 
-    console.log("� tbody encontrado, limpando conteúdo...");
     tbody.innerHTML = '';
 
-    if (this.servicos.length === 0) {
-      console.log("⚠️ Nenhum serviço encontrado - mostrando estado vazio");
+    if (servicos.length === 0) {
       this.renderEmptyState(tbody, 'Nenhum serviço cadastrado', '💇', 'openNewServiceModal()');
       return;
     }
 
-    console.log(`✅ Renderizando ${this.servicos.length} serviços...`);
-    this.servicos.forEach((servico, index) => {
-      console.log(`🔍 Processando serviço ${index + 1}:`, servico);
+    servicos.forEach((servico, index) => {
       
-      const agendamentosCount = window.dataManager.agendamentos.filter(a => a.servico === servico.nome).length;
-      console.log(`🔍 Agendamentos encontrados para ${servico.nome}: ${agendamentosCount}`);
-      
+      // TODO: Carregar agendamentos via service para contar
+      const agendamentosCount = 0;
       const tr = document.createElement('tr');
       const corServico = servico.cor || '#78909c';
       tr.innerHTML = `
@@ -184,38 +159,35 @@ class ServicosPage extends PageManager {
         </td>
         <td>
           <div class="table-actions">
-            <button class="btn btn-sm btn-warning" onclick="pageManager.editService('${servico.nome}')" title="Editar">
+            <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')" title="Editar">
               <span class="btn-icon">✏️</span>
             </button>
-            <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')" title="Excluir">
+            <button class="btn btn-sm btn-danger" onclick="deleteService('${servico.nome}')" title="Excluir">
               <span class="btn-icon">🗑️</span>
             </button>
           </div>
         </td>
       `;
       
-      console.log(`🔍 Adicionando linha ${index + 1} ao tbody...`);
       tbody.appendChild(tr);
     });
-    
-    console.log("✅ Tabela renderizada com sucesso");
-    console.log(`🔍 tbody agora tem ${tbody.children.length} filhos`);
   }
 
-  async updateStatistics() {
+  updateStatistics(servicos) {
+    // ✅ FASE 3.2: Pure function - recebe snapshot como parâmetro
     try {
-      if (this.servicos.length === 0) {
+      if (!servicos || servicos.length === 0) {
         this.updateStatisticsDOM(0, 0, 0);
         return;
       }
 
-      const duracoes = this.servicos.map(s => s.duracao_min || s.duracao_minutos || s.duracao || 0);
-      const valores = this.servicos.map(s => s.valor || s.preco || 0);
+      const duracoes = servicos.map(s => s.duracao_min || s.duracao_minutos || s.duracao || 0);
+      const valores = servicos.map(s => s.valor || s.preco || 0);
       
       const duracaoMedia = duracoes.reduce((a, b) => a + b, 0) / duracoes.length;
       const valorMedio = valores.reduce((a, b) => a + b, 0) / valores.length;
 
-      this.updateStatisticsDOM(this.servicos.length, Math.round(duracaoMedia), valorMedio);
+      this.updateStatisticsDOM(servicos.length, Math.round(duracaoMedia), valorMedio);
     } catch (error) {
       console.error('Erro ao atualizar estatísticas:', error);
     }
@@ -231,8 +203,14 @@ class ServicosPage extends PageManager {
     if (valorElement) valorElement.textContent = this.formatCurrency(valorMedio);
   }
 
-  handleSearch(term) {
-    const filtrados = this.servicos.filter(servico => 
+  // ✅ FASE 3.3: Pure function - recebe snapshot e term explicitamente
+  handleSearch(servicos, term) {
+    if (!servicos) {
+      console.error('[FASE 3.3] handleSearch requires servicos parameter');
+      return;
+    }
+    
+    const filtrados = servicos.filter(servico => 
       servico.nome.toLowerCase().includes(term.toLowerCase()) ||
       (servico.descricao && servico.descricao.toLowerCase().includes(term.toLowerCase()))
     );
@@ -248,7 +226,8 @@ class ServicosPage extends PageManager {
     }
 
     filtrados.forEach(servico => {
-      const agendamentosCount = window.dataManager.agendamentos.filter(a => a.servico === servico.nome).length;
+      // TODO: Carregar agendamentos via service para contar
+      const agendamentosCount = 0;
       
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -257,7 +236,68 @@ class ServicosPage extends PageManager {
         <td><span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span></td>
         <td><span class="badge badge-info">${agendamentosCount}</span></td>
         <td>
-          <button class="btn btn-sm btn-warning" onclick="pageManager.editService('${servico.nome}')">✏️</button>
+          <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')">✏️</button>
+          <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')">🗑️</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+    
+  }
+
+  // ✅ FASE 3.3: Handler para clique de edição - inicia ciclo e chama método puro
+  async handleEditClick(nome) {
+    // ✅ FASE 3.5: Fetch direto do DataCore
+    const servicos = await window.services.servicos.list();
+    this.editService(nome, servicos);
+    // Modal permanece aberto
+  }
+
+  // ✅ FASE 3.5: Handler para busca - compatibilidade com PageManager
+  async handleSearch(term) {
+    if (!term.trim()) {
+      await this.renderPage();
+      return;
+    }
+    // ✅ FASE 3.5: FETCH DIRETO - nenhum cache
+    const servicos = await window.services.servicos.list();
+    this.handleSearchPure(servicos, term);
+  }
+
+  // ✅ FASE 3.3: Método puro de busca (nome mudado para evitar conflito)
+  handleSearchPure(servicos, term) {
+    if (!servicos) {
+      console.error('[FASE 3.3] handleSearchPure requires servicos parameter');
+      return;
+    }
+    
+    const filtrados = servicos.filter(servico => 
+      servico.nome.toLowerCase().includes(term.toLowerCase()) ||
+      (servico.descricao && servico.descricao.toLowerCase().includes(term.toLowerCase()))
+    );
+    
+    const tbody = document.getElementById('tabelaServicos');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (filtrados.length === 0) {
+      this.renderEmptyState(tbody, `Nenhum serviço encontrado para "${term}"`, '🔍');
+      return;
+    }
+
+    filtrados.forEach(servico => {
+      // TODO: Carregar agendamentos via service para contar
+      const agendamentosCount = 0;
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${servico.nome}</strong></td>
+        <td><span class="badge badge-primary">${servico.duracao_min || servico.duracao_minutos || servico.duracao || 0} min</span></td>
+        <td><span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span></td>
+        <td><span class="badge badge-info">${agendamentosCount}</span></td>
+        <td>
+          <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')">✏️</button>
           <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')">🗑️</button>
         </td>
       `;
@@ -290,8 +330,13 @@ class ServicosPage extends PageManager {
     this.showModal('modalServico');
   }
 
-  editService(nome) {
-    const servico = this.servicos.find(s => s.nome === nome);
+  editService(nome, servicos) {
+    // ✅ FASE 3.3: Pure function - SÓ recebe snapshot via parâmetro
+    if (!servicos) {
+      console.error('[FASE 3.3] editService requires servicos parameter');
+      return;
+    }
+    const servico = servicos.find(s => s.nome === nome);
     if (!servico) return;
 
     this.servicoEditando = servico;
@@ -316,19 +361,16 @@ class ServicosPage extends PageManager {
       colorPreview.querySelector('.preview-text').textContent = corServico.toUpperCase();
     }
     
-    // Desabilitar edição do nome
-    document.getElementById('nomeServico').disabled = true;
+    // Manter nome habilitado para edição
+    // document.getElementById('nomeServico').disabled = true;
     
     this.showModal('modalServico');
   }
 
   async saveService() {
-    console.log('🔘 Botão salvar clicado - Iniciando saveService()');
-    
     // PREVENIR DUPLO CLIQUE
     const saveButton = document.getElementById('btnSalvar');
     if (saveButton && saveButton.disabled) {
-      console.log('⚠️ Botão já desabilitado, ignorando clique duplo');
       return;
     }
     
@@ -337,130 +379,93 @@ class ServicosPage extends PageManager {
     const valor = parseFloat(document.getElementById('valorServico').value) || 0;
     const descricao = document.getElementById('descricaoServico').value.trim();
     
-    console.log('📋 Dados do formulário:', { nome, duracao, valor, descricao });
-    
-    // Validação de nome obrigatório
-    if (!nome) {
-      console.log('❌ Validação: nome vazio');
-      UIUtils.showAlert('Nome do serviço é obrigatório', 'error');
+        
+    // Validar campos obrigatórios básicos com mensagem padrão
+    const requiredFields = ['nomeServico', 'duracaoServico', 'valorServico'];
+    if (!window.validateFormFields({ requiredFields })) {
       return;
     }
     
-    // Validação de duração obrigatória e positiva
-    if (!duracao || duracao <= 0) {
-      console.log('❌ Validação: duração inválida', duracao);
-      UIUtils.showAlert('Duração deve ser maior que 0', 'error');
+    // Validações específicas (mantidas para melhor UX)
+    if (duracao <= 0) {
+      showAlert('Duração deve ser maior que 0', 'error');
       return;
     }
     
-    console.log('✅ Validações básicas passadas');
-    
-    // Validação de valor obrigatório e positivo
-    const errors = [];
-    console.log('💰 Valor informado:', valor, 'Tipo:', typeof valor);
-    
-    // Se for edição e valor for 0, verificar se o campo foi preenchido
-    if (this.servicoEditando && valor === 0) {
-      const valorInput = document.getElementById('valorServico').value;
-      console.log('💰 Valor do input:', valorInput);
-      if (valorInput === '' || valorInput === '0') {
-        errors.push('O valor deve ser maior que 0');
-      }
-    } else if (!this.servicoEditando && (valor === null || valor === undefined || valor <= 0)) {
-      errors.push('O valor deve ser maior que 0');
-    } else if (valor > 10000) { // máximo R$ 10.000
-      errors.push('O valor não pode exceder R$ 10.000,00');
-    }
-    
-    // Se houver erros, mostrar primeiro erro
-    if (errors.length > 0) {
-      console.log('❌ Validação: erro de valor', errors[0]);
-      UIUtils.showAlert(errors[0], 'error');
+    // Validação de valor positivo
+    if (valor <= 0) {
+      showAlert('O valor deve ser maior que 0', 'error');
       return;
     }
     
-    console.log('✅ Todas as validações passaram');
+    // Validação de valor máximo
+    if (valor > 10000) { // máximo R$ 10.000
+      showAlert('O valor não pode exceder R$ 10.000,00', 'error');
+      return;
+    }
 
     const btnSalvar = document.getElementById('btnSalvar');
-    console.log('🔘 Botão salvar encontrado:', !!btnSalvar);
-    UIUtils.showLoading(btnSalvar);
-    console.log('✅ Loading mostrado no botão');
+    showLoading(btnSalvar);
 
     try {
       // Obter cor selecionada
       const corServico = document.getElementById('corServico').value;
-      console.log('🎨 Cor selecionada:', corServico, '(agora será salva no banco!)');
       
       if (this.servicoEditando) {
-        console.log('📝 Modo edição - serviço:', this.servicoEditando);
         // Atualizar serviço (com cor agora)
-        await window.dataManager.updateServico(this.servicoEditando.id, {
+        await window.services.servicos.update(this.servicoEditando.id, {
           nome, 
           duracao_min: duracao, // Novo campo
           valor, // Novo campo
           descricao,
           cor: corServico
         });
-        console.log('✅ Serviço atualizado com sucesso');
-        UIUtils.showAlert('Serviço atualizado com sucesso', 'success');
+        showAlert('Serviço atualizado com sucesso', 'success');
       } else {
-        console.log('🆕 Modo criação - novo serviço');
-        // Verificar se já existe
-        if (this.servicos.some(s => s.nome === nome)) {
-          console.log('❌ Serviço já existe:', nome);
-          UIUtils.showAlert('Já existe um serviço com este nome', 'error');
+        // ✅ FASE 3.5: FETCH DIRETO para validação - sempre dados frescos
+        const servicos = await window.services.servicos.list();
+        if (servicos.some(s => s.nome === nome)) {
+          showAlert('Já existe um serviço com este nome', 'error');
           return;
         }
         
         // Criar novo serviço (com cor agora)
-        console.log('💾 Criando novo serviço...');
-        await window.dataManager.addServico({ 
+        await window.services.servicos.create({ 
           nome, 
           duracao_min: duracao, // Novo campo
           valor, // Novo campo
           descricao,
           cor: corServico
         });
-        console.log('✅ Serviço criado com sucesso');
-        UIUtils.showAlert('Serviço criado com sucesso', 'success');
+        showAlert('Serviço criado com sucesso', 'success');
       }
 
-      console.log('🔄 Atualizando página...');
-      
-      // FORÇAR RECARGA COMPLETA DO BANCO
-      if (window.dataManager && window.dataManager.cache) {
-        window.dataManager.cache.servicos = null;
-        window.dataManager.servicos = []; // Limpar array local também
-        console.log('🗑️ Cache e array local limpos para recarga completa');
-      }
-      
+      // ✅ FASE 3.5: Re-render simples - DataCore garante consistência
       await this.renderPage();
-      await this.updateStatistics();
-      console.log('✅ Página atualizada');
       this.closeModal();
-      console.log('✅ Modal fechado');
     } catch (error) {
       console.error('❌ Erro ao salvar serviço:', error);
-      UIUtils.showAlert('Erro ao salvar serviço', 'error');
+      showAlert('Erro ao salvar serviço', 'error');
     } finally {
-      console.log('🔄 Escondendo loading...');
-      UIUtils.hideLoading(btnSalvar);
-      console.log('✅ Loading escondido');
+      hideLoading(btnSalvar);
     }
   }
 
   async deleteServiceByName(nome) {
-    const servico = this.servicos.find(s => s.nome === nome);
+    // ✅ FASE 3.5: FETCH DIRETO para buscar ID
+    const servicos = await window.services.servicos.list();
+    const servico = servicos.find(s => s.nome === nome);
     if (!servico) return;
 
     try {
-      await window.dataManager.deleteServico(servico.id);
-      UIUtils.showAlert('Serviço excluído com sucesso!', 'success');
+      await window.services.servicos.delete(servico.id);
+      showAlert('Serviço excluído com sucesso!', 'success');
+
+      // ✅ FASE 3.5: Re-render simples - DataCore garante consistência
       await this.renderPage();
-      await this.updateStatistics();
     } catch (error) {
       console.error('Erro ao excluir serviço:', error);
-      UIUtils.showAlert('Erro ao excluir serviço', 'error');
+      showAlert('Erro ao excluir serviço', 'error');
     }
   }
 
@@ -470,7 +475,7 @@ class ServicosPage extends PageManager {
   }
 
   async confirmDelete(nome) {
-    const confirmed = await window.ConfirmDialog.confirmDelete({
+    const confirmed = await window.confirmDelete({
       title: 'Excluir Serviço',
       message: 'Tem certeza que deseja excluir este serviço?',
       itemName: nome,
@@ -489,22 +494,15 @@ class ServicosPage extends PageManager {
     const colorInput = document.getElementById('corServico');
     const colorPreview = document.getElementById('colorPreview');
     
-    console.log('🔍 Elementos encontrados:');
-    console.log('  - colorInput:', !!colorInput);
-    console.log('  - colorPreview:', !!colorPreview);
-    
     if (!colorInput || !colorPreview) {
-      console.log('⚠️ Campos de cor não encontrados');
       return;
     }
     
     // Verificar se o preview tem o elemento de texto
     const previewText = colorPreview.querySelector('.preview-text');
-    console.log('  - previewText:', !!previewText);
     
     // Função para atualizar pré-visualização
     const updatePreview = (color) => {
-      console.log('🎨 Atualizando preview para cor:', color);
       colorPreview.style.backgroundColor = color;
       colorPreview.style.color = this.getContrastColor(color);
       if (previewText) {
@@ -515,15 +513,11 @@ class ServicosPage extends PageManager {
     // Event listener para input de cor
     colorInput.addEventListener('input', (e) => {
       const color = e.target.value;
-      console.log('🎨 Cor alterada pelo usuário:', color);
       updatePreview(color);
     });
     
     // Inicializar com a cor atual
-    console.log('🎨 Inicializando com cor:', colorInput.value);
     updatePreview(colorInput.value);
-    
-    console.log('✅ Seletor de cores configurado');
   }
   
   // Método para calcular cor de contraste
@@ -564,7 +558,7 @@ class ServicosPage extends PageManager {
 window.ServicosPage = ServicosPage;
 
 // Função global para o botão excluir
-window.confirmDelete = function(nome) {
+window.deleteService = function(nome) {
   if (window.pageManager && window.pageManager.confirmDelete) {
     window.pageManager.confirmDelete(nome);
   } else if (window.servicosPage && window.servicosPage.confirmDelete) {

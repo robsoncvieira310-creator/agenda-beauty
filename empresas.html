@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Empresas - Agenda Beauty</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css?v=20260319153000">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <h2>💇 Agenda Beauty</h2>
+      <nav>
+        <a href="index.html" class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Início</span>
+        </a>
+        <a href="agenda.html" class="nav-item">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Agenda</span>
+        </a>
+        <a href="clientes.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Clientes</span>
+        </a>
+        <a href="servicos.html" class="nav-item">
+          <span class="nav-icon">💇</span>
+          <span class="nav-text">Serviços</span>
+        </a>
+        <a href="profissionais.html" class="nav-item">
+          <span class="nav-icon">👩</span>
+          <span class="nav-text">Profissionais</span>
+        </a>
+        <a href="empresas.html" class="nav-item active" id="nav-empresas">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-text">Empresas</span>
+        </a>
+      </nav>
+
+      <!-- Verificação de role para Empresas -->
+      <script>
+        (function() {
+          function checkRoleAndHideEmpresas() {
+            try {
+              const authFSM = window.authFSM;
+              if (!authFSM || !authFSM.getState) {
+                console.log('[ROLE CHECK] authFSM não disponível - pulando verificação');
+                return;
+              }
+              
+              const state = authFSM.getState();
+              const user = state?.session?.user;
+              const role = user?.app_metadata?.role || user?.user_metadata?.role || user?.role;
+              
+              const empresasLink = document.getElementById('nav-empresas');
+              if (!empresasLink) return;
+              
+              if (role === 'admin') {
+                empresasLink.style.display = '';
+                console.log('[ROLE CHECK] Admin - mostrando Empresas');
+              } else {
+                empresasLink.style.display = 'none';
+                console.log('[ROLE CHECK] Não-admin - escondendo Empresas, role:', role);
+              }
+            } catch (e) {
+              console.log('[ROLE CHECK] Erro na verificação:', e.message);
+            }
+          }
+          
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkRoleAndHideEmpresas);
+          } else {
+            checkRoleAndHideEmpresas();
+          }
+        })();
+      </script>
+
+      <!-- Botão de Logout -->
+      <button id="logoutButton" class="btn btn-danger logout-btn">
+        🚪 Sair
+      </button>
+    </aside>
+
+    <main class="content">
+      <div class="page-header">
+        <h1>🏢 Empresas</h1>
+        <div class="header-actions">
+          <button id="btnAtualizar" class="btn btn-secondary">
+            🔄 Atualizar
+          </button>
+          <button id="btnNovaEmpresa" class="btn btn-primary">
+            <span class="btn-icon">➕</span>
+            Nova Empresa
+          </button>
+        </div>
+      </div>
+
+      <!-- Estatísticas -->
+      <div class="stats-section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">🏢</div>
+            <div class="stat-content">
+              <div class="stat-value" id="totalEmpresas">0</div>
+              <div class="stat-label">Total de Empresas</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">👤</div>
+            <div class="stat-content">
+              <div class="stat-value" id="totalAdmins">0</div>
+              <div class="stat-label">Administradores</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela de Empresas -->
+      <div class="table-container">
+        <div class="table-header">
+          <h2>Lista de Empresas</h2>
+          <div class="table-actions">
+            <input type="text" id="buscaEmpresa" class="form-control" placeholder="Buscar empresa...">
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Email Admin</th>
+                <th>ID</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaEmpresas">
+              <!-- Empresas serão carregadas aqui -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Alert Container -->
+  <div id="alertContainer" class="alert-container"></div>
+
+  <!-- Modal de Empresa -->
+  <div id="modalEmpresa" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitulo">Nova Empresa</h3>
+        <button type="button" id="btnFecharModal" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-section">
+          <div class="form-group">
+            <label for="nomeEmpresa">Nome da Empresa *</label>
+            <input type="text" id="nomeEmpresa" class="form-control" required placeholder="Nome da empresa">
+          </div>
+
+          <div class="form-group">
+            <label for="emailAdmin">Email do Administrador *</label>
+            <input type="email" id="emailAdmin" class="form-control" required placeholder="admin@empresa.com">
+            <small class="form-text text-muted">Este será o login do administrador da empresa.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="senhaAdmin">Senha *</label>
+            <input type="password" id="senhaAdmin" class="form-control" required placeholder="Mínimo 6 caracteres" minlength="6">
+            <small class="form-text text-muted">O administrador usará esta senha para fazer login.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btnCancelar" class="btn btn-secondary">
+          Cancelar
+        </button>
+        <button type="button" id="btnResetSenha" class="btn btn-warning" style="display: none;">
+          <span class="btn-icon">🔑</span>
+          Resetar Senha
+        </button>
+        <button type="button" id="btnSalvar" class="btn btn-primary">
+          <span class="btn-icon">💾</span>
+          Criar Empresa
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Nova Senha -->
+  <div id="modalNovaSenha" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Redefinir Senha</h3>
+        <button type="button" id="btnFecharModalNovaSenha" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-section">
+          <div class="form-group">
+            <label for="novaSenhaInput">Nova Senha *</label>
+            <input type="password" id="novaSenhaInput" class="form-control" required placeholder="Mínimo 8 caracteres" minlength="8">
+            <small class="form-text text-muted">A senha deve ter pelo menos 8 caracteres.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="confirmarSenhaInput">Confirmar Senha *</label>
+            <input type="password" id="confirmarSenhaInput" class="form-control" required placeholder="Digite novamente a senha">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btnCancelarNovaSenha" class="btn btn-secondary">
+          Cancelar
+        </button>
+        <button type="button" id="btnConfirmarNovaSenha" class="btn btn-primary">
+          <span class="btn-icon">🔑</span>
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Container -->
+  <div id="alertContainer" class="alert-container"></div>
+
+  <!-- ========================================= -->
+  <!-- DEPENDÊNCIAS CRÍTICAS - ORDEM FIXA OBRIGATÓRIA -->
+  <!-- ========================================= -->
+
+  <!-- 1. Infraestrutura Core (sem dependências) -->
+  <script src="js/supabaseClient.js?v=20260319160000"></script>
+  <script src="js/fsm/trace.js"></script>
+
+  <!-- ✅ FASE 1: EventLedger - Sistema central de registro de eventos -->
+  <script src="js/core/event-ledger.js"></script>
+
+  <script src="js/fsm/session-bus.js"></script>
+  <script src="js/fsm/effect-runner.js"></script>
+  <script src="js/fsm/auth-fsm.js"></script>
+
+  <!-- 1.5. Auth Authorization (camada de autorização alinhada com RLS) -->
+  <script src="js/auth-authorization.js"></script>
+
+  <!-- 2. Auth Bootstrap (DEVE vir antes de Data/Services) -->
+  <script src="js/auth/index.js"></script>
+  <script src="js/auth-store.js"></script>
+  <script src="js/bootstrap-auth.js"></script>
+
+  <!-- 3. Data (depende de Auth estabilizado) -->
+  <script src="js/data/core/DataCore.js"></script>
+  <script src="js/services/BaseService.js"></script>
+
+  <!-- 4. Utils -->
+  <script src="js/utils.js"></script>
+
+  <!-- 5. Services (dependem de DataCore) -->
+  <script src="js/services/ClienteService.js"></script>
+  <script src="js/services/ServicoService.js"></script>
+  <script src="js/services/ProfissionalService.js"></script>
+  <script src="js/services/EmpresaService.js?v=20260422150000"></script>
+  <script src="js/services/BloqueioService.js"></script>
+  <script src="js/services/AgendamentoService.js"></script>
+
+  <!-- 5.4. Boot Tracer (observability - DEVE vir primeiro) -->
+  <script src="js/core/boot-tracer.js"></script>
+
+  <!-- 5.5. Boot Kernel (fonte única de controle de execução - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/boot-kernel.js"></script>
+
+  <!-- 5.6. State Hydrator (unificação de estado - DEVE vir antes de CompositionRoot) -->
+  <script src="js/core/state-hydrator.js"></script>
+
+  <!-- 5.7. Boot Anomaly Detector (diagnóstico - non-blocking) -->
+  <script src="js/core/boot-anomaly-detector.js"></script>
+
+  <!-- 5.8. Boot Recovery Manager (resiliência - non-blocking) -->
+  <script src="js/core/boot-recovery-manager.js"></script>
+
+  <!-- ✅ FASE 3.0.1: Lifecycle Contract (DEVE vir antes dos Managers) -->
+  <script src="js/core/lifecycle-contract.js"></script>
+
+  <!-- 🎯 FASE 3.0.1.1: SidebarManager (passivo - carregado antes do CompositionRoot) -->
+  <script src="js/sidebarManager.js"></script>
+
+  <!-- 6. Composition Root (orquestra tudo) -->
+  <script src="js/composition-root.js"></script>
+
+  <!-- 7. Page Scripts -->
+  <script src="js/empresasPage.js"></script>
+  <script src="js/logoutManager.js?v=20260319160000"></script>
+
+  <!-- 8. UI Managers -->
+  <script src="js/menuManager.js"></script>
+
+  <script src="js/core/navigation-effect-runner.js"></script>
+
+  <!-- Bootstrap FSM UI + Carregamento de Página -->
+  <script>
+    // Usar window.* em vez de imports
+    const bootstrapApp = window.bootstrapApp;
+    const EmpresasPage = window.EmpresasPage;
+
+    // GUARD DE INTEGRIDADE DO BOOTSTRAP
+    window.__BOOTSTRAP_OK__ = false;
+    window.__BOOTSTRAP_FAILED__ = false;
+    window.__setBootstrapOk = () => { window.__BOOTSTRAP_OK__ = true; };
+
+    // SAFE TRACE BOOTSTRAP (cross-page safe)
+    try {
+      if (typeof window.trace !== 'function') {
+        window.trace = () => {};
+      }
+    } catch (e) {
+      window.trace = () => {};
+    }
+
+    // 🔥 BOOTSTRAP PIPE - ADAPTER MODE (Read-Only - ZERO STATE)
+    window.__BOOTSTRAP_PIPE = (function() {
+      function mapKernelToPipeStage() {
+        const kernel = window.__BOOT_KERNEL__ || window.__KERNEL__ || window.kernel;
+
+        if (!kernel) {
+          console.warn('[PIPE ADAPTER] Kernel não disponível, retornando INIT');
+          return { stage: 'INIT', flags: { managers: 'pending', auth: 'pending', pageManager: 'pending' } };
+        }
+
+        const state = kernel.getState?.() || kernel.state || {};
+
+        if (state.completed) {
+          return { stage: 'COMPLETE', flags: { managers: 'ready', auth: 'ready', pageManager: 'ready' } };
+        }
+        if (state.failed) {
+          return { stage: 'ERROR', flags: { managers: 'failed', auth: 'failed', pageManager: 'failed' } };
+        }
+        if (state.phase === 'AUTH' || state.auth?.stabilizing) {
+          return { stage: 'AUTH_STABLE', flags: { managers: 'ready', auth: 'stabilizing', pageManager: 'pending' } };
+        }
+        if (state.phase || state.managers?.initialized) {
+          return { stage: 'SERVICES_INIT', flags: { managers: 'ready', auth: 'pending', pageManager: 'pending' } };
+        }
+
+        return { stage: 'INIT', flags: { managers: 'pending', auth: 'pending', pageManager: 'pending' } };
+      }
+
+      return {
+        getStage: mapKernelToPipeStage,
+        isReady: () => mapKernelToPipeStage().stage === 'COMPLETE',
+        subscribe: () => {
+          console.warn('[PIPE ADAPTER] Subscribe não implementado - usar AuthFSM.subscribe diretamente');
+          return () => {};
+        }
+      };
+    })();
+
+    // 🔥 INICIALIZAÇÃO FSM-DRIVEN (NOVO PADRÃO)
+    (async function() {
+      try {
+        console.log('[Empresas Bootstrap] Starting FSM-driven initialization...');
+
+        // 1. INICIALIZAR BOOTSTRAP (não esperar)
+        const bootstrapPromise = bootstrapApp();
+
+        // 2. CONFIGURAR LISTENER DE ESTADO (não bloqueante)
+        const stateCheck = setInterval(() => {
+          const kernel = window.__BOOT_KERNEL__ || window.__KERNEL__;
+          const state = kernel?.getState?.() || {};
+
+          if (state.completed && !window.__BOOTSTRAP_OK__) {
+            console.log('[Empresas Bootstrap] Kernel completed - marking OK');
+            window.__setBootstrapOk();
+            clearInterval(stateCheck);
+          }
+        }, 100);
+
+        // 3. TIMEOUT DE SEGURANÇA (20s)
+        const timeout = setTimeout(() => {
+          if (!window.__BOOTSTRAP_OK__) {
+            console.warn('[Empresas Bootstrap] Timeout - marking OK anyway');
+            window.__setBootstrapOk();
+          }
+          clearInterval(stateCheck);
+        }, 20000);
+
+        // 4. AGUARDAR BOOTSTRAP (sem bloquear UI indefinidamente)
+        await Promise.race([
+          bootstrapPromise,
+          new Promise(resolve => setTimeout(resolve, 8000))
+        ]);
+
+        clearTimeout(timeout);
+        clearInterval(stateCheck);
+
+        // 5. VERIFICAR ESTADO DO KERNEL (fonte da verdade)
+        const kernel = window.__BOOT_KERNEL__ || window.__KERNEL__ || window.kernel;
+        const kernelReady = kernel?.state === 'READY' || kernel?.ready === true;
+        const hasServices = !!window.services;
+
+        console.log('[Empresas Bootstrap] Checking initialization:', {
+          kernelState: kernel?.state,
+          kernelReady,
+          hasServices,
+          empresasPageType: typeof window.EmpresasPage
+        });
+
+        // 6. INICIALIZAR PÁGINA (se kernel estiver pronto)
+        if (kernelReady && hasServices && window.EmpresasPage) {
+          console.log('[Empresas Bootstrap] Initializing EmpresasPage...');
+          window.__BOOTSTRAP_OK__ = true; // Marcar para futuras verificações
+          const empresasPage = new window.EmpresasPage();
+          window.empresasPage = empresasPage;
+
+          // Usar novo contrato FSM
+          if (empresasPage.initializePage) {
+            await empresasPage.initializePage();
+          } else {
+            await empresasPage.initialize();
+          }
+        } else {
+          console.error('[Empresas Bootstrap] Cannot initialize:', {
+            kernelState: kernel?.state,
+            kernelReady,
+            hasServices,
+            empresasPageType: typeof window.EmpresasPage
+          });
+        }
+
+      } catch (error) {
+        console.error('[Empresas Bootstrap] Error:', error);
+        window.__BOOTSTRAP_FAILED__ = true;
+      }
+    })();
+  </script>
+</body>
+</html>
