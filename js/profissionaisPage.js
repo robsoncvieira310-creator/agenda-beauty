@@ -27,6 +27,16 @@ window.ProfissionaisPage = class ProfissionaisPage {
 
   // 🎯 MÉTODO OBRIGATÓRIO: Contrato de bootstrap FSM
   async initializePage() {
+    // ⚠️ VALIDAÇÃO FRONTEND: Apenas admin ou adm_empresa pode acessar (secundária)
+    // A validação REAL acontece no backend (Edge Function)
+    if (!this._canAccessProfissionaisPage()) {
+      window.showAlert?.('Acesso negado. Apenas administradores podem acessar esta página.', 'error');
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
+      return;
+    }
+
     // 🔒 FASE 3.5: Entry point único - sempre fetch fresco do DataCore
     await this.initialize();
     await this.renderPage();
@@ -54,10 +64,17 @@ window.ProfissionaisPage = class ProfissionaisPage {
   }
 
   setupProfessionalButtons() {
-    // Botão novo profissional
+    // Botão novo profissional - com controle de permissão
     const btnNovo = document.getElementById('btnNovoProfissional');
     if (btnNovo) {
-      btnNovo.addEventListener('click', () => this.openModal());
+      // Verificar permissão antes de configurar o botão
+      if (!this._canCreateProfissionais()) {
+        btnNovo.style.display = 'none';
+        console.log('[ProfissionaisPage] Botão Novo Profissional oculto - usuário sem permissão');
+      } else {
+        btnNovo.addEventListener('click', () => this.openModal());
+        console.log('[ProfissionaisPage] Botão Novo Profissional habilitado - usuário com permissão');
+      }
     } else {
       console.error('❌ Botão Novo Profissional não encontrado!');
     }
@@ -690,6 +707,57 @@ window.ProfissionaisPage = class ProfissionaisPage {
   isValidEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  }
+
+  /**
+   * ⚠️ VALIDAÇÃO FRONTEND (SECUNDÁRIA)
+   * Verifica se usuário atual pode acessar página profissionais
+   * Permite admin e adm_empresa, bloqueia profissional
+   * A validação REAL acontece no backend (Edge Function)
+   */
+  _canAccessProfissionaisPage() {
+    const authz = window.authAuthorization || (window.AuthAuthorization && window.createAuthAuthorization && window.createAuthAuthorization());
+    if (authz) {
+      const role = this._getUserRole();
+      return role === 'admin' || role === 'adm_empresa';
+    }
+
+    // Fallback: verificar role no user_metadata
+    const state = window.authFSM?.getState?.();
+    const role = state?.session?.user?.user_metadata?.role || state?.session?.user?.app_metadata?.role;
+    return role === 'admin' || role === 'adm_empresa';
+  }
+
+  /**
+   * ⚠️ VALIDAÇÃO FRONTEND (SECUNDÁRIA)
+   * Verifica se usuário atual pode criar profissionais
+   * Permite admin e adm_empresa, bloqueia profissional
+   */
+  _canCreateProfissionais() {
+    return this._canAccessProfissionaisPage();
+  }
+
+  /**
+   * 🔍 Obter role do usuário atual
+   */
+  _getUserRole() {
+    try {
+      const state = window.authFSM?.getState?.();
+      const user = state?.session?.user;
+      
+      if (!user) {
+        console.warn('[ProfissionaisPage] _getUserRole: No user found');
+        return null;
+      }
+
+      // Prioridade: app_metadata (JWT) > user_metadata (legado)
+      const role = user.app_metadata?.role || user.user_metadata?.role;
+      console.log('[ProfissionaisPage] _getUserRole:', { userId: user.id, role });
+      return role;
+    } catch (e) {
+      console.error('[ProfissionaisPage] _getUserRole error:', e);
+      return null;
+    }
   }
 
   

@@ -29,20 +29,20 @@
           <span class="nav-icon">💇</span>
           <span class="nav-text">Serviços</span>
         </a>
-        <a href="profissionais.html" class="nav-item active">
+        <a href="profissionais.html" class="nav-item active" id="nav-profissionais">
           <span class="nav-icon">👩</span>
           <span class="nav-text">Profissionais</span>
         </a>
         <a href="empresas.html" class="nav-item" id="nav-empresas">
-          <span class="nav-icon">🏢</span>
+          <span class="nav-icon"></span>
           <span class="nav-text">Empresas</span>
         </a>
       </nav>
 
-      <!-- Verificação de role para Empresas -->
+      <!-- Verificação de role para Empresas e Profissionais -->
       <script>
         (function() {
-          function checkRoleAndHideEmpresas() {
+          function checkRoleAndHideMenuItems() {
             try {
               const authFSM = window.authFSM;
               if (!authFSM || !authFSM.getState) {
@@ -54,26 +54,38 @@
               const user = state?.session?.user;
               const role = user?.app_metadata?.role || user?.user_metadata?.role || user?.role;
               
+              // Verificar Empresas (só admin)
               const empresasLink = document.getElementById('nav-empresas');
-              if (!empresasLink) return;
+              if (empresasLink) {
+                if (role === 'admin') {
+                  empresasLink.style.display = '';
+                  console.log('[ROLE CHECK] Admin - mostrando Empresas');
+                } else {
+                  empresasLink.style.display = 'none';
+                  console.log('[ROLE CHECK] Não-admin - escondendo Empresas, role:', role);
+                }
+              }
               
-              if (role === 'admin') {
-                empresasLink.style.display = '';
-                console.log('[ROLE CHECK] Admin - mostrando Empresas');
-              } else {
-                empresasLink.style.display = 'none';
-                console.log('[ROLE CHECK] Não-admin - escondendo Empresas, role:', role);
+              // Verificar Profissionais (admin e adm_empresa)
+              const profissionaisLink = document.getElementById('nav-profissionais');
+              if (profissionaisLink) {
+                if (role === 'admin' || role === 'adm_empresa') {
+                  profissionaisLink.style.display = '';
+                  console.log('[ROLE CHECK] Admin/AdmEmpresa - mostrando Profissionais');
+                } else {
+                  profissionaisLink.style.display = 'none';
+                  console.log('[ROLE CHECK] Profissional - escondendo Profissionais, role:', role);
+                }
               }
             } catch (e) {
               console.log('[ROLE CHECK] Erro na verificação:', e.message);
             }
           }
           
-          // Verificação única quando DOM estiver pronto
           if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', checkRoleAndHideEmpresas);
+            document.addEventListener('DOMContentLoaded', checkRoleAndHideMenuItems);
           } else {
-            checkRoleAndHideEmpresas();
+            checkRoleAndHideMenuItems();
           }
         })();
       </script>
