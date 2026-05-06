@@ -120,15 +120,26 @@ class SupabaseClient {
       },
 
       async signOut() {
-        const response = await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`
-          }
-        });
-        localStorage.removeItem('supabase.auth.token');
-        return response.json();
+        try {
+          const response = await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`
+            }
+          });
+          return response.json();
+        } catch (err) {
+          console.warn('[SUPABASE SIGNOUT] Server logout failed:', err);
+          return { error: { message: err.message } };
+        } finally {
+          // ✅ Limpeza atômica local - executa mesmo em erro de rede
+          localStorage.removeItem('supabase.auth.token');
+          localStorage.removeItem('supabase.auth.refreshToken');
+          localStorage.removeItem('auth_session');
+          sessionStorage.removeItem('auth_redirect_done');
+          console.log('[SUPABASE SIGNOUT] Todos os tokens e sessões foram limpos');
+        }
       },
 
       async getSession() {

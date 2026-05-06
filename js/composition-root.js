@@ -294,68 +294,60 @@ window.CompositionRoot = class CompositionRoot {
     const initialSession = this.sessionBus.getCurrentSession();
     console.log('[BOOT] Snapshot obtido:', { hasSession: !!initialSession });
 
-    // 2. Aplicar snapshot ao FSM (DECISÃO FINAL DE ESTADO - não depende de evento)
-    // 🎯 FASE 1: applySnapshot é síncrono - sempre inicia em AUTHENTICATED se houver sessão
-    const snapshotResult = this.authFSM.applySnapshot(initialSession);
-    console.log('[BOOT] Snapshot aplicado:', snapshotResult);
+// 2. Aplicar snapshot ao FSM (DECISÃO FINAL DE ESTADO - não depende de evento)
+// FASE 1: applySnapshot é síncrono - sempre inicia em AUTHENTICATED se houver sessão
+const snapshotResult = this.authFSM.applySnapshot(initialSession);
+console.log('[BOOT] Snapshot aplicado:', snapshotResult);
 
-    // 🎯 DETECÇÃO CORRETA (Supabase v2 safe chain)
-    try {
-      const state = this.authFSM.getState();
-      const userId = state?.userId;
+// VERIFICAÇÃO DE FIRST_LOGIN REMOVIDA - Agora handled pelo NavigationEffectRunner
+// Isso evita duplicação de verificação e race conditions
+console.log('[BOOT] Verificação de first_login_completed delegada ao NavigationEffectRunner');
 
-      if (!userId) {
-        console.log('[BOOT] userId ausente — pulando verificação de first login (UNAUTHENTICATED)');
-      } else {
-        const client = window.supabaseClient;
+// 3. Reconcile imediato (após FSM estar conectado, mas estado já decidido)
+await this.sessionBus.reconcileImmediate();
+console.log('[BOOT] SessionBus reconcile completo');
 
-        if (!client || typeof client.from !== 'function') {
-          console.error('[BOOT] supabaseClient inválido ou não inicializado');
-        } else {
-          const query = client
-            .from('profiles')
-            .select('first_login_completed')
-            .eq('id', userId)
-            .maybeSingle();
+// 4. Auto-heal só pode atuar após hydration completo
+// Não é mais gate de boot - só verificação pós-hydration
+const healResult = await this.authFSM.runAutoHeal({ trigger: 'composition_root', postHydration: true });
+console.log('[CompositionRoot] Auto-heal pós-hydration:', healResult);
 
-          const { data, error } = await query;
+// 6. Verificar estado estável (FSM já deve estar _hydrated)
+// DETERMINÍSTICO: Não aguarda - estado já foi decidido pelo snapshot
+const bootState = this.authFSM.getState?.();
+console.log('[CompositionRoot] AuthFSM estado final (pós-snapshot):', bootState);
+  
+if (!this.authFSM._hydrated) {
+console.error('[BOOT CRÍTICO] FSM não está hydrated após snapshot - estado inconsistente');
+}
 
-          if (error) {
-            console.error('[BOOT] Erro ao carregar profile:', error.message);
-          } else if (!data) {
-            console.warn('[BOOT] Profile não encontrado para userId:', userId);
-          } else {
-            console.log('[BOOT] first_login_completed:', data.first_login_completed);
+// 7. UI mount
+if (uiAdapter) {
+this.uiAdapter = uiAdapter;
+this.mountUI();
+}
 
-            if (data.first_login_completed === false) {
-              console.log('[BOOT] Disparando FIRST_LOGIN_DETECTED');
-              this.authFSM.dispatch('FIRST_LOGIN_DETECTED');
-            }
-          }
-        }
-      }
+// 8. Setup listener
+this.setupStateListener();
 
-    } catch (err) {
-      console.error('[BOOT] Falha crítica ao verificar first login:', err);
-    }
+// 8.5. Navigation Effect Runner (FSM-driven navigation)
+// Navegação 100% baseada em eventos do AuthFSM - sem polling, sem DOM dependency
+if (window.NavigationEffectRunner) {
+this.navigationRunner = new NavigationEffectRunner(this.authFSM);
+this.navigationRunner.init();
+// Expor globalmente para debug
+window.__NAVIGATION_RUNNER__ = this.navigationRunner;
+console.log('[CompositionRoot] NavigationEffectRunner inicializado');
+}
 
-    // 3. Reconcile imediato (após FSM estar conectado, mas estado já decidido)
-    await this.sessionBus.reconcileImmediate();
-    console.log('[BOOT] SessionBus reconcile completo');
+// 9. DataCore
+this.core = new DataCore(supabaseClient);
+console.log('[CompositionRoot] DataCore ready');
 
-    // 4. Auto-heal só pode atuar após hydration completo
-    // Não é mais gate de boot - só verificação pós-hydration
-    const healResult = await this.authFSM.runAutoHeal({ trigger: 'composition_root', postHydration: true });
-    console.log('[CompositionRoot] Auto-heal pós-hydration:', healResult);
-
-    // 6. Verificar estado estável (FSM já deve estar _hydrated)
-    // ✅ DETERMINÍSTICO: Não aguarda - estado já foi decidido pelo snapshot
-    const bootState = this.authFSM.getState?.();
-    console.log('[CompositionRoot] AuthFSM estado final (pós-snapshot):', bootState);
-    
-    if (!this.authFSM._hydrated) {
-      console.error('[BOOT CRÍTICO] FSM não está hydrated após snapshot - estado inconsistente');
-    }
+// 10. Services (com proteção contra duplicação)
+if (window.services) {
+throw new Error('[BOOTSTRAP FATAL] Services já inicializados');
+}
 
     // 7. UI mount
     if (uiAdapter) {

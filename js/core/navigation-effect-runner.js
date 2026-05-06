@@ -53,13 +53,20 @@ window.NavigationEffectRunner = class NavigationEffectRunner {
     console.log('[NavigationEffectRunner] State received:', {
       state: state.state,
       canAccessApp: state.canAccessApp,
+      requiresPasswordChange: state.requiresPasswordChange,
       hasRedirected: this.hasRedirected
     });
 
+    // 🎯 PRIORIDADE 1: FIRST_LOGIN_REQUIRED - redirecionar para change-password
+    if (state.requiresPasswordChange) {
+      this.executeFirstLoginRedirect();
+      return;
+    }
+
     // 🎯 FASE 5: Navegação baseada em canAccessApp
     if (state.canAccessApp) {
-      // Usuário autenticado → redirecionar para app se estiver no login
-      this.executeRedirect();
+      // 🎯 VERIFICAR FIRST_LOGIN ANTES DE REDIRECIONAR
+      this._checkFirstLoginAndRedirect(state);
     } else {
       // Usuário não autenticado → redirecionar para login se não estiver no login
       this.executeLogoutRedirect();
@@ -91,6 +98,104 @@ window.NavigationEffectRunner = class NavigationEffectRunner {
 
     // Executar navegação
     window.location.href = this.targetUrl;
+  }
+
+  /**
+   * 🎯 Verificar first_login_completed antes de redirecionar
+   */
+  async _checkFirstLoginAndRedirect(state) {
+    try {
+      const userId = state.userId;
+      if (!userId) {
+        console.warn('[NavigationEffectRunner] _checkFirstLoginAndRedirect: userId não disponível');
+        return;
+      }
+
+      console.log('[NavigationEffectRunner] Verificando first_login_completed para userId:', userId);
+
+      // 🎯 Usar supabaseClient para evitar problemas com token expirado
+      const client = window.supabaseClient;
+      if (!client) {
+        console.warn('[NavigationEffectRunner] supabaseClient não disponível');
+        return;
+      }
+
+      console.log('[NavigationEffectRunner] Usando supabaseClient para verificar first_login_completed');
+
+      try {
+        // 🎯 Usar edge function para verificar first_login_completed sem JWT
+        const SUPABASE_URL = 'https://kckbcjjgbipcqzkynwpy.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtja2JjampnaXBjcXpreW53cHkiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3Mjc0MjEyOCwiZXhwIjoyMDg4MzE4MTI4fQ.h3Z8LkzH_PXxE-BBHPii3WUwfHQH5HESsvzHUHKY7ZE';
+
+        const headers = {
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        };
+
+        const url = `${SUPABASE_URL}/functions/v1/first-login-change-password`;
+        console.log('[NavigationEffectRunner] Chamando edge function para verificar first_login_completed');
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ action: 'check', userId })
+        });
+
+        const data = await response.json();
+
+        console.log('[NavigationEffectRunner] Response status:', response.status);
+        console.log('[NavigationEffectRunner] Response data:', data);
+
+        if (!response.ok) {
+          console.error('[NavigationEffectRunner] Erro ao verificar first_login_completed:', response.status, data);
+          return;
+        }
+
+        const firstLoginCompleted = data.first_login_completed;
+        console.log('[NavigationEffectRunner] first_login_completed:', firstLoginCompleted);
+
+        if (firstLoginCompleted === false) {
+          console.log('[NavigationEffectRunner] First login detectado! Redirecionando para change-password.html');
+          this.executeFirstLoginRedirect();
+        } else {
+          console.log('[NavigationEffectRunner] First login já completado - redirecionando para index.html');
+          this.executeRedirect();
+        }
+
+      } catch (err) {
+        console.error('[NavigationEffectRunner] Erro em _checkFirstLoginAndRedirect:', err);
+      }
+
+    } catch (error) {
+      console.error('[NavigationEffectRunner] Erro em _checkFirstLoginAndRedirect:', error);
+    }
+  }
+
+  /**
+   * Executa redirect para change-password quando FIRST_LOGIN_REQUIRED
+   */
+  executeFirstLoginRedirect() {
+    if (this.hasRedirected) {
+      console.log('[NavigationEffectRunner] Redirect já executado, ignorando');
+      return;
+    }
+
+    // Guard: só redirecionar se NÃO estiver na página de change-password
+    const currentPath = window.location.pathname;
+    const isChangePasswordPage = currentPath.includes('change-password');
+
+    if (isChangePasswordPage) {
+      console.log('[NavigationEffectRunner] Já está na página de change-password, skip redirect');
+      return;
+    }
+
+    // Marcar como redirecionado ANTES de navegar (prevents race)
+    this.hasRedirected = true;
+
+    console.log('[NavigationEffectRunner] 🚀 Redirecionando para change-password.html (FIRST_LOGIN_REQUIRED)');
+
+    // Executar navegação
+    window.location.href = 'change-password.html';
   }
 
   /**

@@ -1795,6 +1795,15 @@ window.AuthFSM = class AuthFSM {
 
   // AUTHENTICATED: usuário logado, aceita logout ou refresh
   async handleAuthenticated(event, payload, meta) {
+    // 🎯 FASE 2: Verificar first_login_completed após login bem-sucedido
+    if (event === AuthEvent.LOGIN_SUCCESS) {
+      console.log('[AuthFSM] LOGIN_SUCCESS → verificando first_login_completed');
+      
+      // Verificar se é primeiro login
+      await this._checkFirstLoginAndRedirect();
+      return;
+    }
+
     if (event === AuthEvent.LOGOUT_REQUEST) {
       // FASE 4: LOG DO FLUXO DE LOGOUT - antes
       console.log('[LOGOUT TEST]', {
@@ -1929,6 +1938,74 @@ window.AuthFSM = class AuthFSM {
         this.session = payload;
         this.emitStateChange();
       }
+    }
+
+    // 🎯 FASE 2: Transição para FIRST_LOGIN_REQUIRED quando detectado primeiro login
+    if (event === AuthEvent.FIRST_LOGIN_DETECTED) {
+      console.log('[AuthFSM] FIRST_LOGIN_DETECTED → transicionando para FIRST_LOGIN_REQUIRED');
+      this.transitionTo(AuthState.FIRST_LOGIN_REQUIRED);
+      this.emitStateChange();
+      return { status: 'transitioned', to: AuthState.FIRST_LOGIN_REQUIRED };
+    }
+  }
+
+  // 🎯 FASE 2: Método para verificar first_login_completed após login
+  async _checkFirstLoginAndRedirect() {
+    try {
+      const userId = this.session?.user?.id;
+      if (!userId) {
+        console.warn('[AuthFSM] _checkFirstLoginAndRedirect: userId não disponível');
+        return;
+      }
+
+      console.log('[AuthFSM] Verificando first_login_completed para userId:', userId);
+
+      // Usar a mesma lógica do composition-root.js para verificar first_login_completed
+      const token = this.session?.access_token;
+      if (!token) {
+        console.warn('[AuthFSM] _checkFirstLoginAndRedirect: token não disponível');
+        return;
+      }
+
+      const SUPABASE_URL = 'https://kckbcjjgbipcqzkynwpy.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtja2JjampnaXBjcXpreW53cHkiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3Mjc0MjEyOCwiZXhwIjoyMDg4MzE4MTI4fQ.h3Z8LkzH_PXxE-BBHPii3WUwfHQH5HESsvzHUHKY7ZE';
+
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${token}`
+      };
+
+      const url = `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=first_login_completed`;
+      console.log('[AuthFSM] Query URL:', url);
+
+      const response = await fetch(url, { headers });
+      const data = await response.json();
+
+      console.log('[AuthFSM] Response status:', response.status);
+      console.log('[AuthFSM] Response data:', data);
+
+      if (!response.ok) {
+        console.error('[AuthFSM] Erro ao verificar first_login_completed:', response.status);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.log('[AuthFSM] Profile não encontrado para userId:', userId);
+        return;
+      }
+
+      const firstLoginCompleted = data[0]?.first_login_completed;
+      console.log('[AuthFSM] first_login_completed:', firstLoginCompleted);
+
+      if (firstLoginCompleted === false) {
+        console.log('[AuthFSM] First login detectado! Disparando FIRST_LOGIN_DETECTED');
+        this.dispatch(AuthEvent.FIRST_LOGIN_DETECTED);
+      } else {
+        console.log('[AuthFSM] First login já completado - permanecendo em AUTHENTICATED');
+      }
+
+    } catch (error) {
+      console.error('[AuthFSM] Erro em _checkFirstLoginAndRedirect:', error);
     }
   }
 
@@ -2761,11 +2838,10 @@ window.AuthFSM = class AuthFSM {
   }
 
   getState() {
-    // 🎯 FASE 9: Flags corretas do contrato
+    // FASE 9: Flags corretas do contrato
     const hasSession =
       this.state === AuthState.AUTHENTICATED ||
       this.state === AuthState.FIRST_LOGIN_REQUIRED;
-
     const state = {
       state: this.state,
       session: this.session,
@@ -2775,7 +2851,8 @@ window.AuthFSM = class AuthFSM {
       isAuthenticated: this.state === AuthState.AUTHENTICATED,
       requiresPasswordChange: this.state === AuthState.FIRST_LOGIN_REQUIRED,
       canAccessApp: this.state === AuthState.AUTHENTICATED,
-      hasSession: hasSession
+      hasSession: hasSession,
+      userId: this.session?.user?.id || this.userId
     };
 
     // FASE 2: LOG REAL DO ESTADO
@@ -2784,7 +2861,7 @@ window.AuthFSM = class AuthFSM {
       isAuthenticated: state.isAuthenticated,
       canAccessApp: state.canAccessApp,
       hasSession: state.hasSession,
-      userId: state.session?.user?.id,
+      userId: state.userId,
       error: state.error?.message || null
     }, null, 2));
 
