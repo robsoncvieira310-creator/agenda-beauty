@@ -1,5 +1,5 @@
 
-https://robsoncvieira310-creator.github.io/agenda-beauty/profissionais.html
+https://robsoncvieira310-creator.github.io/agenda-beauty/
 
 # 🌟 Agenda Beauty - Sistema de Gestão para Salões de Beleza
 
