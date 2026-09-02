@@ -7,6 +7,7 @@
   
   <!-- CSS -->
   <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
   
   <style>
     /* Estilos específicos da página de login */
@@ -194,7 +195,7 @@
 <body>
   <div class="login-container">
     <div class="login-card">
-      <div class="login-logo">💇</div>
+      <div class="login-logo"><i data-lucide="sparkles"></i></div>
       <h1 class="login-title">Agenda Beauty</h1>
       <p class="login-subtitle">Sistema de Agendamento Profissional</p>
       
@@ -397,6 +398,9 @@
     document.addEventListener('DOMContentLoaded', async () => {
       console.log('[LOGIN INIT] DOMContentLoaded - inicializando...');
 
+      // Inicializar ícones Lucide
+      if (window.lucide) window.lucide.createIcons();
+
       // � STATE-DRIVEN: Leitura síncrona direta do kernel
       const kernel =
         window.__BOOT_KERNEL__ ||
@@ -473,9 +477,10 @@
         if (alertContainer) {
           alertContainer.innerHTML = `
             <div class="login-error">
-              ⚠️ Sua sessão expirou. Por favor, faça login novamente.
+              <i data-lucide="alert-triangle"></i> Sua sessão expirou. Por favor, faça login novamente.
             </div>
           `;
+          if (window.lucide) window.lucide.createIcons();
         }
         // Limpar URL parameter
         window.history.replaceState({}, document.title, window.location.pathname);

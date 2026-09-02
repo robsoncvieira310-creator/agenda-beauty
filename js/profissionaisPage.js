@@ -260,7 +260,8 @@ window.ProfissionaisPage = class ProfissionaisPage {
       
       // PROTEGER BOTÃO
       btnReset.disabled = true;
-      btnReset.innerHTML = '<span class="btn-icon">⏳</span> Gerando senha...';
+      btnReset.innerHTML = '<span class="btn-icon"><i data-lucide="loader-2"></i></span> Gerando senha...';
+      if (window.lucide) window.lucide.createIcons();
       
       // TODO: Implementar reset de senha via Supabase Auth ou Edge Function
       const resultado = { senha_temporaria: 'temp123456' }; // Placeholder
@@ -285,7 +286,8 @@ window.ProfissionaisPage = class ProfissionaisPage {
       showAlert('Erro ao resetar senha: ' + error.message, 'error');
     } finally {
       btnReset.disabled = false;
-      btnReset.innerHTML = '<span class="btn-icon">🔑</span> Resetar Senha';
+      btnReset.innerHTML = '<span class="btn-icon"><i data-lucide="key-round"></i></span> Resetar Senha';
+      if (window.lucide) window.lucide.createIcons();
     }
   }
   

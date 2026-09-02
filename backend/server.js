@@ -12,13 +12,24 @@ app.use(express.json());
 // ========================================
 // SERVIR FRONTEND
 // ========================================
-app.use(express.static(path.join(__dirname, "../public")));
+app.use(
+  express.static(path.join(__dirname, "../"), {
+    // Evitar cache agressivo de HTML para não exibir versões antigas
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      }
+    },
+  })
+);
 
 // ========================================
 // ROTA PRINCIPAL
 // ========================================
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/index.html"));
+  res.sendFile(path.join(__dirname, "../index.html"));
 });
 
 // ========================================

@@ -125,7 +125,7 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
     tbody.innerHTML = '';
 
     if (servicos.length === 0) {
-      this.renderEmptyState(tbody, 'Nenhum serviço cadastrado', '💇', 'openNewServiceModal()');
+      this.renderEmptyState(tbody, 'Nenhum serviço cadastrado', '<i data-lucide="sparkles"></i>', 'openNewServiceModal()');
       return;
     }
 
@@ -160,10 +160,10 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
         <td>
           <div class="table-actions">
             <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')" title="Editar">
-              <span class="btn-icon">✏️</span>
+              <span class="btn-icon"><i data-lucide="pencil"></i></span>
             </button>
             <button class="btn btn-sm btn-danger" onclick="deleteService('${servico.nome}')" title="Excluir">
-              <span class="btn-icon">🗑️</span>
+              <span class="btn-icon"><i data-lucide="trash-2"></i></span>
             </button>
           </div>
         </td>
@@ -221,7 +221,7 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
     tbody.innerHTML = '';
 
     if (filtrados.length === 0) {
-      this.renderEmptyState(tbody, `Nenhum serviço encontrado para "${term}"`, '🔍');
+      this.renderEmptyState(tbody, `Nenhum serviço encontrado para "${term}"`, '<i data-lucide="search"></i>');
       return;
     }
 
@@ -236,12 +236,14 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
         <td><span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span></td>
         <td><span class="badge badge-info">${agendamentosCount}</span></td>
         <td>
-          <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')">✏️</button>
-          <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')">🗑️</button>
+          <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')" title="Editar"><i data-lucide="pencil"></i></button>
+          <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')" title="Excluir"><i data-lucide="trash-2"></i></button>
         </td>
       `;
       tbody.appendChild(tr);
     });
+    
+    if (window.lucide) window.lucide.createIcons();
     
   }
 
@@ -282,7 +284,7 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
     tbody.innerHTML = '';
 
     if (filtrados.length === 0) {
-      this.renderEmptyState(tbody, `Nenhum serviço encontrado para "${term}"`, '🔍');
+      this.renderEmptyState(tbody, `Nenhum serviço encontrado para "${term}"`, '<i data-lucide="search"></i>');
       return;
     }
 
@@ -297,12 +299,15 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
         <td><span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span></td>
         <td><span class="badge badge-info">${agendamentosCount}</span></td>
         <td>
-          <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')">✏️</button>
-          <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')">🗑️</button>
+          <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')" title="Editar"><i data-lucide="pencil"></i></button>
+          <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')" title="Excluir"><i data-lucide="trash-2"></i></button>
         </td>
       `;
       tbody.appendChild(tr);
     });
+    
+    if (window.lucide) window.lucide.createIcons();
+    
   }
 
   openNewServiceModal() {

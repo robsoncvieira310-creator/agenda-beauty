@@ -8,6 +8,9 @@
   <!-- FullCalendar -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
   
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
@@ -19,30 +22,30 @@
 <body>
   <div class="layout">
     <aside class="sidebar" id="sidebar">
-      <h2>💇 Agenda Beauty</h2>
+      <h2><i data-lucide="sparkles"></i> Agenda Beauty</h2>
       <nav>
         <a href="index.html" class="nav-item">
-          <span class="nav-icon">🏠</span>
+          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
           <span class="nav-text">Início</span>
         </a>
         <a href="agenda.html" class="nav-item active">
-          <span class="nav-icon">📅</span>
+          <span class="nav-icon"><i data-lucide="calendar-days"></i></span>
           <span class="nav-text">Agenda</span>
         </a>
         <a href="clientes.html" class="nav-item">
-          <span class="nav-icon">👥</span>
+          <span class="nav-icon"><i data-lucide="users"></i></span>
           <span class="nav-text">Clientes</span>
         </a>
         <a href="servicos.html" class="nav-item">
-          <span class="nav-icon">💇</span>
+          <span class="nav-icon"><i data-lucide="sparkles"></i></span>
           <span class="nav-text">Serviços</span>
         </a>
         <a href="profissionais.html" class="nav-item" id="nav-profissionais">
-          <span class="nav-icon">👩</span>
+          <span class="nav-icon"><i data-lucide="user-round"></i></span>
           <span class="nav-text">Profissionais</span>
         </a>
         <a href="empresas.html" class="nav-item" id="nav-empresas">
-          <span class="nav-icon">🏢</span>
+          <span class="nav-icon"><i data-lucide="building-2"></i></span>
           <span class="nav-text">Empresas</span>
         </a>
       </nav>
@@ -75,18 +78,18 @@
               }
               
               // Verificar Profissionais (admin e adm_empresa)
-              const profissionaisLink = document.getElementById('nav-profissionais');
-              if (profissionaisLink) {
+              const profLink = document.getElementById('nav-profissionais');
+              if (profLink) {
                 if (role === 'admin' || role === 'adm_empresa') {
-                  profissionaisLink.style.display = '';
-                  console.log('[ROLE CHECK] Admin/AdmEmpresa - mostrando Profissionais');
+                  profLink.style.display = '';
+                  console.log('[ROLE CHECK] Admin/Adm_empresa - mostrando Profissionais');
                 } else {
-                  profissionaisLink.style.display = 'none';
-                  console.log('[ROLE CHECK] Profissional - escondendo Profissionais, role:', role);
+                  profLink.style.display = 'none';
+                  console.log('[ROLE CHECK] Profissional/Cliente - escondendo Profissionais, role:', role);
                 }
               }
-            } catch (e) {
-              console.log('[ROLE CHECK] Erro na verificação:', e.message);
+            } catch (err) {
+              console.error('[ROLE CHECK ERROR]', err);
             }
           }
           
@@ -100,67 +103,69 @@
       
       <!-- Botão de Logout -->
       <button id="logoutButton" class="btn btn-danger logout-btn">
-        🚪 Sair
+        <i data-lucide="log-out"></i> Sair
       </button>
     </aside>
 
     <main class="content">
       <div class="page-header">
-        <h1>📅 Agenda - L'ange Beauty</h1>
+        <h1><i data-lucide="calendar-days"></i> Agenda - L'ange Beauty</h1>
         <div class="header-actions">
           <button id="btnHoje" class="btn btn-secondary">
-            📅 Hoje
+            <i data-lucide="calendar"></i> Hoje
           </button>
           <button id="btnAtualizar" class="btn btn-primary">
-            🔄 Atualizar
+            <i data-lucide="refresh-cw"></i> Atualizar
           </button>
         </div>
       </div>
 
       <!-- NOVA IMPLEMENTAÇÃO V1.2 - FILTROS DINÂMICOS -->
-      <div class="filter-section">
-        <h3> Filtros da Agenda</h3>
+      <div class="filter-section agenda-filter-grid">
+        <h3><i data-lucide="filter"></i> Filtros da Agenda</h3>
         
-        <!-- Filtro por Profissional -->
-        <div class="filter-group">
-          <label for="filtroProfissional">Profissional:</label>
-          <div class="autocomplete-container">
-            <input type="text" id="filtroProfissional" class="filter-input" placeholder="Buscar profissional...">
-            <div id="profissionalDropdown" class="autocomplete-dropdown"></div>
+        <div class="agenda-filter-row">
+          <!-- Filtro por Profissional -->
+          <div class="filter-group">
+            <label for="filtroProfissional">Profissional:</label>
+            <div class="autocomplete-container">
+              <input type="text" id="filtroProfissional" class="filter-input" placeholder="Buscar profissional...">
+              <div id="profissionalDropdown" class="autocomplete-dropdown"></div>
+            </div>
           </div>
-        </div>
 
-        <!-- Filtro por Serviço -->
-        <div class="filter-group">
-          <label for="filtroServico">Serviço:</label>
-          <div class="autocomplete-container">
-            <input type="text" id="filtroServico" class="filter-input" placeholder="Buscar serviço...">
-            <div id="servicoDropdown" class="autocomplete-dropdown"></div>
+          <!-- Filtro por Serviço -->
+          <div class="filter-group">
+            <label for="filtroServico">Serviço:</label>
+            <div class="autocomplete-container">
+              <input type="text" id="filtroServico" class="filter-input" placeholder="Buscar serviço...">
+              <div id="servicoDropdown" class="autocomplete-dropdown"></div>
+            </div>
           </div>
-        </div>
 
-        <!-- Filtro por Cliente -->
-        <div class="filter-group">
-          <label for="filtroCliente">Cliente:</label>
-          <div class="autocomplete-container">
-            <input type="text" id="filtroCliente" class="filter-input" placeholder="Buscar cliente...">
-            <div id="clienteDropdown" class="autocomplete-dropdown"></div>
+          <!-- Filtro por Cliente -->
+          <div class="filter-group">
+            <label for="filtroCliente">Cliente:</label>
+            <div class="autocomplete-container">
+              <input type="text" id="filtroCliente" class="filter-input" placeholder="Buscar cliente...">
+              <div id="clienteDropdown" class="autocomplete-dropdown"></div>
+            </div>
           </div>
-        </div>
 
-        <!-- Filtro por Data -->
-        <div class="filter-group">
-          <label for="filtroData">Data:</label>
-          <div class="autocomplete-container">
-            <input type="text" id="filtroData" class="filter-input" placeholder="DD/MM/AAAA" maxlength="10">
-            <div id="dataDropdown" class="autocomplete-dropdown"></div>
+          <!-- Filtro por Data -->
+          <div class="filter-group">
+            <label for="filtroData">Data:</label>
+            <div class="autocomplete-container">
+              <input type="text" id="filtroData" class="filter-input" placeholder="DD/MM/AAAA" maxlength="10">
+              <div id="dataDropdown" class="autocomplete-dropdown"></div>
+            </div>
           </div>
         </div>
 
         <!-- Botão Limpar Filtros -->
         <div class="filter-actions">
           <button id="btnLimparFiltros" class="btn btn-secondary btn-sm">
-            🗑️ Limpar Filtros
+            <i data-lucide="trash-2"></i> Limpar Filtros
           </button>
         </div>
       </div>
@@ -172,21 +177,21 @@
       <!-- Estatísticas Rápidas -->
       <div class="stats-container">
         <div class="stat-card">
-          <div class="stat-icon">📊</div>
+          <div class="stat-icon"><i data-lucide="bar-chart-3"></i></div>
           <div class="stat-content">
             <div class="stat-value" id="totalAgendamentos">0</div>
             <div class="stat-label">Agendamentos Hoje</div>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">✅</div>
+          <div class="stat-icon"><i data-lucide="check-circle-2"></i></div>
           <div class="stat-content">
             <div class="stat-value" id="confirmadosHoje">0</div>
             <div class="stat-label">Confirmados</div>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">⏰</div>
+          <div class="stat-icon"><i data-lucide="clock"></i></div>
           <div class="stat-content">
             <div class="stat-value" id="proximosAgendamentos">0</div>
             <div class="stat-label">Próximos</div>
@@ -209,8 +214,8 @@
         <div class="form-group">
           <label for="tipoRegistro">Tipo:</label>
           <select id="tipoRegistro" class="form-control">
-            <option value="agendamento">📅 Agendamento</option>
-            <option value="bloqueio">🔒 Bloqueio</option>
+            <option value="agendamento">Agendamento</option>
+            <option value="bloqueio">Bloqueio</option>
           </select>
         </div>
 
@@ -244,12 +249,12 @@
             <div class="form-group">
               <label for="status">Status</label>
               <select id="status" class="form-control">
-                <option value="agendado">📅 Agendado</option>
-                <option value="confirmado">✅ Confirmado</option>
-                <option value="em_andamento">⏳ Em Andamento</option>
-                <option value="concluido">✔️ Concluído</option>
-                <option value="cancelado">❌ Cancelado</option>
-                <option value="nao_compareceu">⚠️ Não Compareceu</option>
+                <option value="agendado">Agendado</option>
+                <option value="confirmado">Confirmado</option>
+                <option value="em_andamento">Em Andamento</option>
+                <option value="concluido">Concluído</option>
+                <option value="cancelado">Cancelado</option>
+                <option value="nao_compareceu">Não Compareceu</option>
               </select>
             </div>
           </div>
@@ -321,12 +326,11 @@
 
       <div class="modal-footer">
         <button type="button" id="btnExcluir" class="btn btn-danger">
-          <span class="btn-icon"> </span>
-          <span class="btn-icon">🗑️</span>
+          <span class="btn-icon"><i data-lucide="trash-2"></i></span>
           Excluir
         </button>
         <button type="button" id="btnSalvar" class="btn btn-primary">
-          <span class="btn-icon">💾</span>
+          <span class="btn-icon"><i data-lucide="save"></i></span>
           Salvar
         </button>
       </div>
@@ -337,13 +341,13 @@
   <div id="modalConflito" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>⚠️ Conflito de Agendamento</h3>
+        <h3><i data-lucide="alert-triangle"></i> Conflito de Agendamento</h3>
         <button type="button" id="btnFecharModalConflito" class="btn-close">&times;</button>
       </div>
 
       <div class="modal-body">
         <div class="alert alert-warning">
-          <div class="alert-icon">⚠️</div>
+          <div class="alert-icon"><i data-lucide="alert-triangle"></i></div>
           <div class="alert-content">
             <h4>Já existe um agendamento neste horário.</h4>
             <p>Gostaria de agendar mesmo assim?</p>
@@ -357,11 +361,11 @@
 
       <div class="modal-footer">
         <button type="button" id="btnCancelarConflito" class="btn btn-secondary">
-          <span class="btn-icon">❌</span>
+          <span class="btn-icon"><i data-lucide="x"></i></span>
           Cancelar
         </button>
         <button type="button" id="btnConfirmarConflito" class="btn btn-warning">
-          <span class="btn-icon">✅</span>
+          <span class="btn-icon"><i data-lucide="check"></i></span>
           Agendar Mesmo Assim
         </button>
       </div>
@@ -701,6 +705,11 @@
           await window.pageManager.initializePage();
           console.log('[BOOT]', 'agenda_initializePage_complete', Date.now());
           console.log('[PAGE MANAGER] initializePage contract OK');
+
+          // Inicializar ícones Lucide
+          if (window.lucide) {
+            window.lucide.createIcons();
+          }
 
           // VALIDAÇÃO FINAL OBRIGATÓRIA
           console.log('[BOOT] FINAL VALIDATION START');

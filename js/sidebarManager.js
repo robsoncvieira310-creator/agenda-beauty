@@ -104,7 +104,15 @@ class SidebarManager extends LifecycleContract {
     this.menuToggle.setAttribute('aria-expanded', 'true');
     this.menuToggle.setAttribute('title', 'Fechar Menu');
     
-    this.menuToggle.innerHTML = '☰';
+    this.menuToggle.innerHTML = '<span class="menu-toggle-icon"><i data-lucide="menu"></i></span>';
+    // Garantir que o ícone do botão seja sempre renderizado,
+    // inclusive se o lucide carregar após a criação do botão.
+    const renderIcon = () => {
+      if (window.lucide) window.lucide.createIcons();
+    };
+    renderIcon();
+    setTimeout(renderIcon, 150);
+    window.addEventListener('load', () => renderIcon());
     
     // 🎯 FASE 2.6.2: Usar addEventListener do LifecycleContract para cleanup automático
     this._boundToggle = () => this.toggle();

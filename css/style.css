@@ -414,6 +414,17 @@ FILTROS - L'ANGE BEAUTY
   backdrop-filter: blur(10px);
 }
 
+.agenda-filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  align-items: flex-end;
+  margin-bottom: 15px;
+}
+.agenda-filter-row .filter-group {
+  margin-bottom: 0;
+}
+
 .filter-section h3 {
   margin: 0 0 15px 0;
   font-family: 'Playfair Display', serif;
@@ -1448,6 +1459,10 @@ DASHBOARD COMPONENTS
   font-size:20px;
   animation:spin 1s linear infinite;
 }
+.loading-spinner svg{
+  width:20px;
+  height:20px;
+}
 
 @keyframes spin{
   from{ transform: rotate(0deg); }
@@ -2337,6 +2352,15 @@ ESTILOS PARA SIDEBAR COLLAPSIBLE - GOOGLE CALENDAR STYLE
   transition: all 0.3s ease;
   z-index: 1001;
   box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+}
+.menu-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+.menu-toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .menu-toggle:hover {

@@ -7,34 +7,35 @@
   
   <!-- CSS -->
   <link rel="stylesheet" href="css/style.css?v=20260319153000">
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar" id="sidebar">
-      <h2>💇 Agenda Beauty</h2>
+      <h2><i data-lucide="sparkles"></i> Agenda Beauty</h2>
       <nav>
         <a href="index.html" class="nav-item">
-          <span class="nav-icon">🏠</span>
+          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
           <span class="nav-text">Início</span>
         </a>
         <a href="agenda.html" class="nav-item">
-          <span class="nav-icon">📅</span>
+          <span class="nav-icon"><i data-lucide="calendar-days"></i></span>
           <span class="nav-text">Agenda</span>
         </a>
         <a href="clientes.html" class="nav-item">
-          <span class="nav-icon">👥</span>
+          <span class="nav-icon"><i data-lucide="users"></i></span>
           <span class="nav-text">Clientes</span>
         </a>
         <a href="servicos.html" class="nav-item">
-          <span class="nav-icon">💇</span>
+          <span class="nav-icon"><i data-lucide="sparkles"></i></span>
           <span class="nav-text">Serviços</span>
         </a>
         <a href="profissionais.html" class="nav-item active" id="nav-profissionais">
-          <span class="nav-icon">👩</span>
+          <span class="nav-icon"><i data-lucide="user-round"></i></span>
           <span class="nav-text">Profissionais</span>
         </a>
         <a href="empresas.html" class="nav-item" id="nav-empresas">
-          <span class="nav-icon"></span>
+          <span class="nav-icon"><i data-lucide="building-2"></i></span>
           <span class="nav-text">Empresas</span>
         </a>
       </nav>
@@ -92,19 +93,19 @@
       
       <!-- Botão de Logout -->
       <button id="logoutButton" class="btn btn-danger logout-btn">
-        🚪 Sair
+        <i data-lucide="log-out"></i> Sair
       </button>
     </aside>
 
     <main class="content">
       <div class="page-header">
-        <h1>👩 Profissionais</h1>
+        <h1><i data-lucide="user-round"></i> Profissionais</h1>
         <div class="header-actions">
           <button id="btnAtualizar" class="btn btn-secondary">
-            🔄 Atualizar
+            <i data-lucide="refresh-cw"></i> Atualizar
           </button>
           <button id="btnNovoProfissional" class="btn btn-primary">
-            <span class="btn-icon">➕</span>
+            <span class="btn-icon"><i data-lucide="plus"></i></span>
             Novo Profissional
           </button>
         </div>
@@ -114,14 +115,14 @@
       <div class="stats-section">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon"><i data-lucide="user-round"></i></div>
             <div class="stat-content">
               <div class="stat-value" id="totalProfissionais">0</div>
               <div class="stat-label">Total de Profissionais</div>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">📅</div>
+            <div class="stat-icon"><i data-lucide="calendar"></i></div>
             <div class="stat-content">
               <div class="stat-value" id="agendamentosHoje">0</div>
               <div class="stat-label">Agendamentos Hoje</div>
@@ -187,7 +188,7 @@
           Cancelar
         </button>
         <button type="button" id="btnConfirmarNovaSenha" class="btn btn-primary">
-          <span class="btn-icon">🔑</span>
+          <span class="btn-icon"><i data-lucide="key-round"></i></span>
           Redefinir Senha
         </button>
       </div>
@@ -233,11 +234,11 @@
           Excluir
         </button>
         <button type="button" id="btnResetSenha" class="btn btn-warning" style="display: none;">
-          <span class="btn-icon">🔑</span>
+          <span class="btn-icon"><i data-lucide="key-round"></i></span>
           Resetar Senha
         </button>
         <button type="button" id="btnSalvar" class="btn btn-primary">
-          <span class="btn-icon">💾</span>
+          <span class="btn-icon"><i data-lucide="save"></i></span>
           Salvar
         </button>
       </div>
@@ -563,6 +564,17 @@
           await window.pageManager.initializePage();
           console.log('[BOOT]', 'profissionais_initializePage_complete', Date.now());
           console.log('[PAGE MANAGER] initializePage contract OK');
+
+          // Inicializar ícones Lucide (com retry para cobrir renderização tardia)
+          if (window.lucide) {
+            window.lucide.createIcons();
+          }
+          setTimeout(() => {
+            if (window.lucide) window.lucide.createIcons();
+          }, 150);
+          window.addEventListener('load', () => {
+            if (window.lucide) window.lucide.createIcons();
+          });
 
           // VALIDAÇÃO FINAL OBRIGATÓRIA
           console.log('[BOOT] FINAL VALIDATION START');

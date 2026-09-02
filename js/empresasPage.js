@@ -257,7 +257,8 @@ window.EmpresasPage = class EmpresasPage {
     // Resetar botão salvar
     const btnSalvar = document.getElementById('btnSalvar');
     if (btnSalvar) {
-      btnSalvar.innerHTML = '<span class="btn-icon">💾</span> Criar Empresa';
+      btnSalvar.innerHTML = '<span class="btn-icon"><i data-lucide="save"></i></span> Criar Empresa';
+      if (window.lucide) window.lucide.createIcons();
     }
   }
 
@@ -326,7 +327,8 @@ window.EmpresasPage = class EmpresasPage {
     const btnSalvar = document.getElementById('btnSalvar');
     if (btnSalvar) {
       btnSalvar.disabled = true;
-      btnSalvar.innerHTML = '<span class="btn-icon">⏳</span> Salvando...';
+      btnSalvar.innerHTML = '<span class="btn-icon"><i data-lucide="loader-2"></i></span> Salvando...';
+      if (window.lucide) window.lucide.createIcons();
     }
 
     try {
@@ -391,7 +393,8 @@ window.EmpresasPage = class EmpresasPage {
       this.saving = false;
       if (btnSalvar) {
         btnSalvar.disabled = false;
-        btnSalvar.innerHTML = `<span class="btn-icon">💾</span> ${this.empresaEditando ? 'Salvar' : 'Criar Empresa'}`;
+        btnSalvar.innerHTML = `<span class="btn-icon"><i data-lucide="save"></i></span> ${this.empresaEditando ? 'Salvar' : 'Criar Empresa'}`;
+        if (window.lucide) window.lucide.createIcons();
       }
     }
   }
@@ -407,7 +410,7 @@ window.EmpresasPage = class EmpresasPage {
     modalDiv.innerHTML = `
       <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
-          <h3>✅ Sucesso!</h3>
+          <h3><i data-lucide="check-circle-2"></i> Sucesso!</h3>
           <button type="button" class="btn-close" onclick="this.closest('.modal').remove()">&times;</button>
         </div>
         <div class="modal-body">
@@ -418,22 +421,23 @@ window.EmpresasPage = class EmpresasPage {
             Fechar
           </button>
           <button type="button" class="btn btn-primary" id="btnCopyId">
-            📋 Copiar ID
+            Copiar ID
           </button>
         </div>
       </div>
     `;
 
     document.body.appendChild(modalDiv);
+    if (window.lucide) window.lucide.createIcons();
 
     // Configurar botão de copiar
     const btnCopy = modalDiv.querySelector('#btnCopyId');
     if (btnCopy) {
       btnCopy.addEventListener('click', () => {
         navigator.clipboard.writeText(copyText).then(() => {
-          btnCopy.textContent = '✅ Copiado!';
+          btnCopy.textContent = 'Copiado!';
           setTimeout(() => {
-            btnCopy.textContent = '📋 Copiar ID';
+            btnCopy.textContent = 'Copiar ID';
           }, 2000);
         });
       });
@@ -495,7 +499,8 @@ window.EmpresasPage = class EmpresasPage {
     // Atualizar texto do botão salvar
     const btnSalvar = document.getElementById('btnSalvar');
     if (btnSalvar) {
-      btnSalvar.innerHTML = '<span class="btn-icon">💾</span> Salvar';
+      btnSalvar.innerHTML = '<span class="btn-icon"><i data-lucide="save"></i></span> Salvar';
+      if (window.lucide) window.lucide.createIcons();
     }
   }
 

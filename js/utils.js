@@ -299,7 +299,7 @@ async function confirmDelete(options = {}) {
         <div class="modal-content">
           <div class="modal-header border-0">
             <h5 class="modal-title">
-              <span class="text-danger">⚠️</span> ${title}
+              <i data-lucide="alert-triangle" class="text-danger"></i> ${title}
             </h5>
             <button type="button" class="btn-close" id="btnCloseConfirm"></button>
           </div>
@@ -307,7 +307,7 @@ async function confirmDelete(options = {}) {
             <div class="d-flex align-items-center mb-3">
               <div class="flex-shrink-0">
                 <div class="rounded-circle bg-danger bg-opacity-10 p-3">
-                  <i class="fas fa-trash-alt text-danger fs-4"></i>
+                  <i data-lucide="trash-2" class="text-danger"></i>
                 </div>
               </div>
               <div class="flex-grow-1 ms-3">
@@ -322,7 +322,7 @@ async function confirmDelete(options = {}) {
               ${cancelText}
             </button>
             <button type="button" class="btn btn-danger" id="btnConfirmDelete">
-              <i class="fas fa-trash-alt me-2"></i>${confirmText}
+              <i data-lucide="trash-2"></i> ${confirmText}
             </button>
           </div>
         </div>
@@ -332,6 +332,9 @@ async function confirmDelete(options = {}) {
 
   // Adicionar modal ao body
   document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // Inicializar ícones Lucide no modal recém-injetado
+  if (window.lucide) window.lucide.createIcons();
 
   return new Promise((resolve) => {
     confirmResolve = resolve;

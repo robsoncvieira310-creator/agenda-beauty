@@ -1459,12 +1459,12 @@ window.ModalManager = class ModalManager extends LifecycleContract {
 
   formatarStatus(status) {
     const statusMap = {
-      'agendado': '📅 Agendado',
-      'confirmado': '✅ Confirmado',
-      'em_andamento': '⏳ Em Andamento',
-      'concluido': '✔️ Concluído',
-      'cancelado': '❌ Cancelado',
-      'nao_compareceu': '⚠️ Não Compareceu'
+      'agendado': 'Agendado',
+      'confirmado': 'Confirmado',
+      'em_andamento': 'Em Andamento',
+      'concluido': 'Concluído',
+      'cancelado': 'Cancelado',
+      'nao_compareceu': 'Não Compareceu'
     };
     return statusMap[status] || status || 'Não definido';
   }

@@ -341,13 +341,14 @@ window.ClientesPage = class ClientesPage {
         <tr>
           <td colspan="5" style="text-align: center; padding: 40px;">
             <div style="color: #666;">
-              <i class="fas fa-users" style="font-size: 48px; margin-bottom: 20px; display: block;"></i>
+              <i data-lucide="users" style="width: 48px; height: 48px; margin-bottom: 20px;"></i>
               <h4>Nenhum cliente encontrado</h4>
               <p>Tente ajustar os filtros de busca</p>
             </div>
           </td>
         </tr>
       `;
+      if (window.lucide) window.lucide.createIcons();
       return;
     }
 
@@ -376,18 +377,18 @@ window.ClientesPage = class ClientesPage {
         <td>
           <div class="table-actions">
             <button class="btn btn-sm btn-primary" onclick="window.clientesPage.openAnamnese(${cliente.id}, '${cliente.nome}')" title="Ficha de Anamnese">
-              <span class="btn-icon">📋</span>
+              <span class="btn-icon"><i data-lucide="file-text"></i></span>
             </button>
             ${fichaLink ? `
               <button class="btn btn-sm btn-secondary" onclick="window.clientesPage.copyFichaLink('${fichaLink}', '${cliente.nome}')" title="Copiar link da ficha">
-                <span class="btn-icon">📎</span>
+                <span class="btn-icon"><i data-lucide="link"></i></span>
               </button>
             ` : ''}
             <button class="btn btn-sm btn-info" onclick="window.clientesPage.showHistorico(${cliente.id}, '${cliente.nome}')" title="Histórico do Cliente">
-              <span class="btn-icon">📅</span>
+              <span class="btn-icon"><i data-lucide="calendar"></i></span>
             </button>
             <button class="btn btn-sm btn-danger" onclick="window.pageManager.confirmDelete('${cliente.nome}')" title="Excluir">
-              <span class="btn-icon">🗑️</span>
+              <span class="btn-icon"><i data-lucide="trash-2"></i></span>
             </button>
           </div>
         </td>
@@ -507,7 +508,7 @@ window.ClientesPage = class ClientesPage {
               <div class="input-group" style="display: flex; gap: 10px;">
                 <input type="text" id="linkFichaInput" class="form-control" value="${link}" readonly style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; background: #f8f9fa;">
                 <button type="button" id="btnCopiarLink" class="btn btn-primary" onclick="window.clientesPage.copiarLinkManual()" style="padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">
-                  <span class="btn-icon">📋</span>
+                  <span class="btn-icon"><i data-lucide="copy"></i></span>
                   Copiar
                 </button>
               </div>
@@ -530,6 +531,9 @@ window.ClientesPage = class ClientesPage {
     // Adicionar modal ao corpo da página
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.body.style.overflow = 'hidden';
+    
+    // Inicializar ícones Lucide no modal recém-injetado
+    if (window.lucide) window.lucide.createIcons();
     
     console.log('📎 Modal adicionado ao DOM');
     
@@ -567,8 +571,9 @@ window.ClientesPage = class ClientesPage {
         
         // Mudar texto do botão temporariamente
         const textoOriginal = button.innerHTML;
-        button.innerHTML = '<span class="btn-icon">✅</span> Copiado!';
+        button.innerHTML = '<span class="btn-icon"><i data-lucide="check"></i></span> Copiado!';
         button.style.background = '#28a745';
+        if (window.lucide) window.lucide.createIcons();
         
         // Restaurar texto original após 2 segundos
         setTimeout(() => {
@@ -742,7 +747,10 @@ window.ClientesPage = class ClientesPage {
     
     // Configurar modal
     document.getElementById('modalAnamneseTitulo').textContent = `Nova Ficha - ${clienteNome}`;
-    document.getElementById('btnSalvarAnamnese').innerHTML = '<span class="btn-icon"> </span> Criar Ficha';
+    document.getElementById('btnSalvarAnamnese').innerHTML = '<span class="btn-icon"><i data-lucide="clipboard-list"></i></span> Criar Ficha';
+    
+    // Re-inicializar ícones Lucide
+    if (window.lucide) window.lucide.createIcons();
     
     // Configurar permissões
     this.setupAnamnesePermissions();
@@ -760,7 +768,10 @@ window.ClientesPage = class ClientesPage {
     
     // Configurar modal
     document.getElementById('modalAnamneseTitulo').textContent = `Editar Ficha - ${clienteNome}`;
-    document.getElementById('btnSalvarAnamnese').innerHTML = '<span class="btn-icon"> </span> Atualizar Ficha';
+    document.getElementById('btnSalvarAnamnese').innerHTML = '<span class="btn-icon"><i data-lucide="clipboard-list"></i></span> Atualizar Ficha';
+    
+    // Re-inicializar ícones Lucide
+    if (window.lucide) window.lucide.createIcons();
     
     // Configurar permissões
     this.setupAnamnesePermissions();
@@ -1104,9 +1115,9 @@ window.ClientesPage = class ClientesPage {
 
           let badgeLembrete;
           if (statusLembrete === 'enviado') {
-            badgeLembrete = '<span style="color: green;">📩 Enviado</span>';
+            badgeLembrete = '<span style="color: green;">Enviado</span>';
           } else {
-            badgeLembrete = '<span style="color: orange;">⏳ Pendente</span>';
+            badgeLembrete = '<span style="color: orange;">Pendente</span>';
           }
 
           const row = `

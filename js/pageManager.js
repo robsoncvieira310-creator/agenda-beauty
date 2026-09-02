@@ -307,7 +307,7 @@ window.PageManager = class PageManager extends LifecycleContract {
   }
 
   // Renderizar empty state
-  renderEmptyState(container, message, icon = '📋', action = null) {
+  renderEmptyState(container, message, icon = '<i data-lucide="clipboard-list"></i>', action = null) {
     const containerElement = typeof container === 'string' ? document.getElementById(container) : container;
     if (!containerElement) return;
 
@@ -318,6 +318,7 @@ window.PageManager = class PageManager extends LifecycleContract {
         ${action ? `<button class="btn btn-primary" onclick="${action}">${action}</button>` : ''}
       </div>
     `;
+    if (window.lucide) window.lucide.createIcons();
   }
 
   // Formatar valores

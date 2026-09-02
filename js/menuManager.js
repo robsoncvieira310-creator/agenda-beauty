@@ -13,16 +13,16 @@ class MenuManager {
     this.menuItems = {
       // Itens visíveis para ADMIN
       admin: [
-        { href: 'index.html', icon: '🏠', text: 'Início', id: 'nav-dashboard' },
-        { href: 'agenda.html', icon: '📅', text: 'Agenda', id: 'nav-agenda' },
-        { href: 'clientes.html', icon: '👥', text: 'Clientes', id: 'nav-clientes' },
-        { href: 'servicos.html', icon: '💇', text: 'Serviços', id: 'nav-servicos' },
-        { href: 'profissionais.html', icon: '👩', text: 'Profissionais', id: 'nav-profissionais' }
+        { href: 'index.html', icon: '<i data-lucide="layout-dashboard"></i>', text: 'Início', id: 'nav-dashboard' },
+        { href: 'agenda.html', icon: '<i data-lucide="calendar-days"></i>', text: 'Agenda', id: 'nav-agenda' },
+        { href: 'clientes.html', icon: '<i data-lucide="users"></i>', text: 'Clientes', id: 'nav-clientes' },
+        { href: 'servicos.html', icon: '<i data-lucide="sparkles"></i>', text: 'Serviços', id: 'nav-servicos' },
+        { href: 'profissionais.html', icon: '<i data-lucide="user-round"></i>', text: 'Profissionais', id: 'nav-profissionais' }
       ],
       // Itens visíveis para PROFISSIONAL
       profissional: [
-        { href: 'agenda.html', icon: '📅', text: 'Agenda', id: 'nav-agenda' },
-        { href: 'clientes.html', icon: '👥', text: 'Clientes', id: 'nav-clientes' }
+        { href: 'agenda.html', icon: '<i data-lucide="calendar-days"></i>', text: 'Agenda', id: 'nav-agenda' },
+        { href: 'clientes.html', icon: '<i data-lucide="users"></i>', text: 'Clientes', id: 'nav-clientes' }
       ]
     };
     
@@ -131,7 +131,7 @@ class MenuManager {
       }
       
       empresasItem.innerHTML = `
-        <span class="nav-icon">🏢</span>
+        <span class="nav-icon"><i data-lucide="building-2"></i></span>
         <span class="nav-text">Empresas</span>
       `;
       
@@ -149,6 +149,11 @@ class MenuManager {
     nav.appendChild(separator);
 
     console.log(`✅ MENU_MANAGER: Menu atualizado com ${allowedItems.length} itens`);
+    
+    // Inicializar ícones Lucide recém-criados no menu dinâmico
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
     
     // Log para diagnóstico
     if (role === 'admin') {

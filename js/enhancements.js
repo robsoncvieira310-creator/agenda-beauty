@@ -97,16 +97,16 @@ class CalendarEnhancements {
       let content = '';
       if (isBlocked) {
         content = `
-          <strong>🔒 ${fcEvent.title}</strong><br>
+          <strong>${fcEvent.title}</strong><br>
           ${props.motivo || 'Sem motivo'}<br>
           <small>${this.formatTime(fcEvent.start)} - ${this.formatTime(fcEvent.end)}</small>
         `;
       } else {
         content = `
-          <strong>👤 ${props.cliente}</strong><br>
-          💇 ${props.servico}<br>
-          👨‍💼 ${props.profissional}<br>
-          📊 ${this.getStatusEmoji(props.status)} ${props.status}<br>
+          <strong>${props.cliente}</strong><br>
+          ${props.servico}<br>
+          ${props.profissional}<br>
+          ${props.status}<br>
           <small>${this.formatTime(fcEvent.start)} - ${this.formatTime(fcEvent.end)}</small>
         `;
       }
@@ -192,7 +192,7 @@ class CalendarEnhancements {
         const props = event.extendedProps;
         this.showNotification(
           'warning',
-          '⏰ Lembrete de Agendamento',
+          'Lembrete de Agendamento',
           `${props.cliente} chega em breve às ${this.formatTime(eventStart)} para ${props.servico}`,
           8000
         );
@@ -247,14 +247,14 @@ class CalendarEnhancements {
     const calendar = this.calendarManager.getCalendar();
     if (calendar) {
       calendar.today();
-      this.showNotification('info', '📅 Navegação', 'Indo para hoje');
+      this.showNotification('info', 'Navegação', 'Indo para hoje');
     }
   }
 
   refreshCalendar() {
     if (this.calendarManager) {
       this.calendarManager.refreshEvents();
-      this.showNotification('success', '🔄 Atualizado', 'Calendário atualizado');
+      this.showNotification('success', 'Atualizado', 'Calendário atualizado');
     }
   }
 
@@ -267,15 +267,7 @@ class CalendarEnhancements {
   }
 
   getStatusEmoji(status) {
-    const emojis = {
-      'agendado': '📅',
-      'confirmado': '✅',
-      'em_andamento': '⏳',
-      'concluido': '✔️',
-      'cancelado': '❌',
-      'nao_compareceu': '⚠️'
-    };
-    return emojis[status] || '📅';
+    return status || 'agendado';
   }
 }
 

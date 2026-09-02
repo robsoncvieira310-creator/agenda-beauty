@@ -7,34 +7,35 @@
 
   <!-- CSS -->
   <link rel="stylesheet" href="css/style.css?v=20260319153000">
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar" id="sidebar">
-      <h2>💇 Agenda Beauty</h2>
+      <h2><i data-lucide="sparkles"></i> Agenda Beauty</h2>
       <nav>
         <a href="index.html" class="nav-item">
-          <span class="nav-icon">🏠</span>
+          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
           <span class="nav-text">Início</span>
         </a>
         <a href="agenda.html" class="nav-item">
-          <span class="nav-icon">📅</span>
+          <span class="nav-icon"><i data-lucide="calendar-days"></i></span>
           <span class="nav-text">Agenda</span>
         </a>
         <a href="clientes.html" class="nav-item">
-          <span class="nav-icon">👥</span>
+          <span class="nav-icon"><i data-lucide="users"></i></span>
           <span class="nav-text">Clientes</span>
         </a>
         <a href="servicos.html" class="nav-item">
-          <span class="nav-icon">💇</span>
+          <span class="nav-icon"><i data-lucide="sparkles"></i></span>
           <span class="nav-text">Serviços</span>
         </a>
         <a href="profissionais.html" class="nav-item" id="nav-profissionais">
-          <span class="nav-icon">👩</span>
+          <span class="nav-icon"><i data-lucide="user-round"></i></span>
           <span class="nav-text">Profissionais</span>
         </a>
         <a href="empresas.html" class="nav-item active" id="nav-empresas">
-          <span class="nav-icon">🏢</span>
+          <span class="nav-icon"><i data-lucide="building-2"></i></span>
           <span class="nav-text">Empresas</span>
         </a>
       </nav>
@@ -92,19 +93,19 @@
 
       <!-- Botão de Logout -->
       <button id="logoutButton" class="btn btn-danger logout-btn">
-        🚪 Sair
+        <i data-lucide="log-out"></i> Sair
       </button>
     </aside>
 
     <main class="content">
       <div class="page-header">
-        <h1>🏢 Empresas</h1>
+        <h1><i data-lucide="building-2"></i> Empresas</h1>
         <div class="header-actions">
           <button id="btnAtualizar" class="btn btn-secondary">
-            🔄 Atualizar
+            <i data-lucide="refresh-cw"></i> Atualizar
           </button>
           <button id="btnNovaEmpresa" class="btn btn-primary">
-            <span class="btn-icon">➕</span>
+            <span class="btn-icon"><i data-lucide="plus"></i></span>
             Nova Empresa
           </button>
         </div>
@@ -114,14 +115,14 @@
       <div class="stats-section">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-icon">🏢</div>
+            <div class="stat-icon"><i data-lucide="building-2"></i></div>
             <div class="stat-content">
               <div class="stat-value" id="totalEmpresas">0</div>
               <div class="stat-label">Total de Empresas</div>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">👤</div>
+            <div class="stat-icon"><i data-lucide="shield-user"></i></div>
             <div class="stat-content">
               <div class="stat-value" id="totalAdmins">0</div>
               <div class="stat-label">Administradores</div>
@@ -194,11 +195,11 @@
           Cancelar
         </button>
         <button type="button" id="btnResetSenha" class="btn btn-warning" style="display: none;">
-          <span class="btn-icon">🔑</span>
+          <span class="btn-icon"><i data-lucide="key-round"></i></span>
           Resetar Senha
         </button>
         <button type="button" id="btnSalvar" class="btn btn-primary">
-          <span class="btn-icon">💾</span>
+          <span class="btn-icon"><i data-lucide="save"></i></span>
           Criar Empresa
         </button>
       </div>
@@ -233,7 +234,7 @@
           Cancelar
         </button>
         <button type="button" id="btnConfirmarNovaSenha" class="btn btn-primary">
-          <span class="btn-icon">🔑</span>
+          <span class="btn-icon"><i data-lucide="key-round"></i></span>
           Confirmar
         </button>
       </div>
@@ -426,6 +427,21 @@
         if (kernelReady && hasServices && window.EmpresasPage) {
           console.log('[Empresas Bootstrap] Initializing EmpresasPage...');
           window.__BOOTSTRAP_OK__ = true; // Marcar para futuras verificações
+
+          // 🎯 ATIVAÇÃO SIDEBAR (Opção A - Manual Controlada) - ANTES de initializePage
+          if (!window._sidebarManagerActivated &&
+              window.SidebarManager &&
+              document.getElementById('sidebar')) {
+            try {
+              const sidebarManager = new SidebarManager({ authFSM: window.authFSM });
+              sidebarManager.activate();
+              window._sidebarManagerActivated = true;
+              console.log('[BOOT] SidebarManager ativado (modo legado)');
+            } catch (e) {
+              console.warn('[BOOT] SidebarManager ativação falhou:', e.message);
+            }
+          }
+
           const empresasPage = new window.EmpresasPage();
           window.empresasPage = empresasPage;
 
@@ -434,6 +450,11 @@
             await empresasPage.initializePage();
           } else {
             await empresasPage.initialize();
+          }
+
+          // Inicializar ícones Lucide
+          if (window.lucide) {
+            window.lucide.createIcons();
           }
         } else {
           console.error('[Empresas Bootstrap] Cannot initialize:', {

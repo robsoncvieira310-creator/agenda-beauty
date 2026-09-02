@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ficha de Anamnese - Agenda Beauty</title>
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -215,7 +216,7 @@
 <body>
     <div class="anamnese-container">
         <div class="anamnese-header">
-            <h1>📋 Ficha de Anamnese</h1>
+            <h1><i data-lucide="clipboard-list"></i> Ficha de Anamnese</h1>
             <p>Por favor, preencha suas informações para atendimento</p>
         </div>
         
@@ -408,7 +409,7 @@
                 </div>
 
                 <button type="submit" class="btn-submit" id="btnSubmit">
-                    📋 Enviar Ficha
+                    <i data-lucide="clipboard-list"></i> Enviar Ficha
                 </button>
             </form>
         </div>
@@ -704,7 +705,7 @@
                     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
                 `;
                 existingMessage.innerHTML = `
-                    <div style="font-size: 48px; margin-bottom: 20px;">📋</div>
+                    <div style="font-size: 48px; margin-bottom: 20px;"><i data-lucide="clipboard-check"></i></div>
                     <h2 style="margin-bottom: 15px; font-size: 24px;">Ficha Já Preenchida</h2>
                     <p style="margin-bottom: 10px; font-size: 16px; opacity: 0.9;">
                         O profissional já recebeu suas informações.
@@ -719,6 +720,7 @@
                 
                 // Inserir mensagem no lugar do formulário
                 formContainer.appendChild(existingMessage);
+                if (window.lucide) window.lucide.createIcons();
             }
 
             disableFormPermanently() {
@@ -811,7 +813,7 @@
                                 box-shadow: 0 10px 30px rgba(0,0,0,0.2);
                             `;
                             successMessage.innerHTML = `
-                                <div style="font-size: 48px; margin-bottom: 20px;">📋</div>
+                                <div style="font-size: 48px; margin-bottom: 20px;"><i data-lucide="clipboard-check"></i></div>
                                 <h2 style="margin-bottom: 15px; font-size: 24px;">Ficha Enviada com Sucesso!</h2>
                                 <p style="margin-bottom: 10px; font-size: 16px; opacity: 0.9;">
                                     O profissional já recebeu suas informações.
@@ -826,6 +828,7 @@
                             
                             // Inserir mensagem no lugar do formulário
                             formContainer.appendChild(successMessage);
+                            if (window.lucide) window.lucide.createIcons();
                             
                             // Esconder botão de submit se ainda estiver visível
                             const submitButton = document.getElementById('btnSubmit');

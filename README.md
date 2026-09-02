@@ -126,7 +126,7 @@ agenda-beauty/
 - **Configuração de horários de trabalho, especialidades e cores de calendário**.
 - **Operações protegidas** de criação e remoção integradas com Edge Functions do Supabase.
 
-### **💇 Serviços**
+### **Serviços**
 - **Catálogo de serviços** (`ServicoService.js`) com definição de preços, durações e categorias.
 - **Integração direta** com o módulo de agendamentos.
 
