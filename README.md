@@ -1,8 +1,8 @@
-# 🌟 Agenda Beauty - Sistema de Gestão para Salões de Beleza
+# Agenda Beauty - Sistema de Gestão para Salões de Beleza
 
 O Agenda Beauty é uma aplicação web para gestão de salões de beleza, com recursos de agendamento, clientes, profissionais, serviços e empresas, integrada ao Supabase.
 
-## 📋 **Visão Geral**
+## Visão Geral
 
 O Agenda Beauty oferece:
 - **Agendamento** com calendário interativo
@@ -11,7 +11,7 @@ O Agenda Beauty oferece:
 - **Autenticação** com controle de acesso
 - **Dashboard** com visão geral do sistema
 
-## 🚀 **Tecnologias Utilizadas**
+## Tecnologias Utilizadas
 
 ### **Frontend**
 - **HTML5**
@@ -45,7 +45,7 @@ O Agenda Beauty oferece:
 
 ---
 
-## 📁 **Estrutura Atual do Projeto**
+## Estrutura Atual do Projeto
 
 ```text
 agenda-beauty/
@@ -109,19 +109,19 @@ agenda-beauty/
 
 ---
 
-## 🎯 **Funcionalidades Principais**
+## Funcionalidades Principais
 
-### **📅 Agenda / Agendamentos**
+### Agenda / Agendamentos
 - **Calendário interativo** integrado via FullCalendar (CDN).
 - **Operações de agendamento** (criação, edição e exclusão) via `AgendamentoService.js`.
 - **Bloqueios de horário** (`BloqueioService.js`) integrados para gestão de folgas e indisponibilidades.
 - **Filtros e visualização por profissional**, com suporte a cores personalizadas no calendário.
 
-### **👥 Clientes**
+### Clientes
 - **Cadastro e listagem** de clientes (`ClienteService.js`).
 - **Consulta de histórico de agendamentos** vinculados ao cliente.
 
-### **👩 Profissionais**
+### Profissionais
 - **Gestão de equipe e colaboradores** (`ProfissionalService.js`).
 - **Configuração de horários de trabalho, especialidades e cores de calendário**.
 - **Operações protegidas** de criação e remoção integradas com Edge Functions do Supabase.
@@ -130,11 +130,11 @@ agenda-beauty/
 - **Catálogo de serviços** (`ServicoService.js`) com definição de preços, durações e categorias.
 - **Integração direta** com o módulo de agendamentos.
 
-### **🏢 Empresas (Multi-empresa)**
+### Empresas (Multi-empresa)
 - **Gestão de unidades e empresas** (`EmpresaService.js`).
 - **Isolamento e associação de dados** por identificador de empresa (`empresa_id`).
 
-### **🔐 Autenticação & Segurança**
+### Autenticação & Segurança
 - **Autenticação de usuários** via Supabase Auth.
 - **Gerenciamento de sessões** com suporte a Finite State Machine (`auth-fsm.js`) e auto-healing de sessão.
 - **Controle de acesso baseado em papéis** (`admin`, `adm_empresa`, `profissional`).
@@ -142,7 +142,7 @@ agenda-beauty/
 
 ---
 
-## 📊 **Banco de Dados (Estrutura Real Supabase)**
+## Banco de Dados (Estrutura Real Supabase)
 
 ### **Tabelas Principais**
 
@@ -260,7 +260,7 @@ CREATE TABLE anamnese_clientes (
 
 ---
 
-## ☁️ **Edge Functions (Supabase / Deno)**
+## Edge Functions (Supabase / Deno)
 
 O repositório contém as seguintes funções serverless em `supabase/functions/`:
 - `create-empresa` / `update-empresa` / `delete-empresa`: Gestão de unidades corporativas.
