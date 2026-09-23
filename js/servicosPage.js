@@ -94,6 +94,14 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
     if (btnFecharModal) {
       btnFecharModal.addEventListener('click', () => this.closeModal());
     }
+
+    // Campo de busca
+    const buscaServico = document.getElementById('buscaServico');
+    if (buscaServico) {
+      buscaServico.addEventListener('input', (e) => {
+        this.handleSearch(e.target.value);
+      });
+    }
   }
 
   async renderPage() {
@@ -102,19 +110,22 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
 
     try {
       // ✅ FASE 3.5: FETCH DIRETO - nenhum cache intermediário
-      const servicos = await window.services.servicos.list();
+      const [servicos, agendamentos] = await Promise.all([
+        window.services.servicos.list(),
+        window.services.agendamentos.list()
+      ]);
 
-      this.renderServiceTable(servicos);
+      this.renderServiceTable(servicos, agendamentos);
       this.updateStatistics(servicos);
 
     } catch (error) {
       console.error("❌ Erro ao carregar serviços em renderPage():", error);
-      this.renderServiceTable([]);
+      this.renderServiceTable([], []);
       this.updateStatistics([]);
     }
   }
 
-  renderServiceTable(servicos = []) {
+  renderServiceTable(servicos = [], agendamentos = []) {
         
     const tbody = document.getElementById('tabelaServicos');
     if (!tbody) {
@@ -130,9 +141,8 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
     }
 
     servicos.forEach((servico, index) => {
-      
-      // TODO: Carregar agendamentos via service para contar
-      const agendamentosCount = 0;
+
+      const agendamentosCount = this.countAgendamentosByServico(servico.id, agendamentos);
       const tr = document.createElement('tr');
       const corServico = servico.cor || '#78909c';
       tr.innerHTML = `
@@ -173,6 +183,12 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
     });
   }
 
+  countAgendamentosByServico(servicoId, agendamentos = []) {
+    return agendamentos.filter(
+      agendamento => String(agendamento.servico_id) === String(servicoId)
+    ).length;
+  }
+
   updateStatistics(servicos) {
     // ✅ FASE 3.2: Pure function - recebe snapshot como parâmetro
     try {
@@ -203,50 +219,6 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
     if (valorElement) valorElement.textContent = this.formatCurrency(valorMedio);
   }
 
-  // ✅ FASE 3.3: Pure function - recebe snapshot e term explicitamente
-  handleSearch(servicos, term) {
-    if (!servicos) {
-      console.error('[FASE 3.3] handleSearch requires servicos parameter');
-      return;
-    }
-    
-    const filtrados = servicos.filter(servico => 
-      servico.nome.toLowerCase().includes(term.toLowerCase()) ||
-      (servico.descricao && servico.descricao.toLowerCase().includes(term.toLowerCase()))
-    );
-    
-    const tbody = document.getElementById('tabelaServicos');
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-
-    if (filtrados.length === 0) {
-      this.renderEmptyState(tbody, `Nenhum serviço encontrado para "${term}"`, '<i data-lucide="search"></i>');
-      return;
-    }
-
-    filtrados.forEach(servico => {
-      // TODO: Carregar agendamentos via service para contar
-      const agendamentosCount = 0;
-      
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><strong>${servico.nome}</strong></td>
-        <td><span class="badge badge-primary">${servico.duracao_min || servico.duracao_minutos || servico.duracao || 0} min</span></td>
-        <td><span class="badge badge-success">${this.formatCurrency(servico.valor || servico.preco || 0)}</span></td>
-        <td><span class="badge badge-info">${agendamentosCount}</span></td>
-        <td>
-          <button class="btn btn-sm btn-warning" onclick="pageManager.handleEditClick('${servico.nome}')" title="Editar"><i data-lucide="pencil"></i></button>
-          <button class="btn btn-sm btn-danger" onclick="confirmDelete('${servico.nome}')" title="Excluir"><i data-lucide="trash-2"></i></button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-    
-    if (window.lucide) window.lucide.createIcons();
-    
-  }
-
   // ✅ FASE 3.3: Handler para clique de edição - inicia ciclo e chama método puro
   async handleEditClick(nome) {
     // ✅ FASE 3.5: Fetch direto do DataCore
@@ -262,12 +234,15 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
       return;
     }
     // ✅ FASE 3.5: FETCH DIRETO - nenhum cache
-    const servicos = await window.services.servicos.list();
-    this.handleSearchPure(servicos, term);
+    const [servicos, agendamentos] = await Promise.all([
+      window.services.servicos.list(),
+      window.services.agendamentos.list()
+    ]);
+    this.handleSearchPure(servicos, term, agendamentos);
   }
 
   // ✅ FASE 3.3: Método puro de busca (nome mudado para evitar conflito)
-  handleSearchPure(servicos, term) {
+  handleSearchPure(servicos, term, agendamentos = []) {
     if (!servicos) {
       console.error('[FASE 3.3] handleSearchPure requires servicos parameter');
       return;
@@ -289,8 +264,7 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
     }
 
     filtrados.forEach(servico => {
-      // TODO: Carregar agendamentos via service para contar
-      const agendamentosCount = 0;
+      const agendamentosCount = this.countAgendamentosByServico(servico.id, agendamentos);
       
       const tr = document.createElement('tr');
       tr.innerHTML = `
