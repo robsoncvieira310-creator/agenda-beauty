@@ -97,28 +97,23 @@ window.AgendaPage = class AgendaPage extends window.PageManager {
       const amanha = new Date(hoje);
       amanha.setDate(amanha.getDate() + 1);
 
-      // Agendamentos hoje
+      // Agendamentos hoje (mesmo fallback da página inicial: inicio || data_inicio)
       const agendamentosHoje = agendamentos.filter(a => {
-        const dataAg = new Date(a.inicio);
+        const dataAg = new Date(a.inicio || a.data_inicio);
         return dataAg >= hoje && dataAg < amanha;
       });
 
-      // Confirmados hoje
-      const confirmadosHoje = agendamentosHoje.filter(a => a.status === 'confirmado');
-
       // Próximos agendamentos (próximos 7 dias)
       const proximosAgendamentos = agendamentos.filter(a => {
-        const dataAg = new Date(a.inicio);
+        const dataAg = new Date(a.inicio || a.data_inicio);
         return dataAg > hoje && dataAg < new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
       });
 
       // Atualizar DOM
       const totalElement = document.getElementById('totalAgendamentos');
-      const confirmadosElement = document.getElementById('confirmadosHoje');
       const proximosElement = document.getElementById('proximosAgendamentos');
 
       if (totalElement) totalElement.textContent = agendamentosHoje.length;
-      if (confirmadosElement) confirmadosElement.textContent = confirmadosHoje.length;
       if (proximosElement) proximosElement.textContent = proximosAgendamentos.length;
     } catch (error) {
       console.error('Erro ao atualizar estatísticas:', error);

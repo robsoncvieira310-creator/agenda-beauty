@@ -376,18 +376,18 @@ window.ClientesPage = class ClientesPage {
         <td>${cliente.observacoes || '-'}</td>
         <td>
           <div class="table-actions">
-            <button class="btn btn-sm btn-primary" onclick="window.clientesPage.openAnamnese(${cliente.id}, '${cliente.nome}')" title="Ficha de Anamnese">
+            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); window.clientesPage.openAnamnese(${cliente.id}, '${cliente.nome}')" title="Ficha de Anamnese">
               <span class="btn-icon"><i data-lucide="file-text"></i></span>
             </button>
             ${fichaLink ? `
-              <button class="btn btn-sm btn-secondary" onclick="window.clientesPage.copyFichaLink('${fichaLink}', '${cliente.nome}')" title="Copiar link da ficha">
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); window.clientesPage.copyFichaLink('${fichaLink}', '${cliente.nome}')" title="Copiar link da ficha">
                 <span class="btn-icon"><i data-lucide="link"></i></span>
               </button>
             ` : ''}
-            <button class="btn btn-sm btn-info" onclick="window.clientesPage.showHistorico(${cliente.id}, '${cliente.nome}')" title="Histórico do Cliente">
+            <button class="btn btn-sm btn-info" onclick="event.stopPropagation(); window.clientesPage.showHistorico(${cliente.id}, '${cliente.nome}')" title="Histórico do Cliente">
               <span class="btn-icon"><i data-lucide="calendar"></i></span>
             </button>
-            <button class="btn btn-sm btn-danger" onclick="window.pageManager.confirmDelete('${cliente.nome}')" title="Excluir">
+            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); window.pageManager.confirmDelete('${cliente.nome}')" title="Excluir">
               <span class="btn-icon"><i data-lucide="trash-2"></i></span>
             </button>
           </div>
@@ -396,8 +396,8 @@ window.ClientesPage = class ClientesPage {
       
       // Adicionar event listener para clicar na linha e abrir ficha
       tr.addEventListener('click', (e) => {
-        // Não abrir ficha se clicou em um botão
-        if (e.target.closest('button')) {
+        // Não abrir ficha se clicou em um botão/ícone/área de ações (SVG do Lucide pode ser e.target)
+        if (e.target.closest('button, [onclick], .btn, .btn-icon, .table-actions, a, svg, i, [data-lucide]')) {
           return;
         }
         console.log('👆 Clicou na linha do cliente:', cliente.nome);
