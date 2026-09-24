@@ -199,18 +199,19 @@ function showAlert(message, type = 'info') {
 }
 
 function showLoading(element) {
-  if (element) {
+  if (element && element.dataset.originalHtml === undefined) {
     element.disabled = true;
-    element.dataset.originalText = element.textContent;
+    element.dataset.originalHtml = element.innerHTML;
     element.textContent = 'Carregando...';
   }
 }
 
 function hideLoading(element) {
-  if (element && element.dataset.originalText) {
+  if (element && element.dataset.originalHtml !== undefined) {
     element.disabled = false;
-    element.textContent = element.dataset.originalText;
-    delete element.dataset.originalText;
+    element.innerHTML = element.dataset.originalHtml;
+    delete element.dataset.originalHtml;
+    if (window.lucide) window.lucide.createIcons();
   }
 }
 

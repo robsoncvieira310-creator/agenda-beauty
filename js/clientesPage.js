@@ -406,6 +406,8 @@ window.ClientesPage = class ClientesPage {
       
       tbody.appendChild(tr);
     }
+
+    if (window.lucide) window.lucide.createIcons();
   }
 
   formatPhone(phone) {

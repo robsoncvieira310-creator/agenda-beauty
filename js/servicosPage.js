@@ -181,6 +181,8 @@ window.ServicosPage = class ServicosPage extends window.PageManager {
       
       tbody.appendChild(tr);
     });
+
+    if (window.lucide) window.lucide.createIcons();
   }
 
   countAgendamentosByServico(servicoId, agendamentos = []) {
